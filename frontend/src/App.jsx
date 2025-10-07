@@ -1,10 +1,14 @@
-function App() {
+import React from "react";
+import Sidebar from "./components/Sidebar";
+import DashboardPage from "./pages/DashboardPage";
+
+export default function App() {
   return (
-    <div style={{ textAlign: 'center', marginTop: '50px' }}>
-      <h1>PSR Inventory Management System</h1>
-      <p>Welcome to your local test environment.</p>
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <div className="flex-1 main-panel p-6">
+        <DashboardPage />
+      </div>
     </div>
   );
 }
-
-export default App;
