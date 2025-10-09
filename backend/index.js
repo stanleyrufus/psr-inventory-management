@@ -1,30 +1,32 @@
-const express = require("express");
+// /backend/server.js
+require('dotenv').config();
+const express = require('express');
 const app = express();
+const cors = require('cors');
 
-// Middleware to parse JSON
+// Routers
+const productsRouter = require('./routes/products');
+const inventoryRouter = require('./routes/inventory');
+const salesRouter = require('./routes/sales_orders');
+const purchaseRouter = require('./routes/purchase_orders');
+const usersRouter = require('./routes/users');
+
+// Middleware
+app.use(cors());
 app.use(express.json());
 
-// Import route modules
-const userRoutes = require("./routes/users");
-const productRoutes = require("./routes/products");
-const inventoryRoutes = require("./routes/inventory");
-const salesOrderRoutes = require("./routes/sales_orders");
-const purchaseOrderRoutes = require("./routes/purchase_orders");
+// Mount routers
+app.use('/products', productsRouter);
+app.use('/inventory', inventoryRouter);
+app.use('/sales', salesRouter);
+app.use('/purchase', purchaseRouter);
+app.use('/users', usersRouter);
 
-// Mount routes WITHOUT /api prefix
-app.use("/users", userRoutes);
-app.use("/products", productRoutes);
-app.use("/inventory", inventoryRoutes);
-app.use("/sales_orders", salesOrderRoutes);
-app.use("/purchase_orders", purchaseOrderRoutes);
-
-// Test route
-app.get("/", (req, res) => {
-  res.send("Backend is running 🚀");
+// Health check
+app.get('/', (req, res) => {
+  res.send('PSR Inventory Management API is running');
 });
 
 // Start server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
