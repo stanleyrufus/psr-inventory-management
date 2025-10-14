@@ -1,13 +1,9 @@
 exports.seed = async function(knex) {
-  // delete dependent users first
-  await knex('users').del();   
+  // Optional: If you have a roles table
+  await knex('roles').del();
 
-  // delete roles
-  await knex('roles').del();   
-
-  // insert new roles
   await knex('roles').insert([
-    { id: 1, name: 'Admin' },
-    { id: 2, name: 'User' },
+    { id: 1, name: 'admin' },
+    { id: 2, name: 'user' },
   ]);
 };

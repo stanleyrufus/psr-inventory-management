@@ -1,0 +1,127 @@
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import LoginPage from "./pages/auth/LoginPage";
+import DashboardPage from "./pages/DashboardPage";
+import ProductList from "./pages/products/ProductList";
+import ProductForm from "./pages/products/ProductForm";
+import InventoryPage from "./pages/inventory/InventoryPage";
+import InventoryUploadPage from "./pages/inventory/InventoryUploadPage";
+import OrdersPage from "./pages/orders/OrdersPage";
+import PrivateRoute from "./components/PrivateRoute";
+import Sidebar from "./components/Sidebar";
+import { AuthProvider } from "./contexts/AuthContext";
+
+function Layout({ children }) {
+  return (
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <main className="main-panel flex-1 p-6 bg-sky-50">{children}</main>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AuthProvider>
+        <Routes>
+          {/* Public route */}
+          <Route path="/login" element={<LoginPage />} />
+
+          {/* Protected routes */}
+          <Route
+            path="/"
+            element={
+              <PrivateRoute>
+                <Layout>
+                  <DashboardPage />
+                </Layout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/products"
+            element={
+              <PrivateRoute>
+                <Layout>
+                  <ProductList />
+                </Layout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/products/new"
+            element={
+              <PrivateRoute>
+                <Layout>
+                  <ProductForm />
+                </Layout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/inventory"
+            element={
+              <PrivateRoute>
+                <Layout>
+                  <InventoryPage />
+                </Layout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/inventory-upload"
+            element={
+              <PrivateRoute>
+                <Layout>
+                  <InventoryUploadPage />
+                </Layout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/orders"
+            element={
+              <PrivateRoute>
+                <Layout>
+                  <OrdersPage />
+                </Layout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/purchase-orders"
+            element={
+              <PrivateRoute>
+                <Layout>
+                  <div>Purchase Orders Page (Coming Soon)</div>
+                </Layout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/reports"
+            element={
+              <PrivateRoute>
+                <Layout>
+                  <div>Reports Page (Coming Soon)</div>
+                </Layout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <PrivateRoute>
+                <Layout>
+                  <div>Settings Page (Coming Soon)</div>
+                </Layout>
+              </PrivateRoute>
+            }
+          />
+        </Routes>
+      </AuthProvider>
+    </Router>
+  );
+}
+
+export default App;

@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom global tweaks */
+:root {
+  --psr-primary: #1E2A38;
+  --psr-accent: #F9A825;
+}
+
+/* Make the app background neutral */
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background: #F4F6F8; /* subtle page background behind sidebar/main */
+  font-family: Inter, Roboto, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial;
+}
+
+.main-panel {
+  background-color: theme('colors.psr.sky');
+  min-height: 100vh;
+}
+
+.card {
+  background-color: theme('colors.psr.surface');
+  border-radius: 0.5rem;
+  box-shadow: 0 6px 18px rgba(18, 23, 32, 0.06);
+}

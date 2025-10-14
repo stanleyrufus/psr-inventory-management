@@ -1,14 +1,10 @@
 const bcrypt = require('bcrypt');
 
-/**
- * @param { import("knex").Knex } knex
- * @returns { Promise<void> }
- */
 exports.seed = async function (knex) {
-  // Deletes ALL existing entries
+  // Delete existing users
   await knex('users').del();
 
-  // Hash password
+  // Hash default admin password
   const hashedPassword = await bcrypt.hash('Admin@123', 10);
 
   // Insert default admin user
@@ -18,7 +14,7 @@ exports.seed = async function (knex) {
       username: 'admin',
       email: 'admin@psr.com',
       password: hashedPassword,
-      role_id: 1 // Admin role
+      role: 'admin' // must match JWT payload
     }
   ]);
 };

@@ -1,14 +1,14 @@
 import React from "react";
 import Sidebar from "./components/Sidebar";
-import DashboardPage from "./pages/DashboardPage";
+import AppRoutes from "./routes/AppRoutes";
 
 export default function App() {
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen bg-psr-sky">
       <Sidebar />
-      <div className="flex-1 main-panel p-6">
-        <DashboardPage />
-      </div>
+      <main className="flex-1 p-6 overflow-auto">
+        <AppRoutes />
+      </main>
     </div>
   );
 }

@@ -3,6 +3,7 @@ exports.up = function(knex) {
     table.increments('id').primary();
     table.string('name').notNullable();
     table.float('price').notNullable();
+    table.timestamps(true, true);
   });
 };
 

@@ -1,0 +1,37 @@
+import React, { createContext, useContext, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+const AuthContext = createContext();
+
+export const AuthProvider = ({ children }) => {
+  const navigate = useNavigate();
+  const [user, setUser] = useState(
+    () => JSON.parse(localStorage.getItem("psrUser")) || null
+  );
+
+  const login = (email, password) => {
+    // Minimal mock auth
+    if (email === "admin@psr.com" && password === "admin") {
+      const userData = { email };
+      setUser(userData);
+      localStorage.setItem("psrUser", JSON.stringify(userData));
+      navigate("/"); // redirect to dashboard
+      return true;
+    }
+    return false;
+  };
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem("psrUser");
+    navigate("/login");
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => useContext(AuthContext);

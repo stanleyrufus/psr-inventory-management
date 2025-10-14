@@ -1,0 +1,58 @@
+// src/pages/inventory/InventoryUploadPage.jsx
+import React, { useState } from "react";
+import InventoryUpload from "../../components/InventoryUpload";
+import { useNavigate } from "react-router-dom";
+
+export default function InventoryUploadPage() {
+  const [message, setMessage] = useState("");
+  const [fileName, setFileName] = useState("");
+  const navigate = useNavigate();
+
+  const handleUpload = (data, file) => {
+    setMessage("");
+    setFileName(file.name);
+
+    try {
+      // Load existing inventory from localStorage
+      const existingRaw = localStorage.getItem("psr_inventory");
+      const existingData = existingRaw ? JSON.parse(existingRaw) : [];
+
+      // Append new data
+      const updatedData = [...existingData, ...data];
+      localStorage.setItem("psr_inventory", JSON.stringify(updatedData));
+
+      setMessage(`✅ Successfully uploaded ${data.length} rows from "${file.name}"`);
+
+      // Clear filename after upload
+      setFileName("");
+    } catch (error) {
+      console.error(error);
+      setMessage("❌ Upload failed. Please try again.");
+    }
+  };
+
+  return (
+    <div className="p-4 max-w-3xl mx-auto">
+      <h2 className="text-xl font-semibold mb-4">Bulk Upload Inventory</h2>
+
+      <InventoryUpload onUpload={handleUpload} />
+
+      {message && (
+        <div
+          className={`mt-4 p-3 rounded-md ${
+            message.startsWith("✅") ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+          }`}
+        >
+          {message}
+        </div>
+      )}
+
+      <button
+        onClick={() => navigate("/inventory")}
+        className="mt-6 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
+      >
+        Back to Inventory
+      </button>
+    </div>
+  );
+}

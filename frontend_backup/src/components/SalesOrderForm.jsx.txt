@@ -1,0 +1,84 @@
+import { useState, useEffect } from "react";
+import axios from "axios";
+import { useAppContext } from "../context/AppContext";
+
+export default function SalesOrderForm({ existingOrder, onSave }) {
+  const { inventory, fetchSalesOrders } = useAppContext();
+  const [formData, setFormData] = useState({
+    customer_name: existingOrder?.customer_name || "",
+    order_date: existingOrder?.order_date?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+    product_id: existingOrder?.product_id || "",
+    quantity: existingOrder?.quantity || 1,
+    status: existingOrder?.status || "Pending",
+    remarks: existingOrder?.remarks || "",
+  });
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (existingOrder) {
+        await axios.put(`/api/sales_orders/${existingOrder.order_id}`, formData);
+      } else {
+        await axios.post("/api/sales_orders", formData);
+      }
+      alert("Sales Order saved!");
+      fetchSalesOrders();
+      onSave();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save Sales Order");
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        name="customer_name"
+        placeholder="Customer Name"
+        value={formData.customer_name}
+        onChange={handleChange}
+        required
+      />
+      <input
+        type="date"
+        name="order_date"
+        value={formData.order_date}
+        onChange={handleChange}
+        required
+      />
+      <select name="product_id" value={formData.product_id} onChange={handleChange} required>
+        <option value="">Select Product/Machine</option>
+        {inventory.map((item) => (
+          <option key={item.part_id} value={item.part_id}>
+            {item.part_name} ({item.part_number})
+          </option>
+        ))}
+      </select>
+      <input
+        type="number"
+        name="quantity"
+        min="1"
+        value={formData.quantity}
+        onChange={handleChange}
+        required
+      />
+      <select name="status" value={formData.status} onChange={handleChange}>
+        <option value="Pending">Pending</option>
+        <option value="Confirmed">Confirmed</option>
+        <option value="Shipped">Shipped</option>
+        <option value="Delivered">Delivered</option>
+      </select>
+      <textarea
+        name="remarks"
+        placeholder="Remarks"
+        value={formData.remarks}
+        onChange={handleChange}
+      />
+      <button type="submit">Save Sales Order</button>
+    </form>
+  );
+}

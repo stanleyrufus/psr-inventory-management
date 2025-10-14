@@ -1,9 +1,10 @@
 import React from "react";
+import { Link } from "react-router-dom";
 
-const NavItem = ({ children }) => (
-  <div className="py-3 px-4 rounded-lg hover:bg-white/10 cursor-pointer text-white">
+const NavItem = ({ to, children }) => (
+  <Link to={to} className="block py-3 px-4 rounded-lg hover:bg-white/10 text-white">
     {children}
-  </div>
+  </Link>
 );
 
 export default function Sidebar() {
@@ -15,13 +16,13 @@ export default function Sidebar() {
       </div>
 
       <nav className="p-4 space-y-1 flex-1">
-        <NavItem>Dashboard</NavItem>
-        <NavItem>Products</NavItem>
-        <NavItem>Inventory</NavItem>
-        <NavItem>Sales Orders</NavItem>
-        <NavItem>Purchase Orders</NavItem>
-        <NavItem>Reports</NavItem>
-        <NavItem>Settings</NavItem>
+        <NavItem to="/">Dashboard</NavItem>
+        <NavItem to="/products">Products</NavItem>
+        <NavItem to="/parts">Inventory / Parts</NavItem>
+        <NavItem to="/sales-orders">Sales Orders</NavItem>
+        <NavItem to="/purchase-orders">Purchase Orders</NavItem>
+        <NavItem to="/reports">Reports</NavItem>
+        <NavItem to="/settings">Settings</NavItem>
       </nav>
 
       <div className="p-4 border-t border-white/10">

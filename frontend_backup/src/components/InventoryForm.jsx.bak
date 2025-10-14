@@ -1,0 +1,64 @@
+// frontend/src/components/InventoryForm.jsx
+import React, { useState } from "react";
+
+export default function InventoryForm({ onAdd }) {
+  const [partName, setPartName] = useState("");
+  const [partNumber, setPartNumber] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [location, setLocation] = useState("");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!partName || !partNumber) return;
+
+    onAdd({ PartName: partName, PartNumber: partNumber, Quantity: quantity, Location: location });
+
+    setPartName("");
+    setPartNumber("");
+    setQuantity("");
+    setLocation("");
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="mb-6 p-4 border rounded bg-white">
+      <h3 className="font-semibold mb-2">Add New Part</h3>
+      <div className="flex gap-2 mb-2">
+        <input
+          type="text"
+          placeholder="Part Name"
+          value={partName}
+          onChange={(e) => setPartName(e.target.value)}
+          className="border rounded px-2 py-1 flex-1"
+          required
+        />
+        <input
+          type="text"
+          placeholder="Part Number"
+          value={partNumber}
+          onChange={(e) => setPartNumber(e.target.value)}
+          className="border rounded px-2 py-1 flex-1"
+          required
+        />
+      </div>
+      <div className="flex gap-2 mb-2">
+        <input
+          type="number"
+          placeholder="Quantity"
+          value={quantity}
+          onChange={(e) => setQuantity(e.target.value)}
+          className="border rounded px-2 py-1 flex-1"
+        />
+        <input
+          type="text"
+          placeholder="Location"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          className="border rounded px-2 py-1 flex-1"
+        />
+      </div>
+      <button type="submit" className="bg-psr-primary text-white px-4 py-2 rounded hover:bg-blue-700">
+        Add Part
+      </button>
+    </form>
+  );
+}

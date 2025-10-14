@@ -1,52 +1,104 @@
-// /routes/products.js
 const express = require('express');
 const router = express.Router();
-const db = require('../knex');
-const { authenticateJWT, authorizeRole } = require('../middleware/auth');
+const knex = require('../knex');
 
-// GET all products
-router.get('/', authenticateJWT, async (req, res) => {
+// Utility: auto-generate product_code like PROD-<timestamp>
+const generateProductCode = () => `PROD-${Date.now()}`;
+
+// ✅ GET all products
+router.get('/', async (req, res) => {
   try {
-    const products = await db('products').select('*');
+    const products = await knex('products').select('*');
     res.json({ message: 'Product list', products });
-  } catch (err) {
-    res.status(500).json({ message: 'Error fetching products', error: err.message });
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    res.status(500).json({ message: 'Error fetching products', error: error.message });
   }
 });
 
-// POST create new product (admin only)
-router.post('/', authenticateJWT, authorizeRole('admin'), async (req, res) => {
-  try {
-    const { name, price } = req.body;
-    const [newProduct] = await db('products').insert({ name, price }).returning('*');
-    res.json({ message: 'Product created', product: newProduct });
-  } catch (err) {
-    res.status(500).json({ message: 'Error creating product', error: err.message });
-  }
-});
-
-// PUT update product by ID (admin only)
-router.put('/:id', authenticateJWT, authorizeRole('admin'), async (req, res) => {
+// ✅ GET product by ID
+router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, price } = req.body;
-    const updated = await db('products').where({ id }).update({ name, price }).returning('*');
-    if (!updated.length) return res.status(404).json({ message: 'Product not found' });
-    res.json({ message: 'Product updated', product: updated[0] });
-  } catch (err) {
-    res.status(500).json({ message: 'Error updating product', error: err.message });
+    const product = await knex('products').where({ product_id: id }).first();
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+    res.json({ product });
+  } catch (error) {
+    console.error('Error fetching product:', error);
+    res.status(500).json({ message: 'Error fetching product', error: error.message });
   }
 });
 
-// DELETE product by ID (admin only)
-router.delete('/:id', authenticateJWT, authorizeRole('admin'), async (req, res) => {
+// ✅ POST create new product (auto-generates product_code if missing)
+router.post('/', async (req, res) => {
+  try {
+    const {
+      product_name,
+      description,
+      category,
+      model_number,
+      dimensions,
+      weight_kg,
+      price,
+      status
+    } = req.body;
+
+    if (!product_name) {
+      return res.status(400).json({ message: 'Product name is required' });
+    }
+
+    const product_code = generateProductCode();
+
+    const [newProduct] = await knex('products')
+      .insert({
+        product_name,
+        product_code,
+        description,
+        category,
+        model_number,
+        dimensions,
+        weight_kg,
+        price,
+        status: status || 'Active'
+      })
+      .returning('*');
+
+    res.status(201).json({ message: 'Product created successfully', product: newProduct });
+  } catch (error) {
+    console.error('Error creating product:', error);
+    res.status(500).json({ message: 'Error creating product', error: error.message });
+  }
+});
+
+// ✅ PUT update product
+router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await db('products').where({ id }).del();
+    const updatedData = req.body;
+
+    const updated = await knex('products')
+      .where({ product_id: id })
+      .update(updatedData)
+      .returning('*');
+
+    if (updated.length === 0) return res.status(404).json({ message: 'Product not found' });
+    res.json({ message: 'Product updated successfully', product: updated[0] });
+  } catch (error) {
+    console.error('Error updating product:', error);
+    res.status(500).json({ message: 'Error updating product', error: error.message });
+  }
+});
+
+// ✅ DELETE product
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await knex('products').where({ product_id: id }).del();
     if (!deleted) return res.status(404).json({ message: 'Product not found' });
-    res.json({ message: 'Product deleted' });
-  } catch (err) {
-    res.status(500).json({ message: 'Error deleting product', error: err.message });
+    res.json({ message: 'Product deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting product:', error);
+    res.status(500).json({ message: 'Error deleting product', error: error.message });
   }
 });
 

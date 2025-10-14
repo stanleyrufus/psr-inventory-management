@@ -1,0 +1,54 @@
+// frontend/src/pages/inventory/InventoryPage.jsx
+import React, { useState } from "react";
+import InventoryUpload from "../../components/InventoryUpload";
+import InventoryForm from "../../components/InventoryForm";
+
+export default function InventoryPage() {
+  const [inventory, setInventory] = useState([
+    { PartName: "Sample Part 1", PartNumber: "P001", Quantity: 10, Location: "Shelf A" },
+    { PartName: "Sample Part 2", PartNumber: "P002", Quantity: 5, Location: "Shelf B" },
+  ]);
+
+  // Bulk upload handler
+  const handleUpload = (data) => {
+    setInventory((prev) => [...prev, ...data]);
+  };
+
+  // Manual add handler
+  const handleAdd = (item) => {
+    setInventory((prev) => [...prev, item]);
+  };
+
+  return (
+    <div className="p-4">
+      <h2 className="text-xl font-semibold mb-4">Inventory</h2>
+
+      {/* Bulk upload */}
+      <InventoryUpload onUpload={handleUpload} />
+
+      {/* Manual entry */}
+      <InventoryForm onAdd={handleAdd} />
+
+      {/* Inventory table */}
+      <table className="min-w-full border border-gray-300 mt-4">
+        <thead>
+          <tr className="bg-gray-100">
+            {inventory[0] && Object.keys(inventory[0]).map((key) => (
+              <th key={key} className="border px-4 py-2">{key}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {inventory.map((item, idx) => (
+            <tr key={idx}>
+              {Object.values(item).map((val, i) => (
+                <td key={i} className="border px-4 py-2">{val}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
