@@ -34,6 +34,7 @@ router.get('/', authenticateJWT, async (req, res) => {
     );
     res.json({ message: 'Inventory list', parts: inventory });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Error fetching inventory', error: err.message });
   }
 });
@@ -41,11 +42,10 @@ router.get('/', authenticateJWT, async (req, res) => {
 // POST add inventory item (admin only)
 router.post('/', authenticateJWT, authorizeRole('admin'), async (req, res) => {
   try {
-    const newItem = await db('inventory')
-      .insert(req.body) // pass full object matching new schema
-      .returning('*');
-    res.json({ message: 'Inventory item added', parts: newItem[0] });
+    const [newItem] = await db('inventory').insert(req.body).returning('*');
+    res.json({ message: 'Inventory item added', parts: newItem });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Error adding inventory', error: err.message });
   }
 });
@@ -54,13 +54,11 @@ router.post('/', authenticateJWT, authorizeRole('admin'), async (req, res) => {
 router.put('/:id', authenticateJWT, authorizeRole('admin'), async (req, res) => {
   try {
     const { id } = req.params;
-    const updated = await db('inventory')
-      .where({ part_id: id })
-      .update(req.body)
-      .returning('*');
-    if (!updated.length) return res.status(404).json({ message: 'Inventory item not found' });
-    res.json({ message: 'Inventory updated', parts: updated[0] });
+    const [updated] = await db('inventory').where({ part_id: id }).update(req.body).returning('*');
+    if (!updated) return res.status(404).json({ message: 'Inventory item not found' });
+    res.json({ message: 'Inventory updated', parts: updated });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Error updating inventory', error: err.message });
   }
 });
@@ -73,6 +71,7 @@ router.delete('/:id', authenticateJWT, authorizeRole('admin'), async (req, res) 
     if (!deleted) return res.status(404).json({ message: 'Inventory item not found' });
     res.json({ message: 'Inventory item deleted' });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Error deleting inventory', error: err.message });
   }
 });
