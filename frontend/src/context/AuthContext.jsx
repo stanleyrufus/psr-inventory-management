@@ -9,13 +9,16 @@ export const AuthProvider = ({ children }) => {
     return savedUser ? JSON.parse(savedUser) : null;
   });
 
+  const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
   const login = async (username, password) => {
     try {
-      // ✅ Add await here
-      const res = await axios.post("http://localhost:5000/users/login", { username, password });
+      const res = await axios.post(`${BASE}/api/users/login`, { username, password });
 
-      // Backend returns { user: {...}, token: "..." }
-      const { user: userData, token } = res.data;
+      const userData = res.data.user || res.data.data?.user;
+      const token = res.data.token || res.data.data?.token;
+
+      if (!userData || !token) throw new Error("Invalid login response structure");
 
       setUser(userData);
       localStorage.setItem("user", JSON.stringify(userData));
@@ -23,7 +26,7 @@ export const AuthProvider = ({ children }) => {
 
       return true;
     } catch (err) {
-      console.error("Login error:", err.response?.data || err.message); // Show backend errors
+      console.error("Login error:", err.response?.data || err.message);
       alert(err.response?.data?.message || "Invalid credentials");
       return false;
     }

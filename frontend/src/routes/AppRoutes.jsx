@@ -6,6 +6,8 @@ import PartsPage from "../pages/PartsPage";
 import SalesOrderPage from "../pages/SalesOrderPage";
 import PurchaseOrderPage from "../pages/PurchaseOrderPage";
 import Login from "../pages/Login";
+import ReportsPage from "../pages/Reports";       // new
+import SettingsPage from "../pages/Settings";     // new
 import { AuthContext } from "../context/AuthContext";
 import Sidebar from "../components/Sidebar";
 
@@ -45,6 +47,14 @@ export default function AppRoutes() {
       <Route
         path="/purchase-orders"
         element={user ? <PrivateLayout><PurchaseOrderPage /></PrivateLayout> : <Navigate to="/login" />}
+      />
+      <Route
+        path="/reports"
+        element={user ? <PrivateLayout><ReportsPage /></PrivateLayout> : <Navigate to="/login" />}
+      />
+      <Route
+        path="/settings"
+        element={user ? <PrivateLayout><SettingsPage /></PrivateLayout> : <Navigate to="/login" />}
       />
     </Routes>
   );

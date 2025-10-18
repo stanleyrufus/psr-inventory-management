@@ -1,14 +1,17 @@
 import React, { useState, useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
-const Login = () => {
+export default function Login() {
   const { login } = useContext(AuthContext);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await login(username, password);
+    const success = await login(username, password);
+    if (success) navigate("/dashboard");
   };
 
   return (
@@ -35,6 +38,4 @@ const Login = () => {
       </form>
     </div>
   );
-};
-
-export default Login;
+}

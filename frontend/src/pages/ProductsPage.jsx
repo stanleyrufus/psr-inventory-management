@@ -1,3 +1,4 @@
+// frontend/src/pages/ProductsPage.jsx
 import React, { useEffect, useState } from "react";
 import api from "../utils/api";
 import ProductForm from "../components/forms/ProductForm";
@@ -6,15 +7,26 @@ export default function ProductsPage() {
   const [products, setProducts] = useState([]);
   const [editing, setEditing] = useState(null);
 
+  // Fetch products from backend
+  const loadProducts = async () => {
+    try {
+      const res = await api.fetchProducts();
+      // backend returns { message, data }
+      setProducts(res.data || []);
+    } catch (e) {
+      console.error("Error fetching products:", e.response?.data?.message || e.message);
+    }
+  };
+
   useEffect(() => {
-    api.fetchProducts().then(setProducts).catch((e) => console.error(e));
+    loadProducts();
   }, []);
 
   const openNew = () => setEditing({}); // empty object for new
   const edit = (p) => setEditing(p);
 
-  const onSaved = (saved) => {
-    api.fetchProducts().then(setProducts);
+  const onSaved = () => {
+    loadProducts();
     setEditing(null);
   };
 
@@ -26,7 +38,9 @@ export default function ProductsPage() {
           <p className="text-sm text-gray-500">Machines and finished goods</p>
         </div>
         <div>
-          <button onClick={openNew} className="bg-psr-accent text-white px-4 py-2 rounded">Add Product</button>
+          <button onClick={openNew} className="bg-psr-accent text-white px-4 py-2 rounded">
+            Add Product
+          </button>
         </div>
       </div>
 
@@ -50,35 +64,40 @@ export default function ProductsPage() {
             </tr>
           </thead>
           <tbody>
-            {products.length === 0 && (
+            {products.length === 0 ? (
               <tr>
-                <td className="p-4 text-center" colSpan={13}>No products</td>
-              </tr>
-            )}
-            {products.map((p) => (
-              <tr key={p.product_id} className="border-t">
-                <td className="py-2 px-3">{p.product_id}</td>
-                <td className="py-2 px-3">{p.product_name}</td>
-                <td className="py-2 px-3">{p.product_code}</td>
-                <td className="py-2 px-3">{p.description}</td>
-                <td className="py-2 px-3">{p.category}</td>
-                <td className="py-2 px-3">{p.model_number}</td>
-                <td className="py-2 px-3">{p.dimensions}</td>
-                <td className="py-2 px-3">{p.weight_kg}</td>
-                <td className="py-2 px-3">${p.price}</td>
-                <td className="py-2 px-3">{p.status}</td>
-                <td className="py-2 px-3">{p.created_at}</td>
-                <td className="py-2 px-3">{p.updated_at}</td>
-                <td className="py-2 px-3">
-                  <button onClick={() => edit(p)} className="text-sm px-3 py-1 rounded bg-gray-100">Edit</button>
+                <td className="p-4 text-center" colSpan={13}>
+                  No products
                 </td>
               </tr>
-            ))}
+            ) : (
+              products.map((p) => (
+                <tr key={p.product_id} className="border-t">
+                  <td className="py-2 px-3">{p.product_id}</td>
+                  <td className="py-2 px-3">{p.product_name}</td>
+                  <td className="py-2 px-3">{p.product_code}</td>
+                  <td className="py-2 px-3">{p.description}</td>
+                  <td className="py-2 px-3">{p.category}</td>
+                  <td className="py-2 px-3">{p.model_number}</td>
+                  <td className="py-2 px-3">{p.dimensions}</td>
+                  <td className="py-2 px-3">{p.weight_kg}</td>
+                  <td className="py-2 px-3">{p.price}</td>
+                  <td className="py-2 px-3">{p.status}</td>
+                  <td className="py-2 px-3">{p.created_at}</td>
+                  <td className="py-2 px-3">{p.updated_at}</td>
+                  <td className="py-2 px-3">
+                    <button onClick={() => edit(p)} className="text-sm px-3 py-1 rounded bg-gray-100">
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
-      {editing !== null && (
+      {editing && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
           <div className="bg-white p-6 rounded w-full max-w-3xl overflow-auto">
             <ProductForm initial={editing} onSaved={onSaved} onCancel={() => setEditing(null)} />

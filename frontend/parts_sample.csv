@@ -1,0 +1,6 @@
+part_number,part_name,category,quantity_on_hand,description
+P-1001,Gear Shaft,Mechanical,50,Steel gear shaft for Model X
+P-1002,Bearing,Mechanical,100,High precision ball bearing
+P-1003,Motor,Electrical,20,DC motor 12V
+P-1004,Sensor,Electrical,40,Temperature sensor
+P-1005,Valve,Hydraulic,15,Hydraulic pressure valve

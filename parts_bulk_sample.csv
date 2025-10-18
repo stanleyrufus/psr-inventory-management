@@ -1,0 +1,4 @@
+part_number,part_name,category,description,uom,quantity_on_hand,minimum_stock_level,unit_price,supplier_name,supplier_part_number,location,status,lead_time_days,weight_kg,material,remarks
+ffewfwf,jjfefe,Metals,6061 T6511 Flat Bar,Piece,6,2,3.17,ABC Metals,ABC-ALB1,Aisle 2 - Rack B,Active,7,216,Aluminum,First batch
+fef,fefew,Metals,High-grade copper rod,Piece,10,3,5.25,XYZ Metals,XYZ-COP2,Aisle 3 - Rack A,Active,10,50,Copper,Handle carefully
+fewf,fwf,Plastics,Spacer for assembly,Piece,100,20,0.1,PlastCo,PLS-100,Bin 12,Active,5,0.02,Plastic,
