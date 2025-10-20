@@ -10,10 +10,14 @@ export default function PartsPage() {
   const [showBulk, setShowBulk] = useState(false);
   const [editingPart, setEditingPart] = useState(null);
 
+  // ✅ Load parts with newest first
   const loadParts = async () => {
     try {
       const data = await api.fetchParts();
-      setParts(Array.isArray(data) ? data : []);
+      const sorted = Array.isArray(data)
+        ? [...data].sort((a, b) => (b.part_id || b.id) - (a.part_id || a.id))
+        : [];
+      setParts(sorted);
     } catch (e) {
       console.error("❌ Error loading parts:", e);
       setParts([]);
@@ -83,17 +87,30 @@ export default function PartsPage() {
             </thead>
             <tbody>
               {parts.map((p) => (
-                <tr key={p.part_id ?? p.id ?? p.part_number} className="hover:bg-gray-50">
+                <tr
+                  key={p.part_id ?? p.id ?? p.part_number}
+                  className="hover:bg-gray-50"
+                >
                   <td className="border px-3 py-2">{p.part_number}</td>
                   <td className="border px-3 py-2">{p.part_name}</td>
                   <td className="border px-3 py-2">{p.category || "-"}</td>
                   <td className="border px-3 py-2">{p.uom || "-"}</td>
-                  <td className="border px-3 py-2 text-right">{p.quantity_on_hand ?? "-"}</td>
-                  <td className="border px-3 py-2 text-right">{p.unit_price ? `$${p.unit_price}` : "-"}</td>
+                  <td className="border px-3 py-2 text-right">
+                    {p.quantity_on_hand ?? "-"}
+                  </td>
+                  <td className="border px-3 py-2 text-right">
+                    {p.unit_price ? `$${p.unit_price}` : "-"}
+                  </td>
                   <td className="border px-3 py-2">{p.supplier_name || "-"}</td>
                   <td className="border px-3 py-2">{p.location || "-"}</td>
                   <td className="border px-3 py-2 text-center">
-                    <span className={`px-2 py-1 rounded text-xs ${p.status === "Active" ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"}`}>
+                    <span
+                      className={`px-2 py-1 rounded text-xs ${
+                        p.status === "Active"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-200 text-gray-600"
+                      }`}
+                    >
                       {p.status || "Unknown"}
                     </span>
                   </td>

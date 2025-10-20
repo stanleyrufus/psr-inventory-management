@@ -24,7 +24,6 @@ export default function PartsList({ parts, onEdit }) {
             <th className="py-2 px-3 border">Lead Time (days)</th>
             <th className="py-2 px-3 border">Weight (kg)</th>
             <th className="py-2 px-3 border">Material</th>
-            <th className="py-2 px-3 border">Machine Compatibility</th>
             <th className="py-2 px-3 border">Last Order Date</th>
             <th className="py-2 px-3 border">Remarks</th>
             <th className="py-2 px-3 border">Created At</th>
@@ -35,7 +34,7 @@ export default function PartsList({ parts, onEdit }) {
         <tbody>
           {parts.length === 0 && (
             <tr>
-              <td className="p-4 border text-center" colSpan={23}>
+              <td className="p-4 border text-center" colSpan={22}>
                 No parts
               </td>
             </tr>
@@ -55,15 +54,20 @@ export default function PartsList({ parts, onEdit }) {
               <td className="py-2 px-3 border">{p.supplier_part_number}</td>
               <td className="py-2 px-3 border">{p.location}</td>
               <td className="py-2 px-3 border">{p.status}</td>
-              <td className="py-2 px-3 border">{p.used_in_products?.join(", ")}</td>
+              <td className="py-2 px-3 border">
+                {p.used_in_products?.join(", ")}
+              </td>
               <td className="py-2 px-3 border">{p.lead_time_days}</td>
               <td className="py-2 px-3 border">{p.weight_kg}</td>
               <td className="py-2 px-3 border">{p.material}</td>
-              <td className="py-2 px-3 border">{p.machine_compatibility}</td>
               <td className="py-2 px-3 border">{p.last_order_date}</td>
               <td className="py-2 px-3 border">{p.remarks}</td>
-              <td className="py-2 px-3 border">{new Date(p.created_at).toLocaleString()}</td>
-              <td className="py-2 px-3 border">{new Date(p.updated_at).toLocaleString()}</td>
+              <td className="py-2 px-3 border">
+                {new Date(p.created_at).toLocaleString()}
+              </td>
+              <td className="py-2 px-3 border">
+                {new Date(p.updated_at).toLocaleString()}
+              </td>
               <td className="py-2 px-3 border">
                 <button
                   onClick={() => onEdit(p)}

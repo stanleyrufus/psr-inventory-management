@@ -1,115 +1,114 @@
 // backend/routes/inventory.js
 import express from "express";
-import { db } from "../db.js";
+import db from "../knex.js";
 
 const router = express.Router();
 
-/** Helper: Normalize fields before DB insert/update */
+/** Normalize data before DB insert/update */
 function normalizeItem(item) {
-  const normalized = { ...item };
   const numericFields = [
     "quantity_on_hand",
     "minimum_stock_level",
     "unit_price",
-    "lead_time_days",
     "weight_kg",
+    "lead_time_days",
   ];
 
-  numericFields.forEach((f) => {
-    if (normalized[f] === "" || normalized[f] === undefined) normalized[f] = null;
-    else normalized[f] = Number(normalized[f]);
+  const normalized = { ...item };
+
+  numericFields.forEach((field) => {
+    if (normalized[field] === "" || normalized[field] === undefined) normalized[field] = null;
+    else normalized[field] = Number(normalized[field]);
   });
 
-  // ✅ Convert empty date string to null
-  if (!normalized.last_order_date || normalized.last_order_date === "")
-    normalized.last_order_date = null;
+  if (!normalized.last_order_date) normalized.last_order_date = null;
 
   return normalized;
 }
 
-// ✅ Get all parts
+// ✅ GET all inventory parts
 router.get("/", async (req, res) => {
   try {
     const parts = await db("inventory").select("*").orderBy("part_id", "asc");
     res.json(parts);
   } catch (err) {
-    console.error("Error fetching parts:", err);
-    res.status(500).json({ success: 0, message: "Error fetching parts", error: err.message });
+    console.error("Error fetching inventory:", err);
+    res.status(500).json({ success: 0, message: "Error fetching inventory", error: err.message });
   }
 });
 
-// ✅ Add single part
+// ✅ ADD new part
 router.post("/", async (req, res) => {
   try {
     const newItem = normalizeItem(req.body);
-    const [newPart] = await db("inventory").insert(newItem).returning("*");
-    res.json({ success: 1, data: newPart });
+    const [inserted] = await db("inventory").insert(newItem).returning("*");
+    res.json({ success: 1, data: inserted });
   } catch (err) {
-    console.error("Error adding part:", err);
+    console.error("Error adding inventory item:", err);
     res.status(500).json({
       success: 0,
-      message: "Error adding part",
+      message: "Error adding inventory item",
       error: err.message,
     });
   }
 });
 
-// ✅ Update part
+// ✅ UPDATE part
 router.put("/:id", async (req, res) => {
   try {
     const updatedItem = normalizeItem(req.body);
-    const updated = await db("inventory")
+    const [updated] = await db("inventory")
       .where({ part_id: req.params.id })
       .update(updatedItem)
       .returning("*");
+
     res.json({ success: 1, data: updated });
   } catch (err) {
-    console.error("Error updating part:", err);
+    console.error("Error updating inventory item:", err);
     res.status(500).json({
       success: 0,
-      message: "Error updating part",
+      message: "Error updating inventory item",
       error: err.message,
     });
   }
 });
 
-// ✅ Bulk upload (handles duplicates too)
+// ✅ BULK upload
 router.post("/bulk-upload", async (req, res) => {
   try {
     const { parts } = req.body;
     if (!Array.isArray(parts) || parts.length === 0)
       return res.status(400).json({ success: 0, message: "No parts provided" });
 
-    const normalizedParts = parts.map(normalizeItem);
-    const inserted = await db("inventory").insert(normalizedParts).returning("*");
+    const normalized = parts.map(normalizeItem);
+    const inserted = await db("inventory").insert(normalized).returning("*");
     res.json({ success: 1, data: inserted });
   } catch (err) {
     if (err.code === "23505") {
-      // duplicate part_number constraint
       return res.status(400).json({
         success: 0,
-        message: "Duplicate part numbers found. Some records already exist.",
+        message: "Duplicate part_number found. Some records already exist.",
       });
     }
-    console.error("Error bulk inserting inventory items:", err);
+    console.error("Error bulk inserting inventory:", err);
     res.status(500).json({
       success: 0,
-      message: "Error bulk inserting inventory items",
+      message: "Error bulk inserting inventory",
       error: err.message,
     });
   }
 });
 
-// ✅ Delete part
+// ✅ DELETE part
 router.delete("/:id", async (req, res) => {
   try {
     await db("inventory").where({ part_id: req.params.id }).del();
     res.json({ success: 1, message: "Part deleted successfully" });
   } catch (err) {
-    console.error("Error deleting part:", err);
+    console.error("Error deleting inventory item:", err);
     res.status(500).json({
       success: 0,
-      message: "Error deleting part",
+      message: "Error deleting inventory item",
       error: err.message,
     });
   }

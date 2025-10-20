@@ -1,7 +1,11 @@
-// /backend/knex.js
-const knex = require('knex');
-const knexConfig = require('./knexfile');
+// backend/knex.js
+import knex from "knex";
+import knexConfig from "./knexfile.js";
+import dotenv from "dotenv";
 
+dotenv.config();
+
+// Initialize Knex using development config
 const db = knex(knexConfig.development);
 
-module.exports = db;
+export default db;

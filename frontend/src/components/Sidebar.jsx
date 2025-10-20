@@ -1,12 +1,16 @@
 import React, { useContext } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 
-const NavItem = ({ to, children, onClick }) => (
+const NavItem = ({ to, children, onClick, active }) => (
   <Link
     to={to || "#"}
     onClick={onClick}
-    className="block py-3 px-4 rounded-lg hover:bg-white/10 text-white"
+    className={`block py-3 px-4 rounded-lg transition-colors ${
+      active
+        ? "bg-white text-psr-primary font-semibold"
+        : "hover:bg-white/10 text-white"
+    }`}
   >
     {children}
   </Link>
@@ -15,6 +19,7 @@ const NavItem = ({ to, children, onClick }) => (
 export default function Sidebar() {
   const { logout } = useContext(AuthContext);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     logout();
@@ -26,22 +31,57 @@ export default function Sidebar() {
       {/* Header */}
       <div className="px-6 py-6 border-b border-white/10">
         <div className="text-xl font-bold">PSR Automation Inc</div>
-        <div className="text-xs text-psr-muted mt-1">Inventory Management System</div>
+        <div className="text-xs text-psr-muted mt-1">
+          Inventory Management System
+        </div>
       </div>
 
       {/* Navigation */}
       <nav className="p-4 space-y-1 flex-1">
-        <NavItem to="/">Dashboard</NavItem>
-        <NavItem to="/products">Products</NavItem>
-        <NavItem to="/parts">Inventory / Parts</NavItem>
-        <NavItem to="/sales-orders">Sales Orders</NavItem>
-        <NavItem to="/purchase-orders">Purchase Orders</NavItem>
-        <NavItem to="/reports">Reports</NavItem>
-        <NavItem to="/settings">Settings</NavItem>
+        <NavItem to="/" active={location.pathname === "/"}>
+          Dashboard
+        </NavItem>
+        <NavItem
+          to="/products"
+          active={location.pathname.startsWith("/products")}
+        >
+          Products
+        </NavItem>
+        <NavItem to="/parts" active={location.pathname.startsWith("/parts")}>
+          Inventory / Parts
+        </NavItem>
+        <NavItem
+          to="/sales-orders"
+          active={location.pathname.startsWith("/sales-orders")}
+        >
+          Sales Orders
+        </NavItem>
+
+        {/* ✅ Purchase Orders Section (submenu removed) */}
+        <NavItem
+          to="/purchase-orders"
+          active={location.pathname.startsWith("/purchase-orders")}
+        >
+          Purchase Orders
+        </NavItem>
+
+        <NavItem
+          to="/reports"
+          active={location.pathname.startsWith("/reports")}
+        >
+          Reports
+        </NavItem>
+        <NavItem
+          to="/settings"
+          active={location.pathname.startsWith("/settings")}
+        >
+          Settings
+        </NavItem>
+
+        {/* Logout */}
         <NavItem onClick={handleLogout}>Logout</NavItem>
       </nav>
 
-      {/* Footer */}
       <div className="p-4 border-t border-white/10">
         <div className="text-sm">Admin</div>
         <div className="text-xs text-psr-muted">admin@psr.com</div>
