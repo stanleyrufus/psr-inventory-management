@@ -14,7 +14,8 @@ import Sidebar from "../components/Sidebar";
 import PurchaseOrderList from "../pages/purchaseOrders/PurchaseOrderList";
 import PurchaseOrderForm from "../pages/purchaseOrders/PurchaseOrderForm";
 import PurchaseOrderDetails from "../pages/purchaseOrders/PurchaseOrderDetails";
-import PurchaseOrderEdit from "../pages/purchaseOrders/PurchaseOrderEdit"; // ✅ new
+import PurchaseOrderEdit from "../pages/purchaseOrders/PurchaseOrderEdit";
+import PurchaseOrderBulkUpload from "../pages/purchaseOrders/PurchaseOrderBulkUpload"; // ✅ new import
 
 export default function AppRoutes() {
   const { user } = useContext(AuthContext);
@@ -100,6 +101,20 @@ export default function AppRoutes() {
           )
         }
       />
+
+      <Route
+        path="/purchase-orders/bulk-upload"
+        element={
+          user ? (
+            <PrivateLayout>
+              <PurchaseOrderBulkUpload />
+            </PrivateLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+
       <Route
         path="/purchase-orders/new"
         element={
@@ -112,6 +127,7 @@ export default function AppRoutes() {
           )
         }
       />
+
       {/* ⚙️ Important: place EDIT before ID to prevent collision */}
       <Route
         path="/purchase-orders/edit/:id"
@@ -125,6 +141,7 @@ export default function AppRoutes() {
           )
         }
       />
+
       <Route
         path="/purchase-orders/:id"
         element={

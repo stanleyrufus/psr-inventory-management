@@ -1,27 +1,36 @@
+/**
+ * @param { import("knex").Knex } knex
+ */
 exports.seed = async function (knex) {
-  await knex('purchase_order_items').del();
-  await knex('purchase_order_items').insert([
+  // Clear existing items
+  await knex("purchase_order_items").del();
+
+  // 🔍 Dynamically fetch existing inventory part IDs
+  const parts = await knex("inventory").select("part_id").orderBy("part_id");
+  if (parts.length < 2) {
+    throw new Error("Need at least 2 inventory parts for seeding PO items.");
+  }
+
+  await knex("purchase_order_items").insert([
     {
-      id: 1,
       po_id: 1,
-      product_id: 1,
-      description: '6061 Aluminum Flat Bar 1/2 x 5',
-      quantity: 100,
-      unit: 'pcs',
+      line_no: 1,
+      part_id: parts[0].part_id, // use first available part
+      quantity: 100.0,
       unit_price: 3.17,
       total_price: 317.0,
-      line_no: 1,
+      created_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
     },
     {
-      id: 2,
       po_id: 2,
-      product_id: 2,
-      description: '304 Stainless Rod 3/4"',
-      quantity: 50,
-      unit: 'pcs',
+      line_no: 1,
+      part_id: parts[1].part_id, // use second available part
+      quantity: 50.0,
       unit_price: 5.42,
       total_price: 271.0,
-      line_no: 1,
+      created_at: knex.fn.now(),
+      updated_at: knex.fn.now(),
     },
   ]);
 };

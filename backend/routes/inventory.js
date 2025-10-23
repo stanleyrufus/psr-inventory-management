@@ -1,6 +1,6 @@
 // backend/routes/inventory.js
 import express from "express";
-import db from "../knex.js";
+import { db } from "../db.js";
 
 const router = express.Router();
 

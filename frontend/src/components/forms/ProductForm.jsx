@@ -1,153 +1,200 @@
-import React, { useState, useEffect } from "react";
+// frontend/src/components/forms/ProductForm.jsx
+import React, { useState } from "react";
 import api from "../../utils/api";
 
 export default function ProductForm({ initial = {}, onSaved, onCancel }) {
-  const [formData, setFormData] = useState({
-    product_name: "",
-    product_code: "",
-    description: "",
-    category: "",
-    model_number: "",
-    dimensions: "",
-    weight_kg: "",
-    price: "",
-    status: "Active",
+  const [form, setForm] = useState({
+    category: initial.category || "",
+    subcategory: initial.subcategory || "",
+    product_code: initial.product_code || "",
+    product_name: initial.product_name || "",
+    short_description: initial.short_description || "",
+    full_description: initial.full_description || "",
+    machine_type: initial.machine_type || "",
+    frame_series: initial.frame_series || "",
+    nozzle_count: initial.nozzle_count || "",
+    status: initial.status || "Active",
   });
 
-  useEffect(() => {
-    if (initial && Object.keys(initial).length > 0) {
-      setFormData({
-        product_name: initial.product_name || "",
-        product_code: initial.product_code || "",
-        description: initial.description || "",
-        category: initial.category || "",
-        model_number: initial.model_number || "",
-        dimensions: initial.dimensions || "",
-        weight_kg: initial.weight_kg || "",
-        price: initial.price || "",
-        status: initial.status || "Active",
-      });
-    }
-  }, [initial]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setForm({ ...form, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setLoading(true);
+
     try {
-      if (initial.product_id) {
-        await api.updateProduct(initial.product_id, formData);
-      } else {
-        await api.createProduct(formData);
+      if (!form.category || !form.product_name || !form.product_code || !form.status) {
+        setError("All fields marked * are required.");
+        setLoading(false);
+        return;
       }
-      if (onSaved) onSaved();
+
+      let res;
+      if (initial.id) {
+        res = await api.updateProduct(initial.id, form);
+      } else {
+        res = await api.createProduct(form);
+      }
+
+      if (res?.success) {
+        onSaved?.();
+      } else {
+        setError(res?.message || "Failed to save product");
+      }
     } catch (err) {
+      const msg =
+        err.response?.data?.message ||
+        (err.response?.status === 409
+          ? "Product code already exists — please use a unique value."
+          : "Unexpected error occurred");
+      setError(msg);
       console.error("Error saving product:", err);
-      alert("Failed to save product");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <h2 className="text-lg font-semibold mb-2">
+        {initial.id ? "Edit Product" : "Add Product"}
+      </h2>
+
+      {error && <p className="text-red-600 text-sm">{error}</p>}
+
       <div className="grid grid-cols-2 gap-4">
-        <input
-          name="product_name"
-          placeholder="Name"
-          className="border p-2 rounded"
-          value={formData.product_name}
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="product_code"
-          placeholder="SKU"
-          className="border p-2 rounded"
-          value={formData.product_code}
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="category"
-          placeholder="Category"
-          className="border p-2 rounded"
-          value={formData.category}
-          onChange={handleChange}
-        />
-        <input
-          name="model_number"
-          placeholder="Model"
-          className="border p-2 rounded"
-          value={formData.model_number}
-          onChange={handleChange}
-        />
-        <input
-          name="dimensions"
-          placeholder="Dimensions"
-          className="border p-2 rounded"
-          value={formData.dimensions}
-          onChange={handleChange}
-        />
-        <input
-          name="weight_kg"
-          type="number"
-          step="0.01"
-          placeholder="Weight (kg)"
-          className="border p-2 rounded"
-          value={formData.weight_kg}
-          onChange={handleChange}
-        />
-        <input
-          name="price"
-          type="number"
-          step="0.01"
-          placeholder="Price"
-          className="border p-2 rounded"
-          value={formData.price}
-          onChange={handleChange}
-        />
-        <select
-          name="status"
-          className="border p-2 rounded"
-          value={formData.status}
-          onChange={handleChange}
-        >
-          <option value="Active">Active</option>
-          <option value="Inactive">Inactive</option>
-        </select>
+        <div>
+          <label className="block text-sm font-medium">
+            Category <span className="text-red-500">*</span>
+          </label>
+          <input
+            name="category"
+            value={form.category}
+            onChange={handleChange}
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Subcategory</label>
+          <input
+            name="subcategory"
+            value={form.subcategory}
+            onChange={handleChange}
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">
+            Product Code <span className="text-red-500">*</span>
+          </label>
+          <input
+            name="product_code"
+            value={form.product_code}
+            onChange={handleChange}
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">
+            Product Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            name="product_name"
+            value={form.product_name}
+            onChange={handleChange}
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        <div className="col-span-2">
+          <label className="block text-sm font-medium">Short Description</label>
+          <textarea
+            name="short_description"
+            value={form.short_description}
+            onChange={handleChange}
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        <div className="col-span-2">
+          <label className="block text-sm font-medium">Full Description</label>
+          <textarea
+            name="full_description"
+            value={form.full_description}
+            onChange={handleChange}
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Machine Type</label>
+          <input
+            name="machine_type"
+            value={form.machine_type}
+            onChange={handleChange}
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Frame Series</label>
+          <input
+            name="frame_series"
+            value={form.frame_series}
+            onChange={handleChange}
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Nozzle Count</label>
+          <input
+            name="nozzle_count"
+            value={form.nozzle_count}
+            onChange={handleChange}
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">
+            Status <span className="text-red-500">*</span>
+          </label>
+          <select
+            name="status"
+            value={form.status}
+            onChange={handleChange}
+            className="w-full border rounded p-2"
+          >
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </div>
       </div>
 
-      <textarea
-        name="description"
-        placeholder="Description"
-        className="border p-2 rounded w-full"
-        value={formData.description}
-        onChange={handleChange}
-      />
-
-      {/* Display system fields (Created At / Updated At) if editing */}
-      {initial.product_id && (
-        <div className="text-sm text-gray-500 space-y-1">
-          <div>Created At: {initial.created_at}</div>
-          <div>Updated At: {initial.updated_at}</div>
-        </div>
-      )}
-
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end gap-2 mt-4">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 rounded border hover:bg-gray-100"
+          className="bg-gray-200 px-4 py-2 rounded"
         >
           Cancel
         </button>
         <button
           type="submit"
-          className="px-4 py-2 rounded bg-psr-primary text-white hover:bg-blue-700"
+          disabled={loading}
+          className="bg-psr-accent text-white px-4 py-2 rounded"
         >
-          {initial.product_id ? "Update" : "Create"}
+          {loading ? "Saving..." : "Save Product"}
         </button>
       </div>
     </form>

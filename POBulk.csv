@@ -1,0 +1,6 @@
+psr_po_number,supplier_name,created_by,order_date,expected_delivery_date,payment_terms,currency,tax_percent,shipping_charges,remarks,status,part_number,description,quantity,unit_price
+PO-1001,ABC Metals,Stanley Medikonda,2025-10-22,2025-11-05,Net 30,USD,8,25,First order of aluminum bars,Draft,AL-6061-2x6x72,6061 Aluminum Bar 2x6x72,15,24.95
+PO-1001,ABC Metals,Stanley Medikonda,2025-10-22,2025-11-05,Net 30,USD,8,25,First order of aluminum bars,Draft,AL-6061-1x4x48,6061 Aluminum Bar 1x4x48,10,18.50
+PO-1002,Global Fasteners,Pawan Kumar,2025-10-23,2025-11-10,Net 15,USD,10,30,Stainless bolts for assembly,Draft,ST-304-BOLT-12,Stainless Bolt 12mm,50,1.20
+PO-1002,Global Fasteners,Pawan Kumar,2025-10-23,2025-11-10,Net 15,USD,10,30,Stainless bolts for assembly,Draft,ST-304-NUT-12,Stainless Nut 12mm,50,0.80
+PO-1003,Plastico Inc,Alex Johnson,2025-10-24,2025-11-20,Net 45,USD,7,40,Plastic caps for new line,Draft,PC-500-CAP,Plastic Cap 500ml,200,0.35

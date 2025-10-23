@@ -1,6 +1,12 @@
-// migrations/20251019_update_po_and_supplier_schema.cjs
+/**
+ * Migration: Update purchase_orders and suppliers schema
+ * Compatible with CommonJS (for .cjs Knex environment)
+ */
 
-export async function up(knex) {
+/**
+ * @param {import('knex').Knex} knex
+ */
+exports.up = async function (knex) {
   // --- PURCHASE_ORDERS table ---
   const hasPurchasedAt = await knex.schema.hasColumn("purchase_orders", "purchased_at");
   if (hasPurchasedAt) {
@@ -38,10 +44,13 @@ export async function up(knex) {
     if (!supplierColNames.includes("phone")) table.string("phone", 50);
     if (!supplierColNames.includes("address")) table.text("address");
   });
-}
+};
 
-export async function down(knex) {
-  // Revert schema changes (optional)
+/**
+ * @param {import('knex').Knex} knex
+ */
+exports.down = async function (knex) {
+  // --- PURCHASE_ORDERS rollback ---
   const hasPurchasedOn = await knex.schema.hasColumn("purchase_orders", "purchased_on");
   if (hasPurchasedOn) {
     await knex.schema.alterTable("purchase_orders", (table) => {
@@ -63,6 +72,7 @@ export async function down(knex) {
     });
   }
 
+  // --- SUPPLIERS rollback ---
   const supplierCols = await knex("information_schema.columns")
     .select("column_name")
     .where({ table_name: "suppliers" });
@@ -74,4 +84,4 @@ export async function down(knex) {
     if (supplierColNames.includes("phone")) table.dropColumn("phone");
     if (supplierColNames.includes("address")) table.dropColumn("address");
   });
-}
+};

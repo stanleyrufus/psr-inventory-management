@@ -1,6 +1,6 @@
 // backend/routes/users.js
 import express from "express";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { db } from "../db.js";
 
@@ -10,16 +10,15 @@ const router = express.Router();
 router.post("/register", async (req, res) => {
   try {
     const { username, email, password, role } = req.body;
-    if (!username || !email || !password) {
+    if (!username || !email || !password)
       return res.status(400).json({ message: "Username, email, and password are required" });
-    }
 
     const existing = await db("users").where({ username }).orWhere({ email }).first();
-    if (existing) {
+    if (existing)
       return res.status(400).json({ message: "Username or email already exists" });
-    }
 
-    const hashed = await bcrypt.hash(password, 10);
+    const hashed = bcrypt.hashSync(password, 10);
+
     const [newUser] = await db("users")
       .insert({ username, email, password: hashed, role: role || "user" })
       .returning(["id", "username", "email", "role"]);
@@ -31,24 +30,38 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// ✅ Login user
+// ✅ Login (username or email)
 router.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body;
-    if (!username || !password) {
+
+    if (!username || !password)
       return res.status(400).json({ message: "Username and password required" });
+
+    // Try username OR email
+    const user = await db("users")
+      .where({ username })
+      .orWhere({ email: username })
+      .first();
+
+    if (!user) {
+      console.log("❌ Login failed: user not found for", username);
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const user = await db("users").where({ username }).first();
-    if (!user) return res.status(401).json({ message: "Invalid credentials" });
+    const valid = bcrypt.compareSync(password, user.password);
+    if (!valid) {
+      console.log("❌ Login failed: wrong password for", username);
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
 
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.status(401).json({ message: "Invalid credentials" });
+    if (!process.env.JWT_SECRET)
+      return res.status(500).json({ message: "Server misconfiguration: missing JWT_SECRET" });
 
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: "1h" }
+      { expiresIn: "2h" }
     );
 
     const { password: _pw, ...userData } = user;
@@ -59,7 +72,7 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// ✅ Get all users (admin only)
+// ✅ Get users list
 router.get("/", async (req, res) => {
   try {
     const users = await db("users").select("id", "username", "email", "role");
