@@ -1,5 +1,6 @@
 import React, { useContext } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+
 import DashboardPage from "../pages/DashboardPage";
 import ProductsPage from "../pages/ProductsPage";
 import PartsPage from "../pages/PartsPage";
@@ -15,11 +16,22 @@ import PurchaseOrderList from "../pages/purchaseOrders/PurchaseOrderList";
 import PurchaseOrderForm from "../pages/purchaseOrders/PurchaseOrderForm";
 import PurchaseOrderDetails from "../pages/purchaseOrders/PurchaseOrderDetails";
 import PurchaseOrderEdit from "../pages/purchaseOrders/PurchaseOrderEdit";
-import PurchaseOrderBulkUpload from "../pages/purchaseOrders/PurchaseOrderBulkUpload"; // ✅ new import
+import PurchaseOrderBulkUpload from "../pages/purchaseOrders/PurchaseOrderBulkUpload";
+
+// ✅ Vendors
+import VendorsPage from "../pages/vendors/VendorsPage";
+import VendorForm from "../pages/vendors/VendorForm";
+import VendorDetails from "../pages/vendors/VendorDetails";
+import VendorBulkUpload from "../pages/vendors/VendorBulkUpload";
+import VendorEdit from "../pages/vendors/VendorEdit";
+
+// ✅ Products
+import ProductDetail from "../pages/ProductDetail";
 
 export default function AppRoutes() {
   const { user } = useContext(AuthContext);
 
+  // ✅ Layout for authenticated pages
   const PrivateLayout = ({ children }) => (
     <div className="flex h-screen bg-psr-sky">
       <Sidebar />
@@ -35,7 +47,7 @@ export default function AppRoutes() {
         element={!user ? <Login /> : <Navigate to="/" replace />}
       />
 
-      {/* ---------- Private ---------- */}
+      {/* ---------- Dashboard ---------- */}
       <Route
         path="/"
         element={
@@ -49,6 +61,7 @@ export default function AppRoutes() {
         }
       />
 
+      {/* ---------- Products ---------- */}
       <Route
         path="/products"
         element={
@@ -61,7 +74,20 @@ export default function AppRoutes() {
           )
         }
       />
+      <Route
+        path="/products/:id"
+        element={
+          user ? (
+            <PrivateLayout>
+              <ProductDetail />
+            </PrivateLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
 
+      {/* ---------- Parts ---------- */}
       <Route
         path="/parts"
         element={
@@ -75,6 +101,7 @@ export default function AppRoutes() {
         }
       />
 
+      {/* ---------- Sales Orders ---------- */}
       <Route
         path="/sales-orders"
         element={
@@ -88,7 +115,7 @@ export default function AppRoutes() {
         }
       />
 
-      {/* ---------- ✅ Purchase Orders ---------- */}
+      {/* ---------- Purchase Orders ---------- */}
       <Route
         path="/purchase-orders"
         element={
@@ -102,19 +129,21 @@ export default function AppRoutes() {
         }
       />
 
-      <Route
-        path="/purchase-orders/bulk-upload"
-        element={
-          user ? (
-            <PrivateLayout>
-              <PurchaseOrderBulkUpload />
-            </PrivateLayout>
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
+     <Route
+  path="/purchase-orders/bulk-upload"
+  element={
+    user ? (
+      <PrivateLayout>
+        <PurchaseOrderBulkUpload />
+      </PrivateLayout>
+    ) : (
+      <Navigate to="/login" replace />
+    )
+  }
+/>
 
+
+     
       <Route
         path="/purchase-orders/new"
         element={
@@ -128,7 +157,6 @@ export default function AppRoutes() {
         }
       />
 
-      {/* ⚙️ Important: place EDIT before ID to prevent collision */}
       <Route
         path="/purchase-orders/edit/:id"
         element={
@@ -155,6 +183,69 @@ export default function AppRoutes() {
         }
       />
 
+      {/* ---------- Vendors ---------- */}
+      <Route
+        path="/vendors"
+        element={
+          user ? (
+            <PrivateLayout>
+              <VendorsPage />
+            </PrivateLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/vendors/new"
+        element={
+          user ? (
+            <PrivateLayout>
+              <VendorForm />
+            </PrivateLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/vendors/bulk-upload"
+        element={
+          user ? (
+            <PrivateLayout>
+              <VendorBulkUpload />
+            </PrivateLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/vendors/edit/:id"
+        element={
+          user ? (
+            <PrivateLayout>
+              <VendorEdit />
+            </PrivateLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/vendors/:id"
+        element={
+          user ? (
+            <PrivateLayout>
+              <VendorDetails />
+            </PrivateLayout>
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+
+      {/* ---------- Reports ---------- */}
       <Route
         path="/reports"
         element={
@@ -168,6 +259,7 @@ export default function AppRoutes() {
         }
       />
 
+      {/* ---------- Settings ---------- */}
       <Route
         path="/settings"
         element={
@@ -181,6 +273,7 @@ export default function AppRoutes() {
         }
       />
 
+      {/* ---------- Fallback ---------- */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

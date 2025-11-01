@@ -1,85 +1,85 @@
 import React, { useState } from "react";
 import axios from "axios";
+import { Link } from "react-router-dom";
+import { CloudArrowUpIcon } from "@heroicons/react/24/solid";
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function PurchaseOrderBulkUpload() {
   const [file, setFile] = useState(null);
-  const [message, setMessage] = useState("");
-  const [uploading, setUploading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
 
-  const handleFileChange = (e) => setFile(e.target.files[0]);
-
-  const handleUpload = async () => {
-    if (!file) {
-      setMessage("❌ Please select an Excel file first.");
-      return;
-    }
-
-    setUploading(true);
-    setMessage("");
+  const onUpload = async () => {
+    if (!file) return setError("Choose File");
+    setBusy(true);
+    setResult(null);
+    setError("");
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      const fd = new FormData();
+      fd.append("file", file);
 
-      const res = await axios.post(`${BASE}/api/purchase_orders/bulk`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      setMessage(res.data.message || "✅ Upload successful!");
-      setFile(null);
-    } catch (err) {
-      console.error("❌ Upload failed:", err);
-      setMessage("❌ Upload failed. See console for details.");
-    } finally {
-      setUploading(false);
+      const res = await axios.post(`${BASE}/api/po_import/import`, fd);
+      setResult(res.data);
+    } catch (e) {
+      setError(e.response?.data?.message || e.message);
     }
+    setBusy(false);
   };
 
   return (
-    <div className="p-6 bg-white shadow rounded max-w-3xl mx-auto">
-      <h2 className="text-2xl font-semibold mb-4 text-gray-800">
-        📦 Bulk Upload Purchase Orders
-      </h2>
+    <div className="p-6 space-y-6 max-w-3xl mx-auto">
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold">Bulk Upload Purchase Orders</h2>
+        <Link to="/purchase-orders" className="text-blue-600 hover:underline">
+          ← Back
+        </Link>
+      </div>
 
-      <p className="text-sm text-gray-600 mb-3">
-        Upload an Excel file (.xlsx or .csv) with the following columns:
-      </p>
+      <div className="border border-gray-200 bg-white rounded-lg p-5 space-y-4 shadow-sm">
+        <label className="block text-sm font-medium text-gray-700">
+          Upload CSV File
+        </label>
 
-      <ul className="list-disc ml-6 text-sm text-gray-700 mb-4">
-        <li>PO Number</li>
-        <li>Supplier</li>
-        <li>Order Date (YYYY-MM-DD)</li>
-        <li>Part Number</li>
-        <li>Quantity</li>
-        <li>Unit Price</li>
-        <li>Shipping</li>
-        <li>Tax %</li>
-        <li>Remarks</li>
-      </ul>
+        <input
+          type="file"
+          onChange={(e) => setFile(e.target.files[0])}
+          className="block w-full border border-gray-300 rounded-lg p-2"
+        />
 
-      <input
-        type="file"
-        accept=".xlsx,.xls,.csv"
-        onChange={handleFileChange}
-        className="border p-2 rounded w-full mb-3"
-      />
+        <button
+          onClick={onUpload}
+          disabled={busy}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
+        >
+          <CloudArrowUpIcon className="h-5 w-5" />
+          {busy ? "Uploading..." : "Start Upload"}
+        </button>
 
-      <button
-        onClick={handleUpload}
-        disabled={uploading}
-        className={`px-4 py-2 rounded text-white ${
-          uploading
-            ? "bg-gray-400 cursor-not-allowed"
-            : "bg-blue-600 hover:bg-blue-700"
-        }`}
-      >
-        {uploading ? "Uploading..." : "Upload File"}
-      </button>
+        {error && (
+          <div className="text-red-600 text-sm font-medium">{error}</div>
+        )}
+      </div>
 
-      {message && (
-        <div className="mt-4 text-sm font-medium text-gray-700">{message}</div>
+      {result && (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+          {[
+            ["Total Rows", result.summary?.totalRows],
+            ["Inserted", result.summary?.insertedPOs],
+            ["Overwritten", result.summary?.overwrittenPOs],
+            ["Skipped", result.summary?.skippedPOs],
+            ["Existing POs", result.summary?.existingPOs],
+            ["Vendors Added", result.summary?.vendorAutoCreated?.count],
+            ["Parts Added", result.summary?.partAutoCreated?.count],
+          ].map(([label, value], i) => (
+            <div key={i} className="bg-gray-50 border border-gray-200 p-3 rounded-lg text-center">
+              <div className="font-semibold text-gray-900">{value ?? 0}</div>
+              <div className="text-xs text-gray-500">{label}</div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

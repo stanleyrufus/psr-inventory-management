@@ -1,39 +1,33 @@
-// frontend/src/components/ProductCard.jsx
 import React from "react";
 
-export default function ProductCard({ product, onView, onEdit }) {
+export default function ProductCard({ product, onView }) {
   return (
-    <div className="bg-white shadow rounded-lg p-4 border hover:shadow-lg transition-all">
-      <h3 className="text-lg font-semibold text-gray-800">{product.product_name}</h3>
-      <p className="text-sm text-gray-500 mb-1">{product.product_code}</p>
-      <p className="text-sm text-gray-600">
-        <span className="font-medium">Category:</span> {product.category || "—"}
-      </p>
-      <p className="text-sm text-gray-600">
-        <span className="font-medium">Status:</span>{" "}
-        <span
-          className={`px-2 py-0.5 rounded-full text-xs ${
-            product.status === "Active"
-              ? "bg-green-100 text-green-800"
-              : "bg-gray-200 text-gray-700"
-          }`}
-        >
-          {product.status}
-        </span>
-      </p>
-
-      <div className="flex justify-between mt-3">
+    <div
+      className="bg-white rounded-xl shadow hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer group"
+      onClick={() => onView(product)}
+    >
+      <div className="relative w-full h-52 overflow-hidden">
+        <img
+          src={product.image_url || "/images/placeholder.jpg"}
+          alt={product.product_name}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+        />
+      </div>
+      <div className="p-4">
+        <h2 className="font-semibold text-gray-800 text-lg">
+          {product.product_code} — {product.product_name}
+        </h2>
+        <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+          {product.short_description || "Industrial automation solution"}
+        </p>
         <button
-          onClick={() => onView(product)}
-          className="text-blue-600 text-sm hover:underline"
+          onClick={(e) => {
+            e.stopPropagation();
+            onView(product);
+          }}
+          className="mt-3 text-blue-600 text-sm font-semibold hover:underline"
         >
-          View
-        </button>
-        <button
-          onClick={() => onEdit(product)}
-          className="text-gray-700 text-sm hover:underline"
-        >
-          Edit
+          View Details →
         </button>
       </div>
     </div>

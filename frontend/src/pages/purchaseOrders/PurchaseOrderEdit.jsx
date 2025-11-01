@@ -10,20 +10,28 @@ export default function PurchaseOrderEdit() {
   const [po, setPo] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Load the existing PO by ID
+  // 🔁 Load PO details (always unwrap .data if backend wraps)
+  const loadPo = async () => {
+    try {
+      const res = await axios.get(`${BASE}/api/purchase_orders/${id}`);
+
+      // Handle both { success:1, data:{...po} } and plain {...po}
+      const normalized =
+        res.data?.data && typeof res.data.data === "object"
+          ? res.data.data
+          : res.data;
+
+      setPo(normalized || null);
+    } catch (err) {
+      console.error("❌ Failed to load PO for edit:", err);
+      setPo(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await axios.get(`${BASE}/api/purchase_orders/${id}`);
-        setPo(res.data || null);
-      } catch (err) {
-        console.error("❌ Failed to load PO for edit:", err);
-        setPo(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+    loadPo();
   }, [id]);
 
   if (loading) {
@@ -50,8 +58,17 @@ export default function PurchaseOrderEdit() {
         </Link>
       </div>
 
-      {/* ✅ Pass the loaded PO to the form */}
-      <PurchaseOrderForm initialPo={po} />
+      {/* ✅ key={po.id} ensures fresh data is loaded each time */}
+      <PurchaseOrderForm
+        key={po.id}
+        initialPo={po}
+        onSaved={async () => {
+          await loadPo();
+          // mark that PO list should refresh next time we return
+          window.localStorage.setItem("refreshPOList", "1");
+        }}
+        onCancel={() => window.history.back()}
+      />
     </div>
   );
 }

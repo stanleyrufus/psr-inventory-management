@@ -1,4 +1,3 @@
-// frontend/src/components/forms/PartForm.jsx
 import React, { useState, useEffect } from "react";
 import api from "../../utils/api";
 
@@ -12,17 +11,18 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
     uom: "",
     quantity_on_hand: "",
     minimum_stock_level: "",
-    unit_price: "",
+    current_unit_price: "", // ✅ fixed
     supplier_name: "",
-    supplier_part_number: "",
     location: "",
     status: "Active",
     lead_time_days: "",
     weight_kg: "",
     material: "",
-    last_order_date: "",
+    last_po_date: "", // ✅ updated (was last_order_date)
     remarks: "",
   });
+
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     if (safeInitial && Object.keys(safeInitial).length > 0) {
@@ -36,16 +36,15 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
         quantity_on_hand: safeInitial.quantity_on_hand ?? prev.quantity_on_hand,
         minimum_stock_level:
           safeInitial.minimum_stock_level ?? prev.minimum_stock_level,
-        unit_price: safeInitial.unit_price ?? prev.unit_price,
+        current_unit_price:
+          safeInitial.current_unit_price ?? prev.current_unit_price,
         supplier_name: safeInitial.supplier_name ?? prev.supplier_name,
-        supplier_part_number:
-          safeInitial.supplier_part_number ?? prev.supplier_part_number,
         location: safeInitial.location ?? prev.location,
         status: safeInitial.status ?? prev.status,
         lead_time_days: safeInitial.lead_time_days ?? prev.lead_time_days,
         weight_kg: safeInitial.weight_kg ?? prev.weight_kg,
         material: safeInitial.material ?? prev.material,
-        last_order_date: safeInitial.last_order_date ?? prev.last_order_date,
+        last_po_date: safeInitial.last_po_date ?? prev.last_po_date,
         remarks: safeInitial.remarks ?? prev.remarks,
       }));
     }
@@ -54,17 +53,33 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const newErrors = {};
+    if (!formData.part_number.trim()) newErrors.part_number = "Required";
+    if (!formData.part_name.trim()) newErrors.part_name = "Required";
+
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      alert("⚠️ Please fill all required fields.");
+      return;
+    }
+
     try {
+      const payload = { ...formData };
+      delete payload.unit_price; // ✅ ensure old field never sent
+
       if (safeInitial && (safeInitial.part_id || safeInitial.id)) {
         const id = safeInitial.part_id ?? safeInitial.id;
-        await api.updatePart(id, formData);
+        await api.updatePart(id, payload);
       } else {
-        await api.createPart(formData);
+        await api.createPart(payload);
       }
+
       alert("✅ Part saved successfully!");
       onSaved && onSaved();
     } catch (err) {
@@ -82,22 +97,36 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
       </h2>
 
       <div className="grid grid-cols-2 gap-3">
-        <input
-          required
-          name="part_number"
-          value={formData.part_number}
-          onChange={handleChange}
-          placeholder="Part Number"
-          className="border p-2 rounded"
-        />
-        <input
-          required
-          name="part_name"
-          value={formData.part_name}
-          onChange={handleChange}
-          placeholder="Part Name"
-          className="border p-2 rounded"
-        />
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-gray-700 mb-1">
+            Part Number <span className="text-red-500">*</span>
+          </span>
+          <input
+            required
+            name="part_number"
+            value={formData.part_number}
+            onChange={handleChange}
+            className={`border p-2 rounded ${
+              errors.part_number ? "border-red-500 animate-pulse" : ""
+            }`}
+          />
+        </label>
+
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-gray-700 mb-1">
+            Part Name <span className="text-red-500">*</span>
+          </span>
+          <input
+            required
+            name="part_name"
+            value={formData.part_name}
+            onChange={handleChange}
+            className={`border p-2 rounded ${
+              errors.part_name ? "border-red-500 animate-pulse" : ""
+            }`}
+          />
+        </label>
+
         <input
           name="category"
           value={formData.category}
@@ -129,10 +158,10 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
           className="border p-2 rounded"
         />
         <input
-          name="unit_price"
+          name="current_unit_price"
           type="number"
           step="0.01"
-          value={formData.unit_price}
+          value={formData.current_unit_price}
           onChange={handleChange}
           placeholder="Unit Price"
           className="border p-2 rounded"
@@ -142,13 +171,6 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
           value={formData.supplier_name}
           onChange={handleChange}
           placeholder="Supplier Name"
-          className="border p-2 rounded"
-        />
-        <input
-          name="supplier_part_number"
-          value={formData.supplier_part_number}
-          onChange={handleChange}
-          placeholder="Supplier Part #"
           className="border p-2 rounded"
         />
         <input
@@ -183,9 +205,9 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
           className="border p-2 rounded"
         />
         <input
-          name="last_order_date"
+          name="last_po_date"
           type="date"
-          value={formData.last_order_date}
+          value={formData.last_po_date}
           onChange={handleChange}
           className="border p-2 rounded"
         />

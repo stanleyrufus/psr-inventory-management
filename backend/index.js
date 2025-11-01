@@ -10,49 +10,60 @@ import { connectDB } from "./db.js";
 import inventoryRoutes from "./routes/inventory.js";
 import usersRoutes from "./routes/users.js";
 import purchaseOrdersRoutes from "./routes/purchase_orders.js";
-import suppliersRoutes from "./routes/suppliers.js";
 import productsRoutes from "./routes/products.js";
-import purchaseOrdersBulkRouter from "./routes/purchase_orders_bulk.js"; // ✅ New route for PO bulk upload
+import purchaseOrdersBulkRouter from "./routes/purchase_orders_bulk.js";
+import purchaseOrderImportRoutes from "./routes/purchase_orders_import.js";
+import vendorRoutes from "./routes/vendors.js"; // ✅ single correct import
+import dashboardRoutes from './routes/dashboard.js';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ✅ Resolve current directory (for ES module path handling)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ✅ Middleware setup
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-// ✅ Static route for uploaded files (PDFs, images, etc.)
+// ✅ Static route for uploaded files
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
-// ✅ Connect to PostgreSQL database
+// ✅ Connect DB
 connectDB();
 
-// ✅ Mount all API routes
+// ✅ Mount API routes (clean separation, no overlaps)
 app.use("/api/parts", inventoryRoutes);
+app.use("/api/vendors", vendorRoutes);
 app.use("/api/users", usersRoutes);
+
+// --- Purchase Orders core + bulk ---
 app.use("/api/purchase_orders", purchaseOrdersRoutes);
-app.use("/api/purchase_orders", purchaseOrdersBulkRouter); // ✅ Mount bulk upload route under same PO path
-app.use("/api/suppliers", suppliersRoutes);
+app.use("/api/purchase_orders_bulk", purchaseOrdersBulkRouter);
+
+// --- Dedicated Import routes (now safe, isolated path) ---
+app.use("/api/po_import", purchaseOrderImportRoutes);
+
+//Dashboard
+app.use('/api/dashboard', dashboardRoutes);
+
+// --- Other modules ---
 app.use("/api/products", productsRoutes);
 
-// ✅ Health check route
+// ✅ Health check
 app.get("/", (req, res) => {
   res.send("🚀 PSR Inventory Management API is running successfully...");
 });
 
-// ✅ Global 404 handler (for unrecognized routes)
+// ✅ 404 handler (must always be last)
 app.use((req, res) => {
   res.status(404).json({ success: false, message: "API route not found" });
 });
 
-// ✅ Start Express server
+// ✅ Start server
 app.listen(PORT, () => {
   console.log(`✅ Backend server running at: http://localhost:${PORT}`);
 });

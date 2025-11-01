@@ -3,11 +3,31 @@ import React, { useEffect, useState } from "react";
 import api from "../utils/api";
 import PartForm from "../components/forms/PartForm";
 import BulkUploadModal from "../components/modals/BulkUploadModal";
-import PartDetail from "../components/PartDetail"; // ✅ new import
+import PartDetail from "../components/PartDetail";
 
 export default function PartsPage() {
   const [parts, setParts] = useState([]);
   const [filtered, setFiltered] = useState([]);
+
+  // ✅ Sorting state + function
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
+
+  const sortBy = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
+    }));
+  };
+
+  const SortIcon = ({ col }) => {
+    if (sortConfig.key !== col) return <span className="ml-1 text-gray-400">▲</span>;
+    return (
+      <span className="ml-1">
+        {sortConfig.direction === "asc" ? "▲" : "▼"}
+      </span>
+    );
+  };
+
   const [editingPart, setEditingPart] = useState(null);
   const [viewingPart, setViewingPart] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -44,9 +64,7 @@ export default function PartsPage() {
         p.part_name?.toLowerCase().includes(search.toLowerCase()) ||
         p.part_number?.toLowerCase().includes(search.toLowerCase()) ||
         p.description?.toLowerCase().includes(search.toLowerCase());
-      const matchCategory = categoryFilter
-        ? p.category === categoryFilter
-        : true;
+      const matchCategory = categoryFilter ? p.category === categoryFilter : true;
       const matchStatus = statusFilter ? p.status === statusFilter : true;
       return matchSearch && matchCategory && matchStatus;
     });
@@ -54,11 +72,20 @@ export default function PartsPage() {
     setCurrentPage(1);
   }, [search, categoryFilter, statusFilter, parts]);
 
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
-  const paginated = filtered.slice(
+  const sortedFiltered = [...filtered].sort((a, b) => {
+    if (!sortConfig.key) return filtered;
+    const x = a[sortConfig.key] ?? "";
+    const y = b[sortConfig.key] ?? "";
+    return sortConfig.direction === "asc" ? (x > y ? 1 : -1) : (x < y ? 1 : -1);
+  });
+
+  const totalPages = Math.ceil(sortedFiltered.length / itemsPerPage) || 1;
+
+  const paginated = sortedFiltered.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
@@ -67,6 +94,18 @@ export default function PartsPage() {
     setShowForm(false);
     setEditingPart(null);
     loadParts();
+  };
+
+  const handleDelete = async (id, name) => {
+    if (!window.confirm(`Delete part "${name}" permanently?`)) return;
+    try {
+      await api.deletePart(id);
+      alert("✅ Part deleted successfully!");
+      loadParts();
+    } catch (err) {
+      console.error("❌ Error deleting part:", err);
+      alert("Error deleting part. Check console.");
+    }
   };
 
   return (
@@ -156,26 +195,79 @@ export default function PartsPage() {
       <div className="bg-white shadow-md rounded-lg overflow-x-auto">
         <table className="min-w-full border text-sm text-left">
           <thead className="bg-gray-100 text-gray-700 uppercase text-xs font-semibold">
-            <tr>
-              <th className="py-3 px-4 border-b">Part #</th>
-              <th className="py-3 px-4 border-b">Name</th>
-              <th className="py-3 px-4 border-b">Category</th>
-              <th className="py-3 px-4 border-b">UOM</th>
-              <th className="py-3 px-4 border-b text-right">Qty</th>
-              <th className="py-3 px-4 border-b text-right">Unit Price</th>
-              <th className="py-3 px-4 border-b">Supplier</th>
-              <th className="py-3 px-4 border-b">Location</th>
-              <th className="py-3 px-4 border-b text-center">Status</th>
-              <th className="py-3 px-4 border-b text-center">Actions</th>
-            </tr>
-          </thead>
+  <tr>
+    <th
+      className="py-3 px-4 border-b cursor-pointer"
+      onClick={() => sortBy("part_number")}
+    >
+      <div className="flex items-center">
+        Part # <SortIcon col="part_number" />
+      </div>
+    </th>
+
+    <th
+      className="py-3 px-4 border-b cursor-pointer"
+      onClick={() => sortBy("part_name")}
+    >
+      <div className="flex items-center">
+        Part Name <SortIcon col="part_name" />
+      </div>
+    </th>
+
+    <th
+      className="py-3 px-4 border-b cursor-pointer"
+      onClick={() => sortBy("category")}
+    >
+      <div className="flex items-center">
+        Category <SortIcon col="category" />
+      </div>
+    </th>
+
+    <th
+      className="py-3 px-4 border-b cursor-pointer"
+      onClick={() => sortBy("machine_name")}
+    >
+      <div className="flex items-center">
+        Machine <SortIcon col="machine_name" />
+      </div>
+    </th>
+
+    <th
+      className="py-3 px-4 border-b text-right cursor-pointer"
+      onClick={() => sortBy("last_unit_price")}
+    >
+      <div className="flex items-center justify-end">
+        Last Price <SortIcon col="last_unit_price" />
+      </div>
+    </th>
+
+    <th
+      className="py-3 px-4 border-b cursor-pointer"
+      onClick={() => sortBy("last_vendor_name")}
+    >
+      <div className="flex items-center">
+        Last Vendor <SortIcon col="last_vendor_name" />
+      </div>
+    </th>
+
+    <th
+      className="py-3 px-4 border-b text-center cursor-pointer"
+      onClick={() => sortBy("status")}
+    >
+      <div className="flex items-center justify-center">
+        Status <SortIcon col="status" />
+      </div>
+    </th>
+
+    <th className="py-3 px-4 border-b text-center">Actions</th>
+  </tr>
+</thead>
+
+
           <tbody>
             {paginated.length === 0 ? (
               <tr>
-                <td
-                  colSpan={10}
-                  className="text-center py-6 text-gray-500 font-medium"
-                >
+                <td colSpan={8} className="text-center py-6 text-gray-500 font-medium">
                   No parts found
                 </td>
               </tr>
@@ -188,15 +280,15 @@ export default function PartsPage() {
                   <td className="py-2 px-4">{p.part_number}</td>
                   <td className="py-2 px-4">{p.part_name}</td>
                   <td className="py-2 px-4">{p.category || "-"}</td>
-                  <td className="py-2 px-4">{p.uom || "-"}</td>
+                  <td className="py-2 px-4">{p.machine_name || "-"}</td>
                   <td className="py-2 px-4 text-right">
-                    {p.quantity_on_hand ?? "-"}
+                    {p.last_unit_price
+                      ? `$${Number(p.last_unit_price).toFixed(2)}`
+                      : p.unit_price
+                      ? `$${Number(p.unit_price).toFixed(2)}`
+                      : "-"}
                   </td>
-                  <td className="py-2 px-4 text-right">
-                    {p.unit_price ? `$${p.unit_price}` : "-"}
-                  </td>
-                  <td className="py-2 px-4">{p.supplier_name || "-"}</td>
-                  <td className="py-2 px-4">{p.location || "-"}</td>
+                  <td className="py-2 px-4">{p.last_vendor_name || "—"}</td>
                   <td className="py-2 px-4 text-center">
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -210,10 +302,7 @@ export default function PartsPage() {
                   </td>
                   <td className="py-2 px-4 text-center">
                     <div className="flex justify-center gap-3">
-                      <button
-                        onClick={() => setViewingPart(p)}
-                        className="text-blue-600 hover:underline text-sm"
-                      >
+                      <button onClick={() => setViewingPart(p)} className="text-blue-600 hover:underline text-sm">
                         View
                       </button>
                       <button
@@ -224,6 +313,12 @@ export default function PartsPage() {
                         className="text-gray-700 hover:underline text-sm"
                       >
                         Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(p.part_id, p.part_name)}
+                        className="text-red-600 hover:underline text-sm"
+                      >
+                        Delete
                       </button>
                     </div>
                   </td>
@@ -279,20 +374,13 @@ export default function PartsPage() {
 
       {showBulk && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl p-6 relative">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl p-6 relative overflow-y-auto max-h-[90vh]">
             <BulkUploadModal
               onClose={() => setShowBulk(false)}
               onComplete={() => {
-                setShowBulk(false);
                 loadParts();
               }}
             />
-            <button
-              className="absolute top-3 right-4 text-gray-500 hover:text-gray-700"
-              onClick={() => setShowBulk(false)}
-            >
-              ✖
-            </button>
           </div>
         </div>
       )}

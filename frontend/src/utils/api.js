@@ -50,7 +50,6 @@ export const bulkUploadParts = async (partsArray) => {
 --------------------------- */
 export const fetchProducts = async () => {
   const res = await apiClient.get("/api/products");
-  // handle both {data: [...]} and plain array
   if (Array.isArray(res.data)) return { success: true, data: res.data };
   if (res.data?.data) return res.data;
   return { success: false, data: [] };
@@ -83,7 +82,6 @@ export const deleteProduct = async (id) => {
 --------------------------- */
 export const fetchPurchaseOrders = async () => {
   const res = await apiClient.get("/api/purchase_orders");
-  // backend returns plain array
   if (Array.isArray(res.data)) return res.data;
   if (Array.isArray(res.data?.data)) return res.data.data;
   return [];
@@ -118,6 +116,36 @@ export const uploadPurchaseOrderFiles = async (id, files) => {
   return res.data;
 };
 
+/* --------------------------
+   🧩 VENDORS API
+--------------------------- */
+export const fetchVendors = async () => {
+  const res = await apiClient.get("/api/vendors");
+  if (Array.isArray(res.data)) return res.data;
+  if (res.data && Array.isArray(res.data.data)) return res.data.data;
+  return [];
+};
+
+export const createVendor = async (data) => {
+  const res = await apiClient.post("/api/vendors", data);
+  return res.data;
+};
+
+export const updateVendor = async (id, data) => {
+  const res = await apiClient.put(`/api/vendors/${id}`, data);
+  return res.data;
+};
+
+export const deleteVendor = async (id) => {
+  const res = await apiClient.delete(`/api/vendors/${id}`);
+  return res.data;
+};
+
+export const bulkUploadVendors = async (vendorsArray) => {
+  const res = await apiClient.post("/api/vendors/bulk-upload", { vendors: vendorsArray });
+  return res.data;
+};
+
 export default {
   fetchParts,
   createPart,
@@ -134,4 +162,9 @@ export default {
   updatePurchaseOrder,
   updatePurchaseOrderStatus,
   uploadPurchaseOrderFiles,
+  fetchVendors,
+  createVendor,
+  updateVendor,
+  deleteVendor,
+  bulkUploadVendors,
 };

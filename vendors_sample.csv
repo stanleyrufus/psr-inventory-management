@@ -1,0 +1,5 @@
+vendor_name  ,contact_name,Phone,Email,Address1,Address2,City,State,Country,postal_code,payment_terms,payment_method,remarks,is_active
+ddsd,John Doe,555-1234,sales@abcmetals.com,123 Industrial Rd,,Austin,TX,USA,78701,Net 30,Wire Transfer,Primary aluminum supplier,TRUE
+adasd,Mary Jane,555-8901,info@globalsteel.com,450 Foundry Blvd,Unit 4,Houston,TX,USA,77002,Net 15,Credit Card,Steel sheets and bars,TRUE
+dasdad,Ravi Kumar,555-3312,contact@precisiontools.in,Plot 22,Sector 19,Gurgaon,Haryana,India,122016,Net 45,Wire Transfer,Preferred tooling vendor,TRUE
+rrrerrrrr,Linda Wong,555-7755,orders@chemco.com,12 Science Park Ave,,Singapore,,Singapore,117684,Net 30,ACH,Chemical lubricants and agents,TRUE

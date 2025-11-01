@@ -1,0 +1,712 @@
+[
+  {
+    "id": 1,
+    "product_code": "F1000",
+    "product_name": "2 Head Servo Filler",
+    "category": "Filling Machines",
+    "short_description": "Compact two-head servo filler for precise liquid filling up to 1 gallon.",
+    "long_description": "The PSR Automation Inc. F1000 Servo Filler is a state-of-the-art filling solution engineered for small to medium production runs. It supports 1 or 2 filling nozzles and handles bottles from 2 ounces to 1 gallon with outstanding accuracy.",
+    "key_features": [
+      "1 or 2 filling nozzles",
+      "Based on the 1000-series frame",
+      "Individual servo-driven positive displacement pumps",
+      "Quick 15-minute changeover design",
+      "304 stainless steel and aluminum construction"
+    ],
+    "technical_specs": [
+      { "label": "Frame Series", "value": "1000 Series" },
+      { "label": "Filling Range", "value": "2 oz – 1 gallon" },
+      { "label": "Power Supply", "value": "220 V AC, 60 Hz" },
+      { "label": "Nozzles", "value": "1 or 2" }
+    ],
+    "applications": [
+      "Pharmaceuticals",
+      "Cosmetics",
+      "Food and Beverage",
+      "Chemicals"
+    ],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/filler-f1000.jpg"
+  },
+  {
+    "id": 2,
+    "product_code": "F1000-PAIL",
+    "product_name": "Servo Pail Filler",
+    "category": "Filling Machines",
+    "short_description": "Extended-frame F1000 variant for 5-gallon pail filling.",
+    "long_description": "The F1000-PAIL Servo Pail Filler widens the standard F1000 frame to accommodate larger 5-gallon pails in addition to standard containers, maintaining the same precision and efficiency as the base model.",
+    "key_features": [
+      "Handles containers up to 5-gallon pails",
+      "1 or 2 servo-driven filling nozzles",
+      "Quick setup and changeover",
+      "304 stainless steel and aluminum construction"
+    ],
+    "technical_specs": [
+      { "label": "Frame Series", "value": "1000 Series (Wide)" },
+      { "label": "Max Container Size", "value": "5 gallons" },
+      { "label": "Nozzles", "value": "1 or 2" }
+    ],
+    "applications": ["Industrial Lubricants", "Food Products", "Chemicals"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/filler-f1000pail.jpg"
+  },
+  {
+    "id": 3,
+    "product_code": "F2000",
+    "product_name": "6 Head Servo Filler",
+    "category": "Filling Machines",
+    "short_description": "High-capacity six-head servo filler based on the 2000-series frame.",
+    "long_description": "The PSR Automation Inc. F2000 Servo Filler offers 2, 4, or 6 nozzle configurations for medium-volume operations, delivering high-precision filling for liquids and viscous products.",
+    "key_features": [
+      "2, 4, or 6 filling nozzles",
+      "2000-series stainless frame",
+      "Individual servo control per pump",
+      "Fast changeover and easy maintenance"
+    ],
+    "technical_specs": [
+      { "label": "Frame Series", "value": "2000 Series" },
+      { "label": "Nozzle Options", "value": "2 / 4 / 6" }
+    ],
+    "applications": ["Pharmaceuticals", "Cosmetics", "Food and Beverage"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/filler-f2000.jpg"
+  },
+  {
+    "id": 4,
+    "product_code": "F3000",
+    "product_name": "8 Head Servo Filler",
+    "category": "Filling Machines",
+    "short_description": "Flagship 8-head volumetric servo filler for maximum precision and speed.",
+    "long_description": "The F3000 is PSR’s premier volumetric servo filling system offered in 2 to 8 head configurations. It uses positive displacement lobe pumps and industrial AC servo motors to deliver unmatched accuracy and efficiency for a wide range of liquid products.",
+    "key_features": [
+      "2 – 8 nozzle configurations",
+      "Positive displacement lobe pumps",
+      "Quick 15-minute changeovers",
+      "Industrial AC servo motors and drives",
+      "Self-adjusting minimal mechanical setup"
+    ],
+    "technical_specs": [
+      { "label": "Nozzles", "value": "2 / 4 / 6 / 8" },
+      { "label": "Frame", "value": "3000 Series Stainless Steel" },
+      { "label": "Fill Range", "value": "2 oz – 2.5 gal" }
+    ],
+    "applications": ["Pharmaceuticals", "Cosmetics", "Food and Beverage", "Chemicals"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/filler-f3000.jpg"
+  },
+  {
+    "id": 5,
+    "product_code": "F3000DL",
+    "product_name": "Dual Lane Servo Filler",
+    "category": "Filling Machines",
+    "short_description": "Dual-lane servo filler for high-volume production efficiency.",
+    "long_description": "The F3000DL Dual Lane Servo Filler minimizes bottle transfer time using two parallel lanes to fill bottles simultaneously, doubling throughput without sacrificing accuracy.",
+    "key_features": [
+      "Dual filling lanes for simultaneous operation",
+      "Independent servo control for each head",
+      "Touchscreen interface with memory recall",
+      "304 stainless steel and aluminum construction"
+    ],
+    "technical_specs": [
+      { "label": "Lanes", "value": "2 (dual lane design)" },
+      { "label": "Nozzles", "value": "Up to 8 per lane" },
+      { "label": "Frame", "value": "3000 Series" }
+    ],
+    "applications": ["Pharmaceuticals", "Cosmetics", "Food and Beverage", "Chemicals"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/filler-f3000dl.jpg"
+  },
+  {
+    "id": 6,
+    "product_code": "F3000-Hazloc",
+    "product_name": "8 Head Hazloc Servo Filler",
+    "category": "Filling Machines",
+    "short_description": "Explosion-protected variant of the F3000 for hazardous locations (Class I Div 2).",
+    "long_description": "The F3000-Hazloc is designed for environments where flammable vapors or products are present. Built to Class I Division 2 standards, it retains the precision and robustness of the standard F3000 model.",
+    "key_features": [
+      "Hazardous location rated (Class I Div 2)",
+      "2–8 nozzle options",
+      "Positive displacement pumps",
+      "3000-series frame construction"
+    ],
+    "technical_specs": [
+      { "label": "Certification", "value": "Class I Division 2" },
+      { "label": "Frame", "value": "3000 Series Hazloc" },
+      { "label": "Nozzles", "value": "2 / 4 / 6 / 8" }
+    ],
+    "applications": ["Chemicals", "Flammable Liquids", "Industrial Lubricants"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/filler-f3000hazloc.jpg"
+  },
+  {
+    "id": 7,
+    "product_code": "CPF1000",
+    "product_name": "Counter Pressure Filler",
+    "category": "Filling Machines",
+    "short_description": "Inline counter-pressure filler for carbonated beverages and sparkling products.",
+    "long_description": "The CPF1000 employs counter-pressure technology to fill carbonated drinks without loss of CO₂, preserving product integrity and ensuring accurate fills for beer, wine, and kombucha.",
+    "key_features": [
+      "Counter-pressure filling system",
+      "Four precision nozzles",
+      "Inline design for seamless integration",
+      "Intuitive controls and safety features"
+    ],
+    "technical_specs": [
+      { "label": "Nozzles", "value": "4" },
+      { "label": "Container Range", "value": "12 oz – 1 L bottles" }
+    ],
+    "applications": ["Beer", "Sparkling Wine", "Kombucha", "Carbonated Juices"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/filler-cpf1000.jpg"
+  },
+  {
+    "id": 8,
+    "product_code": "FLM1000",
+    "product_name": "Flow Meter Filler",
+    "category": "Filling Machines",
+    "short_description": "Advanced flow-meter-based filler optimized for thin liquids and caustic solutions.",
+    "long_description": "The FLM1000 integrates a precision flow meter sensor to measure and dispense exact volumes without contact, eliminating pump wear and providing exceptional accuracy for thin or caustic liquids.",
+    "key_features": [
+      "Integrated flow meter sensor",
+      "Ideal for thin and caustic liquids",
+      "Servo vertical adjustment system",
+      "Touchscreen control with memory recall"
+    ],
+    "technical_specs": [
+      { "label": "Filling Method", "value": "Flow Meter Sensor (Non-contact)" },
+      { "label": "Material", "value": "304 Stainless Steel & Aluminum" }
+    ],
+    "applications": ["Pharmaceuticals", "Cosmetics", "Food and Beverage", "Chemicals"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/filler-flm1000.jpg"
+  },
+  {
+    "id": 9,
+    "product_code": "GF1000",
+    "product_name": "Inline Gravity Filler",
+    "category": "Filling Machines",
+    "short_description": "Time-based gravity filler for high-speed dispensing of thin liquids.",
+    "long_description": "The GF1000 uses time-controlled gravity dispensing to fill thin liquids accurately and economically. Constructed entirely from stainless steel, it is ideal for food and industrial applications.",
+    "key_features": [
+      "1–4 head configurations",
+      "PLC controls and touchscreen interface",
+      "Fiberglass electrical enclosure",
+      "Positive shut-off nozzles",
+      "Optional diving head system"
+    ],
+    "technical_specs": [
+      { "label": "Nozzles", "value": "1 / 2 / 4" },
+      { "label": "Bottle Range", "value": "1 oz – 1 gallon" },
+      { "label": "Frame Material", "value": "304 Stainless Steel" }
+    ],
+    "applications": ["Food and Beverage", "Pharmaceuticals", "Chemicals"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/filler-gf1000.jpg"
+  },
+  {
+    "id": 10,
+    "product_code": "PF1000",
+    "product_name": "Pressure Filler",
+    "category": "Filling Machines",
+    "short_description": "Inline pressure filler for wide-range container sizes and viscosities.",
+    "long_description": "The PF1000 is an inline pressure filling system that uses up to 4 nozzles to deliver consistent fills across multiple container sizes and product types, ensuring hygienic and efficient operation.",
+    "key_features": [
+      "Up to 4 pressure nozzles",
+      "Industrial-grade stainless steel build",
+      "User-friendly control panel",
+      "Sanitary and easy-to-clean design"
+    ],
+    "technical_specs": [
+      { "label": "Nozzles", "value": "1 – 4" },
+      { "label": "Construction", "value": "304 Stainless Steel" }
+    ],
+    "applications": ["Beverage Production", "Pharmaceutical Manufacturing", "Cosmetics", "Chemicals"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/filler-pf1000.jpg"
+  },
+  {
+    "id": 11,
+    "product_code": "P1000",
+    "product_name": "Piston Filler",
+    "category": "Filling Machines",
+    "short_description": "Fully automatic piston filler for accurate volume dispensing of liquids and pastes.",
+    "long_description": "The P1000 Piston Filler combines servo-driven vertical control and dual piston configuration for precise liquid filling. Ideal for food, pharmaceutical, and cosmetic applications requiring consistency and speed.",
+    "key_features": [
+      "High-precision 16 oz piston fill",
+      "Dual nozzle configuration",
+      "Fully automatic operation",
+      "Durable stainless steel frame"
+    ],
+    "technical_specs": [
+      { "label": "Filling Volume", "value": "Up to 16 oz per piston" },
+      { "label": "Nozzles", "value": "Up to 2" }
+    ],
+    "applications": ["Food and Beverage", "Pharmaceuticals", "Cosmetics", "Chemicals"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/filler-p1000.jpg"
+  },
+  {
+    "id": 12,
+    "product_code": "S3F",
+    "product_name": "Table Top Servo Filler",
+    "category": "Filling Machines",
+    "short_description": "Compact tabletop servo filler for lab or small-batch production.",
+    "long_description": "The S3F is PSR’s most compact servo filling solution designed for laboratories or pilot production. Despite its small size, it provides full servo control and industrial precision.",
+    "key_features": [
+      "Tabletop frame design",
+      "Servo-controlled volumetric fill",
+      "Easy cleaning and quick changeover",
+      "Compact industrial-grade construction"
+    ],
+    "technical_specs": [
+      { "label": "Frame Type", "value": "Table Top" },
+      { "label": "Nozzles", "value": "1" },
+      { "label": "Fill Range", "value": "Up to 1 Liter" }
+    ],
+    "applications": ["Pharmaceutical Labs", "Pilot Production", "Cosmetic Sampling"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/filler-s3f.jpg"
+  },
+  {
+    "id": 13,
+    "product_code": "TP-SERIES",
+    "product_name": "Trigger Pump Filler",
+    "category": "Filling Machines",
+    "short_description": "Dedicated filler for trigger-pump or spray bottle packaging lines.",
+    "long_description": "The TP-Series is a specialized servo filler optimized for trigger pump bottles, featuring adjustable stroke filling and automatic neck alignment for consistent output.",
+    "key_features": [
+      "Trigger bottle neck alignment system",
+      "Servo-driven fill control",
+      "Adjustable height and stroke"
+    ],
+    "technical_specs": [
+      { "label": "Bottle Type", "value": "Trigger or Spray" },
+      { "label": "Fill Range", "value": "Up to 1 Liter" }
+    ],
+    "applications": ["Cleaning Products", "Sanitizers", "Spray Bottles"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/filler-TP-Series.jpg"
+  },
+  {
+    "id": 14,
+    "product_code": "LCF5000",
+    "product_name": "Large Container Filler",
+    "category": "Filling Machines",
+    "short_description": "High-capacity filler for drums, totes, and bulk containers.",
+    "long_description": "The LCF5000 handles filling of large containers up to 275-gallon IBC totes. It combines heavy-duty stainless construction with servo control for precision even at high volumes.",
+    "key_features": [
+      "Handles 5 to 275-gallon containers",
+      "Heavy-duty stainless frame",
+      "Automatic tare adjustment",
+      "Optional bottom-up filling"
+    ],
+    "technical_specs": [
+      { "label": "Container Range", "value": "5 – 275 Gallons" },
+      { "label": "Frame Series", "value": "5000 Series" }
+    ],
+    "applications": ["Industrial Chemicals", "Lubricants", "Food Service Bulk"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/filler-lcf5000.jpg"
+  },
+
+  {
+    "id": 15,
+    "product_code": "TO1000",
+    "product_name": "Torque Chuck Capper",
+    "category": "Capping Machines",
+    "short_description": "Inline torque chuck capper for consistent torque-controlled closures.",
+    "long_description": "The TO1000 Torque Capper applies screw caps using a precision servo-driven torque chuck. Designed for repeatable and reliable torque application on various cap and bottle combinations.",
+    "key_features": [
+      "Servo-driven torque chuck system",
+      "Adjustable torque control via HMI",
+      "Quick changeover for cap sizes",
+      "304 stainless steel frame"
+    ],
+    "technical_specs": [
+      { "label": "Torque Range", "value": "5 – 50 in-lbs" },
+      { "label": "Cap Range", "value": "20mm – 110mm" }
+    ],
+    "applications": ["Pharmaceuticals", "Beverages", "Household Products"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/capper-to1000.jpg"
+  },
+  {
+    "id": 16,
+    "product_code": "TO3000",
+    "product_name": "High-Speed Torque Capper",
+    "category": "Capping Machines",
+    "short_description": "Servo torque chuck capper for high-speed production lines.",
+    "long_description": "The TO3000 expands the standard torque chuck capper with dual-head configuration and reinforced 3000-series frame for continuous, high-speed operation.",
+    "key_features": [
+      "Dual torque chuck heads",
+      "Servo-driven with programmable torque settings",
+      "Quick-release spindle chucks",
+      "Hardened aluminum and stainless steel construction"
+    ],
+    "technical_specs": [
+      { "label": "Heads", "value": "1 or 2" },
+      { "label": "Torque Control", "value": "Servo-controlled precision" }
+    ],
+    "applications": ["Food Packaging", "Personal Care", "Pharmaceuticals"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/capper-to3000.png"
+  },
+  {
+    "id": 17,
+    "product_code": "SO1000",
+    "product_name": "Snap-On Capper",
+    "category": "Capping Machines",
+    "short_description": "Compact servo-driven snap-on capper for press-fit closures.",
+    "long_description": "The SO1000 Snap-On Capper delivers efficient press-fit capping using servo-controlled pressure heads, ensuring accurate, damage-free closures for snap-on or plug caps.",
+    "key_features": [
+      "Servo-driven capping heads",
+      "Adjustable downforce for each closure",
+      "Quick changeover tooling",
+      "304 stainless steel frame"
+    ],
+    "technical_specs": [
+      { "label": "Cap Type", "value": "Snap-On / Plug Caps" },
+      { "label": "Max Speed", "value": "Up to 60 CPM" }
+    ],
+    "applications": ["Food", "Cosmetics", "Household Products"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/capper-so1000.jpg"
+  },
+  {
+    "id": 18,
+    "product_code": "SO120",
+    "product_name": "Mini Snap-On Capper",
+    "category": "Capping Machines",
+    "short_description": "Tabletop mini snap-on capper for small-scale or lab use.",
+    "long_description": "The SO120 is a compact tabletop snap-on capper, ideal for laboratory or pilot production. It offers precision control in a portable design for small container sizes.",
+    "key_features": [
+      "Tabletop configuration",
+      "Adjustable pressure force",
+      "Single servo head system",
+      "Lightweight and durable construction"
+    ],
+    "technical_specs": [
+      { "label": "Frame Type", "value": "Tabletop" },
+      { "label": "Cap Diameter", "value": "15mm – 60mm" }
+    ],
+    "applications": ["Pharmaceutical Labs", "R&D", "Sample Packaging"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/capper-so120.jpg"
+  },
+  {
+    "id": 19,
+    "product_code": "PD1000",
+    "product_name": "Pick and Place Capper",
+    "category": "Capping Machines",
+    "short_description": "Servo pick-and-place capper for automatic closure placement and torqueing.",
+    "long_description": "The PD1000 integrates servo-controlled pick-and-place functionality, picking caps from a feeder and applying them with torque precision. Perfect for small bottles and delicate closures.",
+    "key_features": [
+      "Servo pick-and-place system",
+      "Integrated cap feeder bowl",
+      "Torque monitoring",
+      "Touchscreen control"
+    ],
+    "technical_specs": [
+      { "label": "Cap Feed", "value": "Automatic (Bowl Feed)" },
+      { "label": "Speed", "value": "Up to 80 CPM" }
+    ],
+    "applications": ["Pharmaceuticals", "Food", "Personal Care"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/capper-pd1000.jpg"
+  },
+  {
+    "id": 20,
+    "product_code": "PD1500",
+    "product_name": "High-Speed Pick and Place Capper",
+    "category": "Capping Machines",
+    "short_description": "Dual-arm high-speed capper for continuous motion capping.",
+    "long_description": "The PD1500 extends the PD1000 with dual servo arms and rotary continuous motion for high-output lines. It combines efficiency, flexibility, and torque precision at industrial scale.",
+    "key_features": [
+      "Dual servo arms for parallel operation",
+      "Continuous motion indexing",
+      "Torque verification sensors",
+      "Fully enclosed safety design"
+    ],
+    "technical_specs": [
+      { "label": "Speed", "value": "Up to 120 CPM" },
+      { "label": "Cap Type", "value": "Screw, Snap-On, Specialty" }
+    ],
+    "applications": ["Pharmaceuticals", "Beverage", "Cosmetics"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/capper-pd1500.jpg"
+  },
+  {
+    "id": 21,
+    "product_code": "PD2000",
+    "product_name": "Rotary Pick and Place Capper",
+    "category": "Capping Machines",
+    "short_description": "Rotary pick-and-place capper designed for continuous high-volume production.",
+    "long_description": "The PD2000 uses rotary servo control to pick and cap bottles in continuous motion, offering unmatched performance for large-scale bottling lines.",
+    "key_features": [
+      "Rotary continuous motion design",
+      "High-speed servo-driven system",
+      "Multi-head torque application",
+      "Automatic cap orientation"
+    ],
+    "technical_specs": [
+      { "label": "Frame Type", "value": "Rotary" },
+      { "label": "Cap Range", "value": "20–110mm" }
+    ],
+    "applications": ["Beverages", "Personal Care", "Household Products"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/capper-pd2000.jpg"
+  },
+  {
+    "id": 22,
+    "product_code": "PI5000",
+    "product_name": "Press-In Plug Capper",
+    "category": "Capping Machines",
+    "short_description": "Press-in plug capper for tamper-evident closures and stopper-style caps.",
+    "long_description": "The PI5000 applies press-in plugs and stoppers with servo-controlled precision. Designed for consistent insertion depth and uniform pressure across production batches.",
+    "key_features": [
+      "Press-in plug capping technology",
+      "Adjustable insertion depth",
+      "Programmable pressure control",
+      "Compatible with child-proof closures"
+    ],
+    "technical_specs": [
+      { "label": "Cap Type", "value": "Press-In / Stopper" },
+      { "label": "Speed", "value": "Up to 90 CPM" }
+    ],
+    "applications": ["Pharmaceuticals", "Industrial Chemicals", "Beverages"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/capper-pi5000.jpg"
+  },
+  {
+    "id": 23,
+    "product_code": "CC1000",
+    "product_name": "Chuck Capper Compact",
+    "category": "Capping Machines",
+    "short_description": "Compact inline chuck capper ideal for small bottle formats.",
+    "long_description": "The CC1000 Chuck Capper Compact is a cost-effective inline chuck capper with servo torque control for small-format bottles and short production runs.",
+    "key_features": [
+      "Compact frame design",
+      "Single-head torque chuck",
+      "Servo torque control",
+      "Easy changeover tooling"
+    ],
+    "technical_specs": [
+      { "label": "Frame Series", "value": "1000 Series Compact" },
+      { "label": "Torque Range", "value": "5–25 in-lbs" }
+    ],
+    "applications": ["Pharma", "Cosmetics", "Food & Beverage"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/capper-cc1000.jpg"
+  },
+  {
+    "id": 24,
+    "product_code": "ROC2000",
+    "product_name": "Rotary Chuck Capper",
+    "category": "Capping Machines",
+    "short_description": "Rotary chuck capper for high-speed, continuous production.",
+    "long_description": "The ROC2000 Rotary Chuck Capper is PSR’s high-speed rotary capping system built on a 2000-series frame. It combines multi-head torque control and continuous motion indexing for top-tier efficiency.",
+    "key_features": [
+      "Rotary continuous motion system",
+      "Multi-head torque chuck design",
+      "Servo-controlled spindle drives",
+      "Fully enclosed for operator safety"
+    ],
+    "technical_specs": [
+      { "label": "Frame Series", "value": "2000 Series Rotary" },
+      { "label": "Speed", "value": "Up to 150 CPM" }
+    ],
+    "applications": ["Pharmaceuticals", "Food & Beverage", "Cosmetics", "Chemicals"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/capper-roc2000.jpg"
+  },
+
+  {
+    "id": 25,
+    "product_code": "BTH",
+    "product_name": "Bottle Transfer Hopper",
+    "category": "Material Handling",
+    "short_description": "Automated hopper for smooth and consistent bottle transfer to conveyor systems.",
+    "long_description": "The BTH Bottle Transfer Hopper is designed to ensure seamless transfer of empty bottles to filling or capping lines. Its vibratory feed and adjustable guides reduce jams and improve throughput consistency.",
+    "key_features": [
+      "Vibratory feed system for consistent flow",
+      "Adjustable guides for multiple bottle sizes",
+      "Stainless steel construction",
+      "Integrated sensor-based bottle detection"
+    ],
+    "technical_specs": [
+      { "label": "Frame Material", "value": "304 Stainless Steel" },
+      { "label": "Bottle Range", "value": "1 oz – 1 L" },
+      { "label": "Power", "value": "110V / 220V AC" }
+    ],
+    "applications": ["Pharmaceuticals", "Beverage Bottling", "Personal Care"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/handling-bth.jpg"
+  },
+  {
+    "id": 26,
+    "product_code": "CV1000",
+    "product_name": "Inline Conveyor System",
+    "category": "Material Handling",
+    "short_description": "Modular conveyor for bottle or container transport between filling and capping stages.",
+    "long_description": "The CV1000 modular inline conveyor integrates with PSR’s filling and capping equipment to provide efficient, continuous container movement. Its stainless-steel construction and variable speed drive ensure durability and control.",
+    "key_features": [
+      "Variable-speed drive system",
+      "Modular stainless steel design",
+      "Adjustable guide rails",
+      "Compatible with all PSR machines"
+    ],
+    "technical_specs": [
+      { "label": "Belt Width", "value": "4–6 inches" },
+      { "label": "Drive", "value": "Variable Frequency (VFD)" },
+      { "label": "Frame Material", "value": "304 Stainless Steel" }
+    ],
+    "applications": ["Filling Lines", "Capping Lines", "Packaging Conveyance"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/handling-cv1000.jpg"
+  },
+  {
+    "id": 27,
+    "product_code": "EL1000",
+    "product_name": "Bottle Elevator",
+    "category": "Material Handling",
+    "short_description": "Vertical elevator for bottle elevation between conveyors or process levels.",
+    "long_description": "The EL1000 Bottle Elevator is built for vertical transfer of bottles between multiple conveyor heights. With a cleated belt and photoeye sensors, it ensures consistent bottle spacing and prevents line backups.",
+    "key_features": [
+      "Cleated vertical belt system",
+      "Photoeye bottle detection sensors",
+      "Variable speed motor drive",
+      "Low-maintenance, food-grade components"
+    ],
+    "technical_specs": [
+      { "label": "Height Range", "value": "Up to 2.5 meters" },
+      { "label": "Drive", "value": "VFD Controlled" },
+      { "label": "Material", "value": "Stainless Steel & UHMW" }
+    ],
+    "applications": ["Filling Lines", "Capping Lines", "Industrial Automation"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/handling-el1000.jpg"
+  },
+  {
+    "id": 28,
+    "product_code": "TD120",
+    "product_name": "Turntable 120",
+    "category": "Material Handling",
+    "short_description": "Compact accumulation or unscrambling turntable for small containers.",
+    "long_description": "The TD120 Turntable is ideal for accumulating or feeding small bottles. It can serve as both an unscrambler at the start of a line or a pack-off table at the end, improving workflow flexibility.",
+    "key_features": [
+      "Adjustable variable-speed rotation",
+      "Stainless steel table surface",
+      "Height-adjustable legs",
+      "Tool-free disassembly for cleaning"
+    ],
+    "technical_specs": [
+      { "label": "Table Diameter", "value": "1200 mm (47 inches)" },
+      { "label": "Speed", "value": "0–60 RPM adjustable" }
+    ],
+    "applications": ["Pharmaceuticals", "Cosmetics", "Food & Beverage"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/handling-td120.jpg"
+  },
+  {
+    "id": 29,
+    "product_code": "TS1000",
+    "product_name": "Transfer Station",
+    "category": "Material Handling",
+    "short_description": "Automated transfer station for smooth bottle handoff between conveyors.",
+    "long_description": "The TS1000 Transfer Station synchronizes two conveyor lines, providing a smooth, jam-free transfer of containers between stages in the bottling process. It features servo synchronization and independent belt control.",
+    "key_features": [
+      "Servo synchronization between conveyors",
+      "Adjustable belt speeds",
+      "Stainless steel guard enclosure",
+      "Easy maintenance design"
+    ],
+    "technical_specs": [
+      { "label": "Frame Material", "value": "304 Stainless Steel" },
+      { "label": "Drive System", "value": "Dual Servo Motors" }
+    ],
+    "applications": ["Filling Lines", "Packaging Integration", "Material Conveyance"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/handling-ts1000.jpg"
+  },
+  {
+    "id": 30,
+    "product_code": "TT1000",
+    "product_name": "Top Transfer Conveyor",
+    "category": "Material Handling",
+    "short_description": "Overhead conveyor for bottle stabilization during transfer and capping.",
+    "long_description": "The TT1000 Top Transfer Conveyor provides top-down stabilization of bottles as they pass between filling and capping stations. It prevents bottle tipping and ensures perfect alignment for downstream automation.",
+    "key_features": [
+      "Adjustable upper belt tension",
+      "Top-down bottle stabilization",
+      "Variable height control",
+      "304 stainless steel frame"
+    ],
+    "technical_specs": [
+      { "label": "Speed Range", "value": "0–60 FPM" },
+      { "label": "Bottle Diameter", "value": "1–4 inches" }
+    ],
+    "applications": ["Beverages", "Pharmaceuticals", "Industrial Packaging"],
+    "contact_info": { "phone": "952-233-1441", "email": "info@psrautomation.com" },
+    "image_url": "/images/products/handling-tt1000.jpg"
+  },
+
+  {
+    "id": 31,
+    "product_code": "BMA1000",
+    "product_name": "Bottle Mixing Agitator",
+    "category": "Other Machines",
+    "short_description": "Automated bottle mixing system for pre-fill agitation of viscous or particulate products.",
+    "long_description": "The BMA1000 Bottle Mixing Agitator ensures uniform product consistency before filling. Designed for viscous or particulate liquids, it integrates with PSR’s filling lines to deliver consistent mixing action for each batch.",
+    "key_features": [
+      "Adjustable mixing speed control",
+      "Programmable mixing cycles",
+      "Compact 1000-series frame for integration",
+      "Stainless steel shaft and paddle assembly"
+    ],
+    "technical_specs": [
+      { "label": "Mixing Volume", "value": "Up to 25 L per batch" },
+      { "label": "Speed Control", "value": "Variable frequency drive" },
+      { "label": "Frame Series", "value": "1000 Compact Frame" }
+    ],
+    "applications": [
+      "Cosmetics (lotions, creams)",
+      "Food and Beverage (sauces, syrups)",
+      "Pharmaceutical Suspensions"
+    ],
+    "contact_info": {
+      "phone": "952-233-1441",
+      "email": "info@psrautomation.com"
+    },
+    "image_url": "/images/products/bma1000.jpg"
+  },
+  {
+    "id": 32,
+    "product_code": "OTHER-BMA1000",
+    "product_name": "Custom Bottle Mixing Agitator",
+    "category": "Other Machines",
+    "short_description": "Custom-engineered mixing agitator with configurable shaft, paddle, and tank dimensions.",
+    "long_description": "The OTHER-BMA1000 Custom Bottle Mixing Agitator is tailored to specific production needs, allowing for custom shaft lengths, motor torque settings, and tank capacities. Designed for clients requiring unique agitation profiles or integration with non-standard filling equipment.",
+    "key_features": [
+      "Fully configurable tank and shaft design",
+      "Optional temperature control system",
+      "Explosion-proof motor variant available",
+      "Integrates with PSR filling and capping lines"
+    ],
+    "technical_specs": [
+      { "label": "Motor Type", "value": "AC Servo or Pneumatic" },
+      { "label": "Tank Capacity", "value": "Customizable 10–100 L" },
+      { "label": "Material", "value": "304 / 316 Stainless Steel" }
+    ],
+    "applications": [
+      "Specialty Chemicals",
+      "Industrial Adhesives",
+      "Custom Bottling Operations"
+    ],
+    "contact_info": {
+      "phone": "952-233-1441",
+      "email": "info@psrautomation.com"
+    },
+    "image_url": "/images/products/other-bma1000.jpg"
+  }
+]
+

@@ -1,0 +1,4 @@
+part_number,part_name,category,description,unit_price,vendor_name,machine_name,status
+P1001,Aluminum Rod,Metals,High-grade aluminum rod,24.5,ABC Metals,Machine A,Active
+P1002,Steel Plate,Metals,Carbon steel plate,35.2,XYZ Steel,Machine B,Active
+P1003,Plastic Cap,Components,Cap for 500ml bottles,0.25,PlasticWorks,Machine C,Active

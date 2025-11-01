@@ -1,0 +1,3 @@
+part_number,part_name,description,category,machine_name,unit_price,minimum_stock_level,lead_time_days,weight_kg,last_vendor_name,last_vendor_id,last_po_number,last_po_date,last_unit_price,last_quantity,last_currency_code,last_freight,last_payment_terms,last_payment_method,last_item_subtotal,status
+aaaa,Aluminum Rod,High-grade aluminum rod,Metals,Lathe-Cutter,24.5,5,7,2.3,ABC Metals,1,PO-245,9/12/2025,24.5,10,USD,15,NET30,Wire,245,Active
+bbbb,Stainless Steel Bolt,SS M8 bolt set,Fasteners,Drill-Machine,0.45,100,3,0.02,XYZ Fasteners,2,PO-246,9/14/2025,0.45,100,USD,5,COD,Cash,45,Active

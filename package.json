@@ -1,9 +1,12 @@
 {
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "framer-motion": "^12.23.24",
     "jsonwebtoken": "^9.0.2",
     "knex": "^3.1.0",
-    "pg": "^8.16.3"
+    "lucide-react": "^0.552.0",
+    "pg": "^8.16.3",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.21",

@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import PurchaseOrderForm from "./PurchaseOrderForm";
-import PurchaseOrderDetails from "./PurchaseOrderDetails";
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -10,96 +8,67 @@ export default function PurchaseOrderList() {
   const navigate = useNavigate();
 
   const [orders, setOrders] = useState([]);
-  const [editingOrder, setEditingOrder] = useState(null);
-  const [viewingOrder, setViewingOrder] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-
-  // 🔍 filters + pagination state
   const [search, setSearch] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  // ✅ Load purchase orders
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
+
   const loadOrders = async () => {
-    try {
-      const res = await axios.get(`${BASE}/api/purchase_orders`);
-      const data = Array.isArray(res.data) ? res.data : [];
-
-      // Sort newest first
-      const sorted = [...data].sort((a, b) => {
-        const ida = a.id ?? 0;
-        const idb = b.id ?? 0;
-        if (ida !== 0 || idb !== 0) return idb - ida;
-        return new Date(b.created_at) - new Date(a.created_at);
-      });
-
-      setOrders(sorted);
-    } catch (e) {
-      console.error("❌ Error loading purchase orders:", e);
-      setOrders([]);
-    }
+    const res = await axios.get(`${BASE}/api/purchase_orders`);
+    const data = Array.isArray(res.data) ? res.data : [];
+    setOrders(data);
   };
 
+  useEffect(() => { loadOrders(); }, []);
   useEffect(() => {
-    loadOrders();
+    if (localStorage.getItem("refreshPOList") === "1") {
+      localStorage.removeItem("refreshPOList");
+      loadOrders();
+    }
   }, []);
 
-  // Unique supplier & status options
-  const supplierOptions = useMemo(
-    () => Array.from(new Set(orders.map((o) => o.supplier_name).filter(Boolean))),
-    [orders]
-  );
-  const statusOptions = useMemo(
-    () => Array.from(new Set(orders.map((o) => o.status).filter(Boolean))),
-    [orders]
-  );
+  const sortBy = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
+    }));
+  };
 
-  // ✅ Apply search + filters
+  const sortedOrders = useMemo(() => {
+    if (!sortConfig.key) return orders;
+    return [...orders].sort((a, b) => {
+      const x = a[sortConfig.key] ?? "";
+      const y = b[sortConfig.key] ?? "";
+      return sortConfig.direction === "asc"
+        ? x > y ? 1 : -1
+        : x < y ? 1 : -1;
+    });
+  }, [orders, sortConfig]);
+
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return orders.filter((o) => {
+    const q = search.toLowerCase();
+    return sortedOrders.filter((o) => {
       const matchSearch =
         !q ||
         o.psr_po_number?.toLowerCase().includes(q) ||
-        o.supplier_name?.toLowerCase().includes(q) ||
-        o.remarks?.toLowerCase().includes(q);
-
-      const matchSupplier = supplierFilter ? o.supplier_name === supplierFilter : true;
+        o.vendor_name?.toLowerCase().includes(q);
+      const matchSupplier = supplierFilter ? o.vendor_name === supplierFilter : true;
       const matchStatus = statusFilter ? o.status === statusFilter : true;
-
       return matchSearch && matchSupplier && matchStatus;
     });
-  }, [orders, search, supplierFilter, statusFilter]);
+  }, [sortedOrders, search, supplierFilter, statusFilter]);
 
-  // ✅ Pagination
   const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
-  const paginated = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filtered.slice(start, start + itemsPerPage);
-  }, [filtered, currentPage, itemsPerPage]);
+  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const goToPage = (page) => {
-    if (page >= 1 && page <= totalPages) setCurrentPage(page);
-  };
+  const goToPage = (p) => p >= 1 && p <= totalPages && setCurrentPage(p);
 
-  // ✅ View → fetch full PO details
-  const handleView = async (row) => {
-    try {
-      const res = await axios.get(`${BASE}/api/purchase_orders/${row.id}`);
-      const full = res.data || row;
-      setViewingOrder(full);
-    } catch {
-      setViewingOrder(row);
-    }
-  };
-
-  // ✅ After Save/Update
-  const handleSavedClose = () => {
-    setShowForm(false);
-    setEditingOrder(null);
-    loadOrders();
+  const SortIcon = ({ col }) => {
+    if (sortConfig.key !== col) return <span className="ml-1 text-gray-400">▲</span>;
+    return <span className="ml-1">{sortConfig.direction === "asc" ? "▲" : "▼"}</span>;
   };
 
   return (
@@ -112,19 +81,17 @@ export default function PurchaseOrderList() {
         </div>
 
         <div className="flex gap-2">
+          {/* Bulk upload only */}
           <button
-            onClick={() => navigate("/purchaseOrders/bulk-upload")}
-            className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded shadow"
+            onClick={() => navigate("/purchase-orders/bulk-upload")}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow"
           >
             📤 Bulk Upload
           </button>
 
           <button
-            onClick={() => {
-              setEditingOrder(null);
-              setShowForm(true);
-            }}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow"
+            onClick={() => navigate("/purchase-orders/new")}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
           >
             ➕ Create PO
           </button>
@@ -133,200 +100,116 @@ export default function PurchaseOrderList() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-4 mb-4 items-center">
+
+        {/* Search */}
         <input
-          type="text"
-          placeholder="🔍 Search PO #, Supplier, Remarks..."
+          placeholder="🔍 Search PO#, Vendor..."
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setCurrentPage(1);
-          }}
+          onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
           className="border rounded px-3 py-2 w-64"
         />
 
-        <select
-          value={supplierFilter}
-          onChange={(e) => {
-            setSupplierFilter(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="border rounded px-3 py-2"
-        >
-          <option value="">All Suppliers</option>
-          {supplierOptions.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+        {/* Vendor Filter */}
+       <select
+  value={supplierFilter}
+  onChange={(e) => { setSupplierFilter(e.target.value); setCurrentPage(1); }}
+  className="border rounded px-2 py-2 w-40"
+>
+  <option value="">All Vendors</option>
+  {Array.from(new Set(orders.map(o => o.vendor_name).filter(Boolean))).map((s) => (
+    <option key={s}>{s}</option>
+  ))}
+</select>
 
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setCurrentPage(1);
-          }}
-          className="border rounded px-3 py-2"
-        >
-          <option value="">All Status</option>
-          {statusOptions.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
 
-        <select
-          value={itemsPerPage}
-          onChange={(e) => {
-            setItemsPerPage(Number(e.target.value));
-            setCurrentPage(1);
-          }}
-          className="border rounded px-3 py-2"
-        >
-          {[10, 25, 50].map((n) => (
-            <option key={n} value={n}>
-              Show {n} per page
-            </option>
-          ))}
-        </select>
+       <select
+  value={statusFilter}
+  onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+  className="border rounded px-2 py-2 w-32"
+>
+  <option value="">All Status</option>
+  {Array.from(new Set(orders.map(o => o.status).filter(Boolean))).map((s) => (
+    <option key={s}>{s}</option>
+  ))}
+</select>
+
+
+        {/* Show per page */}
+        <div>
+  <select
+    value={itemsPerPage}
+    onChange={(e) => setItemsPerPage(Number(e.target.value))}
+    className="border rounded px-2 py-2"
+  >
+    {[10, 20, 50, 100].map((n) => (
+      <option key={n} value={n}>
+        Show {n} per page
+      </option>
+    ))}
+  </select>
+</div>
+
+
+
       </div>
 
       {/* Table */}
       <div className="bg-white shadow-md rounded-lg overflow-x-auto">
-        <table className="min-w-full border text-sm text-left">
+        <table className="min-w-full border text-sm">
           <thead className="bg-gray-100 text-gray-700 uppercase text-xs font-semibold">
             <tr>
-              <th className="py-3 px-4 border-b">PO #</th>
-              <th className="py-3 px-4 border-b">Supplier</th>
-              <th className="py-3 px-4 border-b text-right">Subtotal</th>
-              <th className="py-3 px-4 border-b text-right">Tax</th>
-              <th className="py-3 px-4 border-b text-right">Shipping</th>
-              <th className="py-3 px-4 border-b text-right">Grand Total</th>
-              <th className="py-3 px-4 border-b">Order Date</th>
+              <th className="py-3 px-4 border-b cursor-pointer" onClick={() => sortBy("psr_po_number")}>
+                PO # <SortIcon col="psr_po_number" />
+              </th>
+              <th className="py-3 px-4 border-b cursor-pointer" onClick={() => sortBy("vendor_name")}>
+                Vendor <SortIcon col="vendor_name" />
+              </th>
+              <th className="py-3 px-4 border-b text-right cursor-pointer" onClick={() => sortBy("grand_total")}>
+                Grand Total <SortIcon col="grand_total" />
+              </th>
+              <th className="py-3 px-4 border-b cursor-pointer" onClick={() => sortBy("order_date")}>
+                Order Date <SortIcon col="order_date" />
+              </th>
               <th className="py-3 px-4 border-b text-center">Status</th>
               <th className="py-3 px-4 border-b text-center">Actions</th>
             </tr>
           </thead>
+
           <tbody>
             {paginated.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="text-center py-6 text-gray-500 font-medium">
-                  No purchase orders found
+              <tr><td colSpan="6" className="text-center py-6 text-gray-500">No purchase orders found</td></tr>
+            ) : paginated.map((o) => (
+              <tr key={o.id} className="border-t hover:bg-gray-50">
+                <td className="py-2 px-4 cursor-pointer text-blue-600" onClick={() => navigate(`/purchase-orders/${o.id}`)}>
+                  {o.psr_po_number}
+                </td>
+                <td className="py-2 px-4">{o.vendor_name || "-"}</td>
+                <td className="py-2 px-4 text-left font-semibold">{o.grand_total ? `$${o.grand_total}` : "-"}</td>
+                <td className="py-2 px-4">{o.order_date ? new Date(o.order_date).toLocaleDateString() : "-"}</td>
+                <td className="py-2 px-4 text-center">{o.status}</td>
+                <td className="py-2 px-4 text-center">
+                  <button className="text-blue-600 mr-2" onClick={() => navigate(`/purchase-orders/${o.id}`)}>View</button>
+                  <button className="text-gray-700 mr-2" onClick={() => navigate(`/purchase-orders/edit/${o.id}`)}>Edit</button>
+                  <button className="text-red-600" onClick={() => axios.delete(`${BASE}/api/purchase_orders/${o.id}`).then(loadOrders)}>
+                    Delete
+                  </button>
                 </td>
               </tr>
-            ) : (
-              paginated.map((o) => (
-                <tr key={o.id} className="border-t hover:bg-gray-50 transition">
-                  <td className="py-2 px-4 font-mono">{o.psr_po_number}</td>
-                  <td className="py-2 px-4">{o.supplier_name || "-"}</td>
-                  <td className="py-2 px-4 text-right">
-                    {o.subtotal != null ? `$${Number(o.subtotal).toFixed(2)}` : "-"}
-                  </td>
-                  <td className="py-2 px-4 text-right">
-                    {o.tax_amount != null ? `$${Number(o.tax_amount).toFixed(2)}` : "-"}
-                  </td>
-                  <td className="py-2 px-4 text-right">
-                    {o.shipping_charges != null
-                      ? `$${Number(o.shipping_charges).toFixed(2)}`
-                      : "-"}
-                  </td>
-                  <td className="py-2 px-4 text-right font-semibold">
-                    {o.grand_total != null ? `$${Number(o.grand_total).toFixed(2)}` : "-"}
-                  </td>
-                  <td className="py-2 px-4">
-                    {o.order_date ? new Date(o.order_date).toLocaleDateString() : "-"}
-                  </td>
-                  <td className="py-2 px-4 text-center">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        o.status === "Delivered"
-                          ? "bg-green-100 text-green-700"
-                          : o.status === "Pending" || o.status === "Draft"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : o.status === "Cancelled"
-                          ? "bg-red-100 text-red-700"
-                          : "bg-gray-200 text-gray-600"
-                      }`}
-                    >
-                      {o.status || "Unknown"}
-                    </span>
-                  </td>
-                  <td className="py-2 px-4 text-center">
-                    <div className="flex justify-center gap-3">
-                      <button
-                        onClick={() => handleView(o)}
-                        className="text-blue-600 hover:underline text-sm"
-                      >
-                        View
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingOrder(o);
-                          setShowForm(true);
-                        }}
-                        className="text-gray-700 hover:underline text-sm"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
+            ))}
           </tbody>
         </table>
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center mt-4 gap-3 text-sm">
-          <button
-            onClick={() => goToPage(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="px-3 py-1 border rounded disabled:opacity-50"
-          >
-            Prev
-          </button>
-          <span>
-            Page {currentPage} of {totalPages}
-          </span>
-          <button
-            onClick={() => goToPage(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="px-3 py-1 border rounded disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <div className="flex justify-center items-center gap-3 mt-4 text-sm">
+        <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1}
+          className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Prev</button>
 
-      {/* Modals */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-5xl p-6 overflow-y-auto max-h-[95vh]">
-            <PurchaseOrderForm
-              initialPo={editingOrder ?? null}
-              onSaved={() => {
-                setShowForm(false);
-                setEditingOrder(null);
-                loadOrders();
-              }}
-              onCancel={() => {
-                setShowForm(false);
-                setEditingOrder(null);
-              }}
-            />
-          </div>
-        </div>
-      )}
+        <span>Page {currentPage} of {totalPages}</span>
 
-      {viewingOrder && (
-        <PurchaseOrderDetails
-          order={viewingOrder}
-          onClose={() => setViewingOrder(null)}
-        />
-      )}
+        <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages}
+          className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50">Next</button>
+      </div>
     </div>
   );
 }
