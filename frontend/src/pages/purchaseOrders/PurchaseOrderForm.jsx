@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";  // ✅ imported correctly
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -7,11 +8,14 @@ const n = (v) => Number(v ?? 0);
 const money = (v) => n(v).toFixed(2);
 
 export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
+  const navigate = useNavigate();  // ✅ add this line here
+
   const [vendors, setVendors] = useState([]);
   const [parts, setParts] = useState([]);
   const [attachments, setAttachments] = useState([]);
   const [staffList] = useState(["Stanley Medikonda", "Pawan Kumar", "Alex Johnson"]);
   const [submitting, setSubmitting] = useState(false);
+
 
   // inline vendor "add new vendor" state
   const [addingNewVendor, setAddingNewVendor] = useState(false);
@@ -38,42 +42,43 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
   });
 
   // Normalize the initialPo items shape if editing
-const normalizePo = (poData) => {
-  if (!poData) return null;
-  const items = (poData.items || []).map((i) => ({
-    partId: i.part_id || i.id || "",
-    description: i.description || i.part_name || "",
-    quantity: i.quantity || 1,
-    unitPrice: i.unit_price || i.current_unit_price || 0,
-    totalPrice:
-      (i.quantity || 1) * (i.unit_price || i.current_unit_price || 0),
-    lastUnitPrice: i.last_unit_price || null,
-  }));
-  return { ...poData, items };
-};
+  const normalizePo = (poData) => {
+    if (!poData) return null;
+    const items = (poData.items || []).map((i) => ({
+      partId: i.part_id || i.id || "",
+      description: i.description || i.part_name || "",
+      quantity: i.quantity || 1,
+      unitPrice: i.unit_price || i.current_unit_price || 0,
+      totalPrice:
+        (i.quantity || 1) * (i.unit_price || i.current_unit_price || 0),
+      lastUnitPrice: i.last_unit_price || null,
+    }));
+    return { ...poData, items };
+  };
 
-const [po, setPo] = useState(
-  initialPo ? normalizePo(initialPo) : {
-    psr_po_number: "",
-    order_date: new Date().toISOString().split("T")[0],
-    expected_delivery_date: "",
-    created_by: "",
-    vendor_id: "",
-    vendor_name: "",
-    payment_method: "",
-    payment_terms: "",
-    currency: "USD",
-    remarks: "",
-    tax_percent: 8,
-    shipping_charges: 0,
-    items: [],
-    subtotal: 0,
-    tax_amount: 0,
-    grand_total: 0,
-    status: "Draft",
-  }
-);
-
+  const [po, setPo] = useState(
+    initialPo
+      ? normalizePo(initialPo)
+      : {
+          psr_po_number: "",
+          order_date: new Date().toISOString().split("T")[0],
+          expected_delivery_date: "",
+          created_by: "",
+          vendor_id: "",
+          vendor_name: "",
+          payment_method: "",
+          payment_terms: "",
+          currency: "USD",
+          remarks: "",
+          tax_percent: 8,
+          shipping_charges: 0,
+          items: [],
+          subtotal: 0,
+          tax_amount: 0,
+          grand_total: 0,
+          status: "Draft",
+        }
+  );
 
   // load vendors + parts
   useEffect(() => {
@@ -83,12 +88,25 @@ const [po, setPo] = useState(
       .catch(() => setVendors([]));
 
     axios
-      .get(`${BASE}/api/purchase_orders/support/parts`)
-      .then((res) => setParts(res.data?.data || res.data || []))
-      .catch(() => setParts([]));
+  .get(`${BASE}/api/parts`)
+  .then((res) => {
+    const raw = res.data?.data || res.data || [];
+    const normalized = raw.map((p) => ({
+      part_id: p.part_id || p.id,
+      part_number: p.part_number,
+      description: p.description || "", // ✅ Added this line
+      current_unit_price: p.current_unit_price || p.unit_price || 0,
+      last_unit_price: p.last_unit_price || null,
+    }));
+    setParts(normalized);
+  })
+  .catch(() => setParts([]));
+
+
   }, []);
 
-  const nNum = (v) => (v === "" || v === null || v === undefined ? 0 : Number(v));
+  const nNum = (v) =>
+    v === "" || v === null || v === undefined ? 0 : Number(v);
 
   const recalcTotals = (items, shipping = po.shipping_charges) => {
     const subtotal = items.reduce((sum, i) => sum + nNum(i.totalPrice), 0);
@@ -97,7 +115,7 @@ const [po, setPo] = useState(
     setPo((prev) => ({ ...prev, subtotal, tax_amount, grand_total }));
   };
 
-  // add a blank line item row (original behavior)
+  // add a blank line item row
   const addItemRow = () => {
     setPo((prev) => ({
       ...prev,
@@ -116,9 +134,7 @@ const [po, setPo] = useState(
     }));
   };
 
-  //
   // ---- PER-ROW NEW PART ----
-  //
   const openNewPartFormForRow = (rowIndex) => {
     setAddingNewPartRow((prev) => ({ ...prev, [rowIndex]: true }));
     setNewPartDraft((prev) => ({
@@ -186,7 +202,8 @@ const [po, setPo] = useState(
         lastUnitPrice: newPart.last_unit_price || null,
       };
       updatedItems[rowIndex].totalPrice =
-        nNum(updatedItems[rowIndex].quantity) * nNum(updatedItems[rowIndex].unitPrice);
+        nNum(updatedItems[rowIndex].quantity) *
+        nNum(updatedItems[rowIndex].unitPrice);
 
       setPo({ ...po, items: updatedItems });
       recalcTotals(updatedItems);
@@ -198,7 +215,7 @@ const [po, setPo] = useState(
     }
   };
 
-  // select part for a row
+  // ✅ FIXED PART SELECTION LOGIC
   const handlePartSelect = (index, value) => {
     if (value === "new") {
       openNewPartFormForRow(index);
@@ -206,17 +223,29 @@ const [po, setPo] = useState(
     }
 
     const selected = parts.find(
-      (p) => p.part_id === Number(value) || p.id === Number(value)
+      (p) => String(p.part_id) === String(value) || String(p.id) === String(value)
     );
 
+    if (!selected) return;
+
     const updatedItems = [...po.items];
-    updatedItems[index].partId = value;
-    updatedItems[index].description =
-      selected?.description || selected?.part_name || "";
-    updatedItems[index].lastUnitPrice = selected?.last_unit_price || null;
-    updatedItems[index].unitPrice = nNum(selected?.current_unit_price || 0);
-    updatedItems[index].totalPrice =
-      nNum(updatedItems[index].quantity) * nNum(updatedItems[index].unitPrice);
+    updatedItems[index] = {
+      ...updatedItems[index],
+      partId: selected.part_id,
+      unitPrice: selected.last_unit_price
+        ? nNum(selected.last_unit_price)
+        : selected.current_unit_price
+        ? nNum(selected.current_unit_price)
+        : "",
+      lastUnitPrice: selected.last_unit_price || null,
+      totalPrice:
+        nNum(updatedItems[index].quantity) *
+        (selected.last_unit_price
+          ? nNum(selected.last_unit_price)
+          : selected.current_unit_price
+          ? nNum(selected.current_unit_price)
+          : nNum(updatedItems[index].unitPrice || 0)),
+    };
 
     setPo({ ...po, items: updatedItems });
     recalcTotals(updatedItems);
@@ -234,9 +263,7 @@ const [po, setPo] = useState(
     recalcTotals(updatedItems);
   };
 
-  //
   // ---- GLOBAL NEW PART PANEL ----
-  //
   const saveGlobalPart = async () => {
     if (!globalPart.part_number.trim()) {
       alert("Part Number is required.");
@@ -285,9 +312,7 @@ const [po, setPo] = useState(
     }
   };
 
-  //
   // ---- Vendor inline add/save ----
-  //
   const saveNewVendor = async () => {
     if (!newVendor.vendor_name.trim()) {
       alert("Vendor name required.");
@@ -323,7 +348,6 @@ const [po, setPo] = useState(
     }
   };
 
-  // totals helpers
   const recalcShipping = (e) => {
     const val = e.target.value;
     setPo((prev) => ({ ...prev, shipping_charges: val }));
@@ -332,7 +356,6 @@ const [po, setPo] = useState(
 
   const handleFileChange = (e) => setAttachments([...e.target.files]);
 
-  // submit PO
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (submitting) return;
@@ -524,7 +547,6 @@ const [po, setPo] = useState(
               }
               disabled={submitting}
             />
-
             <div className="flex gap-2">
               <input
                 placeholder="City"
@@ -665,25 +687,29 @@ const [po, setPo] = useState(
               <td className="border p-2">
                 {!addingNewPartRow[i] ? (
                   <>
-                    <select
-                      className="border p-1 rounded w-full"
-                      value={item.partId}
-                      onChange={(e) => handlePartSelect(i, e.target.value)}
-                      disabled={submitting}
-                    >
-                      <option value="">Select</option>
-                      {parts.map((p) => (
-                        <option key={p.part_id || p.id} value={p.part_id || p.id}>
-                          {p.part_number}
-                        </option>
-                      ))}
-                      <option value="new">+ Add New Part</option>
-                    </select>
-                    {item.description && (
-                      <div className="text-xs text-gray-600 mt-1">
-                        {item.description}
-                      </div>
-                    )}
+                <select
+  className="border p-1 rounded w-full"
+  value={item.partId}
+  onChange={(e) => handlePartSelect(i, e.target.value)}
+  disabled={submitting}
+>
+  <option value="">Select</option>
+  {parts.map((p) => (
+    <option key={p.part_id || p.id} value={p.part_id || p.id}>
+      {p.part_number}
+    </option>
+  ))}
+  <option value="new">+ Add New Part</option>
+</select>
+
+{/* ✅ Inline description display */}
+{item.partId && (
+  <div className="text-xs text-gray-500 mt-1">
+    {parts.find((p) => String(p.part_id) === String(item.partId))?.description ||
+      "No description available"}
+  </div>
+)}
+
                   </>
                 ) : (
                   <div className="bg-gray-50 border rounded p-2 space-y-1">
@@ -795,9 +821,7 @@ const [po, setPo] = useState(
                 )}
               </td>
 
-              <td className="border p-2 text-right">
-                ${money(item.totalPrice)}
-              </td>
+              <td className="border p-2 text-right">${money(item.totalPrice)}</td>
             </tr>
           ))}
         </tbody>
@@ -829,9 +853,7 @@ const [po, setPo] = useState(
             disabled={submitting}
           />
         </div>
-        <div className="font-bold mt-2">
-          Grand Total: ${money(po.grand_total)}
-        </div>
+        <div className="font-bold mt-2">Grand Total: ${money(po.grand_total)}</div>
       </div>
 
       {/* --- Attachments --- */}
@@ -845,6 +867,30 @@ const [po, setPo] = useState(
           disabled={submitting}
         />
       </div>
+{/* --- Existing Attachments (for Edit mode) --- */}
+{initialPo?.files?.length > 0 && (
+  <div className="mt-2 border p-3 bg-gray-50 rounded">
+    <p className="font-semibold mb-1 text-gray-700">Existing Attachments:</p>
+    <ul className="list-disc pl-6 text-sm">
+      {initialPo.files.map((f) => (
+        <li key={f.id || f.filepath}>
+          <a
+            href={`${import.meta.env.VITE_API_URL || "http://localhost:5000"}${
+              f.filepath?.startsWith("/") ? "" : "/"
+            }${f.filepath}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-blue-700 hover:underline"
+          >
+            {f.original_filename || "File"} ({f.mime_type || ""},{" "}
+            {f.size_bytes?.toLocaleString() || 0} bytes)
+          </a>
+        </li>
+      ))}
+    </ul>
+  </div>
+)}
+
 
       {/* --- Remarks --- */}
       <div className="mt-4">
@@ -860,31 +906,34 @@ const [po, setPo] = useState(
       </div>
 
       {/* --- Buttons --- */}
-      <div className="mt-6 flex justify-end space-x-4">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="bg-gray-300 hover:bg-gray-400 text-black px-4 py-2 rounded shadow"
-          disabled={submitting}
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={submitting}
-          className={`px-4 py-2 rounded shadow text-white ${
-            submitting
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-green-600 hover:bg-green-700"
-          }`}
-        >
-          {submitting
-            ? "Saving..."
-            : initialPo
-            ? "Update Purchase Order"
-            : "Submit Purchase Order"}
-        </button>
-      </div>
+      {/* --- Buttons --- */}
+<div className="mt-6 flex justify-end space-x-4">
+  <button
+    type="button"
+    onClick={() => navigate("/purchase-orders")}
+    className="bg-gray-300 hover:bg-gray-400 text-black px-4 py-2 rounded shadow"
+    disabled={submitting}
+  >
+    Cancel
+  </button>
+
+  <button
+    type="submit"
+    disabled={submitting}
+    className={`px-4 py-2 rounded shadow text-white ${
+      submitting
+        ? "bg-gray-400 cursor-not-allowed"
+        : "bg-green-600 hover:bg-green-700"
+    }`}
+  >
+    {submitting
+      ? "Saving..."
+      : initialPo
+      ? "Update Purchase Order"
+      : "Submit Purchase Order"}
+  </button>
+</div>
+
     </form>
   );
 }

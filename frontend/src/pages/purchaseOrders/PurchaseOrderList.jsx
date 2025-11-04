@@ -190,9 +190,23 @@ export default function PurchaseOrderList() {
                 <td className="py-2 px-4 text-center">
                   <button className="text-blue-600 mr-2" onClick={() => navigate(`/purchase-orders/${o.id}`)}>View</button>
                   <button className="text-gray-700 mr-2" onClick={() => navigate(`/purchase-orders/edit/${o.id}`)}>Edit</button>
-                  <button className="text-red-600" onClick={() => axios.delete(`${BASE}/api/purchase_orders/${o.id}`).then(loadOrders)}>
-                    Delete
-                  </button>
+                  <button
+  className="text-red-600"
+  onClick={async () => {
+    if (!window.confirm(`Are you sure you want to delete PO "${o.psr_po_number}"?`)) return;
+    try {
+      await axios.delete(`${BASE}/api/purchase_orders/${o.id}`);
+      alert("✅ Purchase Order deleted successfully!");
+      loadOrders();
+    } catch (err) {
+      console.error("❌ Delete failed:", err);
+      alert("Error deleting PO. Check console for details.");
+    }
+  }}
+>
+  Delete
+</button>
+
                 </td>
               </tr>
             ))}

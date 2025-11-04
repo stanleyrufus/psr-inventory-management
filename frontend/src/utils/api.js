@@ -1,10 +1,11 @@
 // frontend/src/utils/api.js
 import axios from "axios";
 
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+// ✅ VITE_API_URL should be "http://localhost:5000" (no /api)
+const BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
 
 const apiClient = axios.create({
-  baseURL: BASE_URL,
+  baseURL: BASE_URL + "/api",
   headers: { "Content-Type": "application/json" },
 });
 
@@ -19,132 +20,82 @@ apiClient.interceptors.request.use((config) => {
    🧩 PARTS API
 --------------------------- */
 export const fetchParts = async () => {
-  const res = await apiClient.get("/api/parts");
-  if (Array.isArray(res.data)) return res.data;
-  if (res.data && Array.isArray(res.data.data)) return res.data.data;
-  return [];
+  const res = await apiClient.get("/parts");
+  return Array.isArray(res.data) ? res.data : res.data.data || [];
 };
 
-export const createPart = async (data) => {
-  const res = await apiClient.post("/api/parts", data);
-  return res.data;
-};
-
-export const updatePart = async (id, data) => {
-  const res = await apiClient.put(`/api/parts/${id}`, data);
-  return res.data;
-};
-
-export const deletePart = async (id) => {
-  const res = await apiClient.delete(`/api/parts/${id}`);
-  return res.data;
-};
-
-export const bulkUploadParts = async (partsArray) => {
-  const res = await apiClient.post("/api/parts/bulk-upload", { parts: partsArray });
-  return res.data;
-};
+export const createPart = async (data) => (await apiClient.post("/parts", data)).data;
+export const updatePart = async (id, data) => (await apiClient.put(`/parts/${id}`, data)).data;
+export const deletePart = async (id) => (await apiClient.delete(`/parts/${id}`)).data;
+export const bulkUploadParts = async (partsArray) =>
+  (await apiClient.post("/parts/bulk-upload", { parts: partsArray })).data;
 
 /* --------------------------
    🧩 PRODUCTS API
 --------------------------- */
 export const fetchProducts = async () => {
-  const res = await apiClient.get("/api/products");
-  if (Array.isArray(res.data)) return { success: true, data: res.data };
-  if (res.data?.data) return res.data;
-  return { success: false, data: [] };
+  const res = await apiClient.get("/products");
+  return res.data?.data ? res.data : { success: false, data: [] };
 };
 
 export const createProduct = async (data) => {
   try {
-    const res = await apiClient.post("/api/products", data);
-    return res.data;
+    return (await apiClient.post("/products", data)).data;
   } catch (err) {
-    if (err.response?.status === 409) {
+    if (err.response?.status === 409)
       return { success: false, field: "product_code", message: "Product code already exists" };
-    }
     throw err;
   }
 };
 
-export const updateProduct = async (id, data) => {
-  const res = await apiClient.put(`/api/products/${id}`, data);
-  return res.data;
-};
-
-export const deleteProduct = async (id) => {
-  const res = await apiClient.delete(`/api/products/${id}`);
-  return res.data;
-};
+export const updateProduct = async (id, data) => (await apiClient.put(`/products/${id}`, data)).data;
+export const deleteProduct = async (id) => (await apiClient.delete(`/products/${id}`)).data;
 
 /* --------------------------
    🧩 PURCHASE ORDERS API
 --------------------------- */
 export const fetchPurchaseOrders = async () => {
-  const res = await apiClient.get("/api/purchase_orders");
-  if (Array.isArray(res.data)) return res.data;
-  if (Array.isArray(res.data?.data)) return res.data.data;
-  return [];
+  const res = await apiClient.get("/purchase_orders");
+  return Array.isArray(res.data) ? res.data : res.data.data || [];
 };
 
-export const fetchPurchaseOrderById = async (id) => {
-  const res = await apiClient.get(`/api/purchase_orders/${id}`);
-  return res.data;
-};
+export const fetchPurchaseOrderById = async (id) =>
+  (await apiClient.get(`/purchase_orders/${id}`)).data;
 
-export const createPurchaseOrder = async (data) => {
-  const res = await apiClient.post("/api/purchase_orders", data);
-  return res.data;
-};
+export const createPurchaseOrder = async (data) =>
+  (await apiClient.post("/purchase_orders", data)).data;
 
-export const updatePurchaseOrder = async (id, data) => {
-  const res = await apiClient.put(`/api/purchase_orders/${id}`, data);
-  return res.data;
-};
+export const updatePurchaseOrder = async (id, data) =>
+  (await apiClient.put(`/purchase_orders/${id}`, data)).data;
 
-export const updatePurchaseOrderStatus = async (id, status) => {
-  const res = await apiClient.post(`/api/purchase_orders/${id}/status`, { status });
-  return res.data;
-};
+export const updatePurchaseOrderStatus = async (id, status) =>
+  (await apiClient.post(`/purchase_orders/${id}/status`, { status })).data;
 
 export const uploadPurchaseOrderFiles = async (id, files) => {
   const formData = new FormData();
-  for (const file of files) formData.append("files", file);
-  const res = await apiClient.post(`/api/purchase_orders/${id}/upload`, formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-  return res.data;
+  files.forEach((file) => formData.append("files", file));
+  return (
+    await apiClient.post(`/purchase_orders/${id}/upload`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+  ).data;
 };
 
 /* --------------------------
    🧩 VENDORS API
 --------------------------- */
 export const fetchVendors = async () => {
-  const res = await apiClient.get("/api/vendors");
-  if (Array.isArray(res.data)) return res.data;
-  if (res.data && Array.isArray(res.data.data)) return res.data.data;
-  return [];
+  const res = await apiClient.get("/vendors");
+  return Array.isArray(res.data) ? res.data : res.data.data || [];
 };
 
-export const createVendor = async (data) => {
-  const res = await apiClient.post("/api/vendors", data);
-  return res.data;
-};
+export const createVendor = async (data) => (await apiClient.post("/vendors", data)).data;
+export const updateVendor = async (id, data) => (await apiClient.put(`/vendors/${id}`, data)).data;
+export const deleteVendor = async (id) => (await apiClient.delete(`/vendors/${id}`)).data;
+export const bulkUploadVendors = async (vendorsArray) =>
+  (await apiClient.post("/vendors/bulk-upload", { vendors: vendorsArray })).data;
 
-export const updateVendor = async (id, data) => {
-  const res = await apiClient.put(`/api/vendors/${id}`, data);
-  return res.data;
-};
-
-export const deleteVendor = async (id) => {
-  const res = await apiClient.delete(`/api/vendors/${id}`);
-  return res.data;
-};
-
-export const bulkUploadVendors = async (vendorsArray) => {
-  const res = await apiClient.post("/api/vendors/bulk-upload", { vendors: vendorsArray });
-  return res.data;
-};
+export const apiRaw = apiClient;
 
 export default {
   fetchParts,

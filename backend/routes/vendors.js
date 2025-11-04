@@ -13,7 +13,7 @@ function normalizeVendor(vendor) {
     if (typeof v[k] === "string") v[k] = v[k].trim();
   });
 
-  // ✅ Handle CSV / Excel headers and align with new DB schema (snake_case)
+  // ✅ Handle CSV / Excel headers and align with new DB schema
   v.vendor_name =
     v.vendor_name ||
     v.VendorName ||
@@ -44,7 +44,7 @@ function normalizeVendor(vendor) {
   v.remarks = v.remarks || v.Remarks || "";
   v.acknowledgement_no = v.acknowledgement_no || v.Acknowlegdement || "";
 
-  // ✅ Boolean coercion helper
+  // ✅ Boolean handling
   const toBool = (val, def = false) => {
     if (val === true || val === false) return val;
     if (typeof val === "string") {
@@ -55,11 +55,10 @@ function normalizeVendor(vendor) {
     return def;
   };
 
-  // ✅ Align boolean fields properly
   v.is_tax_inclusive_pricing = toBool(
     v.is_tax_inclusive_pricing ??
-      v.istaxinclusivepricing ??
-      v.IsTaxInclusivePricing,
+    v.istaxinclusivepricing ??
+    v.IsTaxInclusivePricing,
     false
   );
 
@@ -68,7 +67,7 @@ function normalizeVendor(vendor) {
     true
   );
 
-  // ✅ Remove all legacy/camelCase/duplicate keys
+  // ✅ Remove legacy keys
   const removeKeys = [
     "addressremarks", "addresstype", "taxingscheme",
     "istaxinclusivepricing", "preferredcarrier", "currencycode",
@@ -83,6 +82,17 @@ function normalizeVendor(vendor) {
 
   return v;
 }
+
+/** ✅ Vendor Count (MUST COME FIRST — before /:id) */
+router.get("/count", async (req, res) => {
+  try {
+    const result = await db("vendors").count("vendor_id as count").first();
+    res.json({ count: Number(result.count) });
+  } catch (err) {
+    console.error("❌ Vendor count error:", err);
+    res.status(500).json({ success: 0, message: "Error counting vendors" });
+  }
+});
 
 /** ✅ Get all vendors */
 router.get("/", async (req, res) => {
@@ -108,7 +118,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-/** ✅ Add new vendor */
+/** ✅ Add vendor */
 router.post("/", async (req, res) => {
   try {
     const { vendor_name } = req.body;
@@ -135,9 +145,9 @@ router.post("/", async (req, res) => {
     });
   } catch (err) {
     console.error("❌ Error adding vendor:", err);
-    res
-      .status(500)
-      .json({ success: 0, message: "Error adding vendor", error: err.message });
+    res.status(500).json({
+      success: 0, message: "Error adding vendor", error: err.message
+    });
   }
 });
 
@@ -153,17 +163,11 @@ router.put("/:id", async (req, res) => {
     if (!updated)
       return res.status(404).json({ success: 0, message: "Vendor not found" });
 
-    res.json({
-      success: 1,
-      data: updated,
-      message: "✅ Vendor updated successfully",
-    });
+    res.json({ success: 1, data: updated, message: "✅ Vendor updated successfully" });
   } catch (err) {
     console.error("❌ Error updating vendor:", err);
     res.status(500).json({
-      success: 0,
-      message: "Error updating vendor",
-      error: err.message,
+      success: 0, message: "Error updating vendor", error: err.message
     });
   }
 });
@@ -174,13 +178,12 @@ router.delete("/:id", async (req, res) => {
     const deleted = await db("vendors").where({ vendor_id: req.params.id }).del();
     if (!deleted)
       return res.status(404).json({ success: 0, message: "Vendor not found" });
+
     res.json({ success: 1, message: "✅ Vendor deleted successfully" });
   } catch (err) {
     console.error("❌ Error deleting vendor:", err);
     res.status(500).json({
-      success: 0,
-      message: "Error deleting vendor",
-      error: err.message,
+      success: 0, message: "Error deleting vendor", error: err.message
     });
   }
 });
@@ -190,18 +193,15 @@ router.post("/bulk-upload", async (req, res) => {
   try {
     const vendors = req.body.vendors || req.body;
     if (!Array.isArray(vendors) || vendors.length === 0)
-      return res
-        .status(400)
-        .json({ success: 0, message: "No vendor data provided." });
+      return res.status(400).json({ success: 0, message: "No vendor data provided." });
 
     const normalized = vendors.map((v) => normalizeVendor(v));
-
     const missing = normalized.filter((v) => !v.vendor_name);
+
     if (missing.length === normalized.length) {
       return res.status(400).json({
         success: 0,
-        message:
-          "Missing required column(s): vendor_name (accepted: Vendor Name, vendor_name, VendorName)",
+        message: "Missing vendor_name column",
       });
     }
 
@@ -213,24 +213,23 @@ router.post("/bulk-upload", async (req, res) => {
       const exists = await db("vendors")
         .whereRaw("LOWER(vendor_name) = ?", v.vendor_name.toLowerCase())
         .first();
+
       if (exists) {
         duplicates.push(v.vendor_name);
         continue;
       }
+
       const [added] = await db("vendors").insert(v).returning("*");
       inserted.push(added);
     }
 
     let message = "";
     if (inserted.length && duplicates.length)
-      message = `✅ Inserted ${inserted.length} vendor(s). ⚠️ Skipped ${duplicates.length} duplicate(s): ${duplicates.join(
-        ", "
-      )}`;
+      message = `✅ ${inserted.length} inserted, ⚠️ ${duplicates.length} skipped`;
     else if (duplicates.length)
-      message = `⚠️ Skipped ${duplicates.length} duplicate(s): ${duplicates.join(
-        ", "
-      )}`;
-    else message = `✅ Inserted ${inserted.length} vendor(s).`;
+      message = `⚠️ ${duplicates.length} skipped`;
+    else
+      message = `✅ ${inserted.length} vendor(s) inserted`;
 
     res.json({ success: 1, inserted, duplicates, message });
   } catch (err) {

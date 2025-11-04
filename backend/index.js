@@ -14,7 +14,6 @@ import productsRoutes from "./routes/products.js";
 import purchaseOrdersBulkRouter from "./routes/purchase_orders_bulk.js";
 import purchaseOrderImportRoutes from "./routes/purchase_orders_import.js";
 import vendorRoutes from "./routes/vendors.js"; // ✅ single correct import
-import dashboardRoutes from './routes/dashboard.js';
 
 dotenv.config();
 
@@ -47,8 +46,7 @@ app.use("/api/purchase_orders_bulk", purchaseOrdersBulkRouter);
 // --- Dedicated Import routes (now safe, isolated path) ---
 app.use("/api/po_import", purchaseOrderImportRoutes);
 
-//Dashboard
-app.use('/api/dashboard', dashboardRoutes);
+
 
 // --- Other modules ---
 app.use("/api/products", productsRoutes);

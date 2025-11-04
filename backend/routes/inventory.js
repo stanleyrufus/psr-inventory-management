@@ -1,4 +1,3 @@
-// backend/routes/inventory.js
 import express from "express";
 import { db } from "../db.js";
 
@@ -6,7 +5,6 @@ const router = express.Router();
 
 /**
  * ✅ Convert Excel serial date (e.g. 45106.6) to "YYYY-MM-DD"
- * Excel epoch starts 1899-12-30
  */
 function excelSerialToISODate(value) {
   if (value === null || value === undefined) return null;
@@ -29,6 +27,9 @@ function excelSerialToISODate(value) {
   return null;
 }
 
+/** ----------------------------------------
+ *  ✅ Normalization helpers
+ *------------------------------------------ */
 function normalizeItem(item) {
   const normalized = { ...item };
 
@@ -79,21 +80,13 @@ function sanitizeInventoryRecord(recIn) {
   ];
 
   intFields.forEach((field) => {
-    if (rec[field] === "" || rec[field] === undefined || rec[field] === null) {
-      rec[field] = null;
-    } else {
-      const parsed = parseInt(rec[field], 10);
-      rec[field] = isNaN(parsed) ? null : parsed;
-    }
+    if (!rec[field] && rec[field] !== 0) rec[field] = null;
+    else rec[field] = parseInt(rec[field], 10) || null;
   });
 
   numericFields.forEach((field) => {
-    if (rec[field] === "" || rec[field] === undefined || rec[field] === null) {
-      rec[field] = null;
-    } else {
-      const parsed = parseFloat(rec[field]);
-      rec[field] = isNaN(parsed) ? null : parsed;
-    }
+    if (!rec[field] && rec[field] !== 0) rec[field] = null;
+    else rec[field] = parseFloat(rec[field]) || null;
   });
 
   if (rec.last_po_date !== undefined) {
@@ -103,186 +96,112 @@ function sanitizeInventoryRecord(recIn) {
   return rec;
 }
 
-/** ✅ GET all inventory parts */
-router.get("/", async (req, res) => {
+/** ----------------------------------------
+ * ✅ Dashboard endpoints FIRST
+ *------------------------------------------ */
+
+// Total parts
+router.get("/count", async (_, res) => {
+  const r = await db("inventory").count("part_id as count").first();
+  res.json({ count: Number(r.count) });
+});
+
+// Low-stock count
+router.get("/low-stock/count", async (_, res) => {
+  const r = await db("inventory")
+    .whereNotNull("minimum_stock_level")
+    .andWhere("quantity_on_hand", "<=", db.ref("minimum_stock_level"))
+    .count("part_id as count")
+    .first();
+  res.json({ count: Number(r.count) });
+});
+
+// Low-stock preview
+router.get("/low-stock", async (req, res) => {
   try {
-    const parts = await db("inventory").select("*").orderBy("part_id", "asc");
-    res.json(parts);
+    const limit = Math.min(parseInt(req.query.limit || "10"), 100);
+    const rows = await db("inventory")
+      .select("part_id", "part_number", "part_name", "quantity_on_hand", "minimum_stock_level", "location")
+      .whereNotNull("minimum_stock_level")
+      .andWhere("quantity_on_hand", "<=", db.ref("minimum_stock_level"))
+      .orderBy([{ column: "quantity_on_hand", order: "asc" }, { column: "part_number", order: "asc" }])
+      .limit(limit);
+
+    res.json({ success: 1, data: rows });
   } catch (err) {
-    console.error("❌ Error fetching inventory:", err);
-    res.status(500).json({
-      success: 0,
-      message: "Error fetching inventory",
-      error: err.message,
-    });
+    res.status(500).json({ success: 0, errormsg: "Failed to fetch low stock" });
   }
 });
 
-/** ✅ ADD new part with duplicate check */
+// Monthly inventory trend
+router.get("/trend/monthly", async (req, res) => {
+  try {
+    const months = Math.min(parseInt(req.query.months || "6"), 24);
+
+    const rows = await db("purchase_order_items as i")
+      .leftJoin("purchase_orders as po", "i.po_id", "po.id")
+      .whereNotNull("po.order_date")
+      .select(
+        db.raw(`to_char(date_trunc('month', po.order_date), 'YYYY-MM') as ym`),
+        db.raw("COALESCE(SUM(i.quantity), 0)::int as count")
+      )
+      .groupByRaw("date_trunc('month', po.order_date)")
+      .orderByRaw("date_trunc('month', po.order_date) desc")
+      .limit(months);
+
+    res.json({ success: 1, data: rows.reverse() });
+  } catch (err) {
+    res.status(500).json({ success: 0, errormsg: "Trend fetch error" });
+  }
+});
+
+/** ----------------------------------------
+ * ✅ CRUD routes AFTER dashboard routes
+ *------------------------------------------ */
+
+// Get all parts
+router.get("/", async (_, res) => {
+  const parts = await db("inventory").select("*").orderBy("part_id", "asc");
+  res.json(parts);
+});
+
+// Add part
 router.post("/", async (req, res) => {
   try {
-    // we require part_number at minimum when adding inline from PO
-    if (
-      !req.body.part_number ||
-      String(req.body.part_number).trim() === ""
-    ) {
-      return res.status(400).json({
-        success: 0,
-        message: "part_number is required",
-      });
+    if (!req.body.part_number) {
+      return res.status(400).json({ success: 0, message: "part_number required" });
     }
 
-    const newItemNorm = normalizeItem(req.body);
-    const newItem = sanitizeInventoryRecord(newItemNorm);
-
-    const existing = await db("inventory")
-      .where({ part_number: newItem.part_number })
-      .first();
-    if (existing) {
-      return res.status(400).json({
-        success: 0,
-        message: `Duplicate part number "${newItem.part_number}" already exists.`,
-      });
+    const exists = await db("inventory").where({ part_number: req.body.part_number }).first();
+    if (exists) {
+      return res.status(400).json({ success: 0, message: "Duplicate part_number" });
     }
 
-    const [inserted] = await db("inventory").insert(newItem).returning("*");
-    res.json({
-      success: 1,
-      data: inserted,
-      message: "Part added successfully",
-    });
-  } catch (err) {
-    console.error("❌ Error adding inventory item:", err);
-    res.status(500).json({
-      success: 0,
-      message: "Error adding inventory item",
-      error: err.message,
-    });
+    const item = sanitizeInventoryRecord(normalizeItem(req.body));
+    const [inserted] = await db("inventory").insert(item).returning("*");
+    res.json({ success: 1, data: inserted, message: "Part added" });
+  } catch {
+    res.status(500).json({ success: 0, message: "Insert error" });
   }
 });
 
-/** ✅ BULK upload parts (CSV/Excel) — skip duplicates gracefully */
-router.post("/bulk-upload", async (req, res) => {
-  try {
-    const parts = req.body.parts || req.body;
-    if (!Array.isArray(parts) || parts.length === 0) {
-      return res.status(400).json({
-        success: 0,
-        message: "No parts provided for bulk upload",
-      });
-    }
-
-    const normalized = parts.map((p) => normalizeItem(p));
-    const sanitized = normalized.map((p) => sanitizeInventoryRecord(p));
-
-    const allowedColumns = await db("information_schema.columns")
-      .select("column_name")
-      .where({ table_name: "inventory" })
-      .then((rows) => rows.map((r) => r.column_name));
-
-    const cleaned = sanitized.map((obj) =>
-      Object.fromEntries(
-        Object.entries(obj).filter(([key]) =>
-          allowedColumns.includes(key)
-        )
-      )
-    );
-
-    const inserted = [];
-    const duplicates = [];
-
-    for (const p of cleaned) {
-      try {
-        if (!p.part_number || p.part_number === "") {
-          console.error("⚠️ Skipping row with no part_number");
-          continue;
-        }
-        const exists = await db("inventory")
-          .where({ part_number: p.part_number })
-          .first();
-
-        if (exists) {
-          duplicates.push(p.part_number);
-          continue;
-        }
-
-        const [added] = await db("inventory").insert(p).returning("*");
-        inserted.push(added);
-      } catch (e) {
-        console.error(`❌ Insert error for ${p.part_number}:`, e.message);
-      }
-    }
-
-    let message;
-    if (inserted.length && duplicates.length) {
-      message = `✅ Inserted ${inserted.length} part(s). ⚠️ Skipped ${duplicates.length} duplicate(s): ${duplicates.join(
-        ", "
-      )}`;
-    } else if (duplicates.length && !inserted.length) {
-      message = `⚠️ Skipped ${duplicates.length} duplicate(s): ${duplicates.join(
-        ", "
-      )}`;
-    } else {
-      message = `✅ Inserted ${inserted.length} part(s).`;
-    }
-
-    res.json({ success: 1, inserted, duplicates, message });
-  } catch (err) {
-    console.error("❌ Error in bulk upload:", err.message);
-    res.status(500).json({
-      success: 0,
-      message: "Error bulk inserting inventory items",
-      error: err.message,
-    });
-  }
-});
-
-/** ✅ DELETE part */
-router.delete("/:id", async (req, res) => {
-  try {
-    await db("inventory").where({ part_id: req.params.id }).del();
-    res.json({ success: 1, message: "Part deleted successfully" });
-  } catch (err) {
-    console.error("❌ Error deleting inventory item:", err);
-    res.status(500).json({
-      success: 0,
-      message: "Error deleting inventory item",
-      error: err.message,
-    });
-  }
-});
-
-/** ✅ UPDATE part (PUT /api/parts/:id) */
+// Update part
 router.put("/:id", async (req, res) => {
   try {
-    const { id } = req.params;
-    const updatedNorm = normalizeItem(req.body);
-    const updated = sanitizeInventoryRecord(updatedNorm);
+    const item = sanitizeInventoryRecord(normalizeItem(req.body));
+    const result = await db("inventory").where({ part_id: req.params.id }).update(item).returning("*");
 
-    const result = await db("inventory")
-      .where({ part_id: id })
-      .update(updated)
-      .returning("*");
-
-    if (!result || result.length === 0) {
-      return res
-        .status(404)
-        .json({ success: 0, message: "Part not found" });
-    }
-
-    res.json({
-      success: 1,
-      data: result[0],
-      message: "Part updated successfully",
-    });
-  } catch (err) {
-    console.error("❌ Error updating inventory item:", err);
-    res.status(500).json({
-      success: 0,
-      message: "Error updating inventory item",
-      error: err.message,
-    });
+    if (!result.length) return res.status(404).json({ success: 0, message: "Not found" });
+    res.json({ success: 1, data: result[0], message: "Updated" });
+  } catch {
+    res.status(500).json({ success: 0, message: "Update failed" });
   }
+});
+
+// Delete
+router.delete("/:id", async (req, res) => {
+  await db("inventory").where({ part_id: req.params.id }).del();
+  res.json({ success: 1, message: "Deleted" });
 });
 
 export default router;

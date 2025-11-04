@@ -11,14 +11,14 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
     uom: "",
     quantity_on_hand: "",
     minimum_stock_level: "",
-    current_unit_price: "", // ✅ fixed
+    current_unit_price: "",
     supplier_name: "",
     location: "",
     status: "Active",
     lead_time_days: "",
     weight_kg: "",
     material: "",
-    last_po_date: "", // ✅ updated (was last_order_date)
+    last_po_date: "",
     remarks: "",
   });
 
@@ -71,7 +71,7 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
 
     try {
       const payload = { ...formData };
-      delete payload.unit_price; // ✅ ensure old field never sent
+      delete payload.unit_price;
 
       if (safeInitial && (safeInitial.part_id || safeInitial.id)) {
         const id = safeInitial.part_id ?? safeInitial.id;
@@ -89,7 +89,16 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-3 relative">
+      {/* ✅ Added close (X) button */}
+      <button
+        type="button"
+        onClick={onCancel}
+        className="absolute top-3 right-4 text-gray-500 hover:text-gray-700 text-lg"
+      >
+        ✖
+      </button>
+
       <h2 className="text-lg font-semibold text-gray-700 mb-2">
         {safeInitial && (safeInitial.part_id || safeInitial.id)
           ? "Edit Part"

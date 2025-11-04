@@ -101,6 +101,11 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
 
         // ✅ trigger fade-out after 3 seconds only for success messages
         setTimeout(() => setFadeOut(true), 3000);
+
+        // ✅ Close modal and refresh dashboard/vendor list
+        setTimeout(() => {
+          if (typeof onSaved === "function") onSaved();
+        }, 800);
       } else {
         setMessage(res.message || "⚠️ Vendor already exists or not saved.");
         setFadeOut(false);
@@ -117,9 +122,8 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
     }
   };
 
-  // ✅ manual close triggers refresh + modal close
   const handleClose = () => {
-    if (typeof onSaved === "function") onSaved();
+    if (typeof onCancel === "function") onCancel();
   };
 
   return (
@@ -130,7 +134,7 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
       {/* top-right close icon */}
       <button
         type="button"
-        onClick={onCancel}
+        onClick={handleClose}
         className="absolute top-3 right-4 text-gray-500 hover:text-gray-700 text-lg"
       >
         ✖
@@ -271,7 +275,7 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
           onClick={handleClose}
           className="px-4 py-2 rounded border hover:bg-gray-100"
         >
-          Close
+          Cancel
         </button>
 
         {!isSubmitted && (

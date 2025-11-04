@@ -1,36 +1,89 @@
-import React, { useMemo } from "react";
+// src/pages/purchaseOrders/PurchaseOrderDetails.jsx
+import React, { useEffect, useMemo, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import axios from "axios";
 
+const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const money = (v) => (v == null ? "-" : `$${Number(v).toFixed(2)}`);
 
-export default function PurchaseOrderDetails({ order, onClose }) {
-  // 🔧 Normalize order data in case backend wrapped it under { success, data }
-  const po = useMemo(() => {
-    if (!order) return null;
-    return order.data ? order.data : order; // support { success:1, data:{...} }
-  }, [order]);
+export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [fetchedOrder, setFetchedOrder] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  if (!po) return null;
+  // 🔧 Load from backend if no propOrder provided (route-based)
+  useEffect(() => {
+    if (propOrder) return;
+    if (!id) return;
+
+    setLoading(true);
+    axios
+      .get(`${BASE}/api/purchase_orders/${id}`)
+      .then((res) => {
+        setFetchedOrder(res.data?.data || res.data || null);
+      })
+      .catch((err) => {
+        console.error("❌ Error loading PO:", err);
+        alert("Failed to load Purchase Order details.");
+      })
+      .finally(() => setLoading(false));
+  }, [id, propOrder]);
+
+  // Choose the correct order source
+  const po = useMemo(() => {
+    if (propOrder) return propOrder.data || propOrder;
+    return fetchedOrder;
+  }, [propOrder, fetchedOrder]);
+
+  if (loading) return <div className="p-6">Loading...</div>;
+  if (!po) return <div className="p-6">Purchase Order not found.</div>;
 
   const items = Array.isArray(po.items) ? po.items : [];
   const files = Array.isArray(po.files) ? po.files : [];
 
+  // Determine close/back behavior
+  const handleClose = () => {
+    if (onClose) onClose();
+    else navigate("/purchase-orders");
+  };
+
+  // ✅ When used as route → full-page layout
+  // ✅ When used as modal → overlay centered
+  const isModal = !!onClose;
+
+  const Wrapper = ({ children }) =>
+    isModal ? (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+        {children}
+      </div>
+    ) : (
+      <div className="p-6 bg-white rounded shadow max-w-5xl mx-auto my-8">
+        {children}
+      </div>
+    );
+
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl p-6 overflow-y-auto max-h-[95vh]">
+    <Wrapper>
+      <div
+        className={`bg-white rounded-lg shadow-xl w-full ${
+          isModal ? "max-w-5xl p-6 overflow-y-auto max-h-[95vh]" : "p-6"
+        }`}
+      >
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-semibold text-gray-800">
             Purchase Order — {po.psr_po_number}
           </h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-500 hover:text-gray-700 text-lg"
           >
             ✕
           </button>
         </div>
 
-        {/* Top meta */}
+        {/* Top Meta */}
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <p>
@@ -44,7 +97,7 @@ export default function PurchaseOrderDetails({ order, onClose }) {
             <p>
               <span className="font-medium text-gray-700">Order Date:</span>{" "}
               {po.order_date
-                ? new Date(po.order_date).toLocaleString()
+                ? new Date(po.order_date).toLocaleDateString()
                 : "—"}
             </p>
             <p>
@@ -89,9 +142,7 @@ export default function PurchaseOrderDetails({ order, onClose }) {
             </div>
             <div>
               <span className="text-gray-600">Shipping</span>
-              <div className="font-semibold">
-                {money(po.shipping_charges)}
-              </div>
+              <div className="font-semibold">{money(po.shipping_charges)}</div>
             </div>
             <div>
               <span className="text-gray-600">Grand Total</span>
@@ -125,10 +176,7 @@ export default function PurchaseOrderDetails({ order, onClose }) {
                       {it.part_number || it.part_name || it.part_id || "—"}
                     </td>
                     <td className="border px-2 py-1">
-                      {it.description ||
-                        it.part_name ||
-                        it.part_number ||
-                        "—"}
+                      {it.description || it.part_name || it.part_number || "—"}
                     </td>
                     <td className="border px-2 py-1 text-right">
                       {it.quantity}
@@ -155,8 +203,7 @@ export default function PurchaseOrderDetails({ order, onClose }) {
             {files.map((f) => (
               <li key={f.id || f.filepath}>
                 <a
-                  href={`${(import.meta.env.VITE_API_URL ||
-                    "http://localhost:5000")}${
+                  href={`${BASE}${
                     f.filepath?.startsWith("/") ? "" : "/"
                   }${f.filepath}`}
                   target="_blank"
@@ -170,9 +217,11 @@ export default function PurchaseOrderDetails({ order, onClose }) {
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-gray-500 mt-2">No attachments uploaded.</p>
+          <p className="text-sm text-gray-500 mt-2">
+            No attachments uploaded.
+          </p>
         )}
       </div>
-    </div>
+    </Wrapper>
   );
 }
