@@ -39,6 +39,8 @@ export default function PartsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
+  const [zoomImage, setZoomImage] = useState(null); // ✅ for image zoom modal
+
   const loadParts = async () => {
     try {
       const data = await api.fetchParts();
@@ -107,6 +109,8 @@ export default function PartsPage() {
       alert("Error deleting part. Check console.");
     }
   };
+
+const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
 
   return (
     <div className="p-6">
@@ -195,79 +199,81 @@ export default function PartsPage() {
       <div className="bg-white shadow-md rounded-lg overflow-x-auto">
         <table className="min-w-full border text-sm text-left">
           <thead className="bg-gray-100 text-gray-700 uppercase text-xs font-semibold">
-  <tr>
-    <th
-      className="py-3 px-4 border-b cursor-pointer"
-      onClick={() => sortBy("part_number")}
-    >
-      <div className="flex items-center">
-        Part # <SortIcon col="part_number" />
-      </div>
-    </th>
+            <tr>
+              {/* ✅ Image Column */}
+              <th className="py-3 px-4 border-b text-center">Image</th>
 
-    <th
-      className="py-3 px-4 border-b cursor-pointer"
-      onClick={() => sortBy("part_name")}
-    >
-      <div className="flex items-center">
-        Part Name <SortIcon col="part_name" />
-      </div>
-    </th>
+              <th
+                className="py-3 px-4 border-b cursor-pointer"
+                onClick={() => sortBy("part_number")}
+              >
+                <div className="flex items-center">
+                  Part # <SortIcon col="part_number" />
+                </div>
+              </th>
 
-    <th
-      className="py-3 px-4 border-b cursor-pointer"
-      onClick={() => sortBy("category")}
-    >
-      <div className="flex items-center">
-        Category <SortIcon col="category" />
-      </div>
-    </th>
+              <th
+                className="py-3 px-4 border-b cursor-pointer"
+                onClick={() => sortBy("part_name")}
+              >
+                <div className="flex items-center">
+                  Part Name <SortIcon col="part_name" />
+                </div>
+              </th>
 
-    <th
-      className="py-3 px-4 border-b cursor-pointer"
-      onClick={() => sortBy("machine_name")}
-    >
-      <div className="flex items-center">
-        Machine <SortIcon col="machine_name" />
-      </div>
-    </th>
+              <th
+                className="py-3 px-4 border-b cursor-pointer"
+                onClick={() => sortBy("category")}
+              >
+                <div className="flex items-center">
+                  Category <SortIcon col="category" />
+                </div>
+              </th>
 
-    <th
-      className="py-3 px-4 border-b text-right cursor-pointer"
-      onClick={() => sortBy("last_unit_price")}
-    >
-      <div className="flex items-center justify-end">
-        Last Price <SortIcon col="last_unit_price" />
-      </div>
-    </th>
+              <th
+                className="py-3 px-4 border-b cursor-pointer"
+                onClick={() => sortBy("machine_name")}
+              >
+                <div className="flex items-center">
+                  Machine <SortIcon col="machine_name" />
+                </div>
+              </th>
 
-    <th
-      className="py-3 px-4 border-b cursor-pointer"
-      onClick={() => sortBy("last_vendor_name")}
-    >
-      <div className="flex items-center">
-        Last Vendor <SortIcon col="last_vendor_name" />
-      </div>
-    </th>
+              <th
+                className="py-3 px-4 border-b text-right cursor-pointer"
+                onClick={() => sortBy("last_unit_price")}
+              >
+                <div className="flex items-center justify-end">
+                  Last Price <SortIcon col="last_unit_price" />
+                </div>
+              </th>
 
-    <th
-      className="py-3 px-4 border-b text-center cursor-pointer"
-      onClick={() => sortBy("status")}
-    >
-      <div className="flex items-center justify-center">
-        Status <SortIcon col="status" />
-      </div>
-    </th>
+              <th
+                className="py-3 px-4 border-b cursor-pointer"
+                onClick={() => sortBy("last_vendor_name")}
+              >
+                <div className="flex items-center">
+                  Last Vendor <SortIcon col="last_vendor_name" />
+                </div>
+              </th>
 
-    <th className="py-3 px-4 border-b text-center">Actions</th>
-  </tr>
-</thead>
+              <th
+                className="py-3 px-4 border-b text-center cursor-pointer"
+                onClick={() => sortBy("status")}
+              >
+                <div className="flex items-center justify-center">
+                  Status <SortIcon col="status" />
+                </div>
+              </th>
 
+              <th className="py-3 px-4 border-b text-center">Actions</th>
+            </tr>
+          </thead>
 
           <tbody>
             {paginated.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-6 text-gray-500 font-medium">
+                <td colSpan={9} className="text-center py-6 text-gray-500 font-medium">
                   No parts found
                 </td>
               </tr>
@@ -277,6 +283,22 @@ export default function PartsPage() {
                   key={p.part_id ?? p.id ?? p.part_number}
                   className="border-t hover:bg-gray-50 transition"
                 >
+                  {/* ✅ Thumbnail */}
+                  <td className="py-2 px-4 text-center">
+  {p.image_url ? (
+    <img
+      src={`${BASE}${p.image_url}`}
+      alt="img"
+      className="w-12 h-12 object-cover rounded cursor-pointer border"
+      onClick={() => setZoomImage(`${BASE}${p.image_url}`)}
+      onError={(e) => { e.target.src = "/no-image.png"; }}
+    />
+  ) : (
+    <span className="text-gray-400 text-xs italic">No image</span>
+  )}
+</td>
+
+
                   <td className="py-2 px-4">{p.part_number}</td>
                   <td className="py-2 px-4">{p.part_name}</td>
                   <td className="py-2 px-4">{p.category || "-"}</td>
@@ -328,6 +350,34 @@ export default function PartsPage() {
           </tbody>
         </table>
       </div>
+
+      {/* ✅ Image Zoom Modal */}
+      {zoomImage && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
+          <div className="bg-white p-4 rounded shadow-lg relative">
+            <button
+              className="absolute top-2 right-2 text-gray-600"
+              onClick={() => setZoomImage(null)}
+            >
+              ✖
+            </button>
+            <img
+              src={zoomImage}
+              className="max-h-[80vh] max-w-[80vw] object-contain rounded"
+            />
+
+            <div className="text-center mt-2">
+              <a
+                href={zoomImage}
+                download
+                className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
+              >
+                ⬇ Download
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Pagination */}
       {totalPages > 1 && (

@@ -1,7 +1,28 @@
 import express from "express";
 import { db } from "../db.js";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 
 const router = express.Router();
+
+/**
+ * ✅ Multer config for part images storage
+ */
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(process.cwd(), "uploads", "parts");
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const fname = `${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`;
+    cb(null, fname);
+  },
+});
+
+const upload = multer({ storage });
 
 /**
  * ✅ Convert Excel serial date (e.g. 45106.6) to "YYYY-MM-DD"
@@ -100,13 +121,11 @@ function sanitizeInventoryRecord(recIn) {
  * ✅ Dashboard endpoints FIRST
  *------------------------------------------ */
 
-// Total parts
 router.get("/count", async (_, res) => {
   const r = await db("inventory").count("part_id as count").first();
   res.json({ count: Number(r.count) });
 });
 
-// Low-stock count
 router.get("/low-stock/count", async (_, res) => {
   const r = await db("inventory")
     .whereNotNull("minimum_stock_level")
@@ -116,16 +135,25 @@ router.get("/low-stock/count", async (_, res) => {
   res.json({ count: Number(r.count) });
 });
 
-// Low-stock preview
 router.get("/low-stock", async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit || "10"), 100);
     const rows = await db("inventory")
-      .select("part_id", "part_number", "part_name", "quantity_on_hand", "minimum_stock_level", "location")
+      .select(
+        "part_id",
+        "part_number",
+        "part_name",
+        db.raw(`COALESCE(description, '') as description`),
+        "quantity_on_hand",
+        "minimum_stock_level",
+        db.raw(`COALESCE(last_vendor_name, '') as last_vendor_name`),
+        "location"
+      )
       .whereNotNull("minimum_stock_level")
       .andWhere("quantity_on_hand", "<=", db.ref("minimum_stock_level"))
-      .orderBy([{ column: "quantity_on_hand", order: "asc" }, { column: "part_number", order: "asc" }])
-      .limit(limit);
+      .orderBy([
+        { column: "quantity_on_hand", order: "asc" },
+        { column: "part_number", order: "asc" }
+      ]);
 
     res.json({ success: 1, data: rows });
   } catch (err) {
@@ -133,7 +161,6 @@ router.get("/low-stock", async (req, res) => {
   }
 });
 
-// Monthly inventory trend
 router.get("/trend/monthly", async (req, res) => {
   try {
     const months = Math.min(parseInt(req.query.months || "6"), 24);
@@ -159,14 +186,13 @@ router.get("/trend/monthly", async (req, res) => {
  * ✅ CRUD routes AFTER dashboard routes
  *------------------------------------------ */
 
-// Get all parts
 router.get("/", async (_, res) => {
   const parts = await db("inventory").select("*").orderBy("part_id", "asc");
   res.json(parts);
 });
 
-// Add part
-router.post("/", async (req, res) => {
+// ✅ Add part with optional image
+router.post("/", upload.single("image"), async (req, res) => {
   try {
     if (!req.body.part_number) {
       return res.status(400).json({ success: 0, message: "part_number required" });
@@ -178,27 +204,36 @@ router.post("/", async (req, res) => {
     }
 
     const item = sanitizeInventoryRecord(normalizeItem(req.body));
+    if (req.file) item.image_url = `/uploads/parts/${req.file.filename}`;
+
     const [inserted] = await db("inventory").insert(item).returning("*");
     res.json({ success: 1, data: inserted, message: "Part added" });
-  } catch {
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ success: 0, message: "Insert error" });
   }
 });
 
-// Update part
-router.put("/:id", async (req, res) => {
+// ✅ Update part with optional new image
+router.put("/:id", upload.single("image"), async (req, res) => {
   try {
     const item = sanitizeInventoryRecord(normalizeItem(req.body));
-    const result = await db("inventory").where({ part_id: req.params.id }).update(item).returning("*");
+    if (req.file) item.image_url = `/uploads/parts/${req.file.filename}`;
+
+    const result = await db("inventory")
+      .where({ part_id: req.params.id })
+      .update(item)
+      .returning("*");
 
     if (!result.length) return res.status(404).json({ success: 0, message: "Not found" });
     res.json({ success: 1, data: result[0], message: "Updated" });
-  } catch {
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ success: 0, message: "Update failed" });
   }
 });
 
-// Delete
+// Delete part
 router.delete("/:id", async (req, res) => {
   await db("inventory").where({ part_id: req.params.id }).del();
   res.json({ success: 1, message: "Deleted" });

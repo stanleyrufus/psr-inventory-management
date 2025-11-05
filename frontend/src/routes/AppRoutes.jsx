@@ -11,6 +11,13 @@ import Login from "../pages/Login";
 import { AuthContext } from "../context/AuthContext";
 import Sidebar from "../components/Sidebar";
 
+// ✅ Reports
+import ReportsIndex from "../pages/reports/ReportsIndex";
+import LowStockReport from "../pages/reports/LowStockReport";
+import PurchaseOrderReport from "../pages/reports/PurchaseOrderReport";
+import StockMovementReport from "../pages/reports/StockMovementReport";
+
+
 // ✅ Purchase Orders
 import PurchaseOrderList from "../pages/purchaseOrders/PurchaseOrderList";
 import PurchaseOrderForm from "../pages/purchaseOrders/PurchaseOrderForm";
@@ -247,17 +254,59 @@ export default function AppRoutes() {
 
       {/* ---------- Reports ---------- */}
       <Route
-        path="/reports"
-        element={
-          user ? (
-            <PrivateLayout>
-              <ReportsPage />
-            </PrivateLayout>
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
+  path="/reports"
+  element={
+    user ? (
+      <PrivateLayout>
+        <ReportsIndex />
+      </PrivateLayout>
+    ) : (
+      <Navigate to="/login" replace />
+    )
+  }
+/>
+
+
+{/* --------- Reports: Sub Routes --------- */}
+<Route
+  path="/reports/low-stock"
+  element={
+    user ? (
+      <PrivateLayout>
+        <LowStockReport />
+      </PrivateLayout>
+    ) : (
+      <Navigate to="/login" replace />
+    )
+  }
+/>
+
+<Route
+  path="/reports/purchase-orders"
+  element={
+    user ? (
+      <PrivateLayout>
+        <PurchaseOrderReport />
+      </PrivateLayout>
+    ) : (
+      <Navigate to="/login" replace />
+    )
+  }
+/>
+
+<Route
+  path="/reports/stock-movement"
+  element={
+    user ? (
+      <PrivateLayout>
+        <StockMovementReport />
+      </PrivateLayout>
+    ) : (
+      <Navigate to="/login" replace />
+    )
+  }
+/>
+
 
       {/* ---------- Settings ---------- */}
       <Route

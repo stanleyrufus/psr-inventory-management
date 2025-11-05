@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
-import api from "../../utils/api";
+import api, { apiRaw } from "../../utils/api";
 
 export default function PartForm({ initial = {}, onSaved, onCancel }) {
   const safeInitial = initial || {};
+  const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
+
   const [formData, setFormData] = useState({
     part_number: "",
     part_name: "",
@@ -22,8 +24,11 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
     remarks: "",
   });
 
+  const [imageFile, setImageFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
   const [errors, setErrors] = useState({});
 
+  // ✅ Load initial values + image
   useEffect(() => {
     if (safeInitial && Object.keys(safeInitial).length > 0) {
       setFormData((prev) => ({
@@ -34,10 +39,8 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
         description: safeInitial.description ?? prev.description,
         uom: safeInitial.uom ?? prev.uom,
         quantity_on_hand: safeInitial.quantity_on_hand ?? prev.quantity_on_hand,
-        minimum_stock_level:
-          safeInitial.minimum_stock_level ?? prev.minimum_stock_level,
-        current_unit_price:
-          safeInitial.current_unit_price ?? prev.current_unit_price,
+        minimum_stock_level: safeInitial.minimum_stock_level ?? prev.minimum_stock_level,
+        current_unit_price: safeInitial.current_unit_price ?? prev.current_unit_price,
         supplier_name: safeInitial.supplier_name ?? prev.supplier_name,
         location: safeInitial.location ?? prev.location,
         status: safeInitial.status ?? prev.status,
@@ -47,8 +50,21 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
         last_po_date: safeInitial.last_po_date ?? prev.last_po_date,
         remarks: safeInitial.remarks ?? prev.remarks,
       }));
+
+      // ✅ Build correct preview URL
+      if (safeInitial.image_url) {
+        const url = safeInitial.image_url.startsWith("/")
+          ? `${BASE}${safeInitial.image_url}`
+          : `${BASE}/uploads/parts/${safeInitial.image_url}`;
+        setPreviewUrl(url);
+      }
     }
   }, [safeInitial]);
+
+  // ✅ Local image preview
+  useEffect(() => {
+    if (imageFile) setPreviewUrl(URL.createObjectURL(imageFile));
+  }, [imageFile]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -70,14 +86,31 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
     }
 
     try {
-      const payload = { ...formData };
-      delete payload.unit_price;
+      let res;
 
-      if (safeInitial && (safeInitial.part_id || safeInitial.id)) {
-        const id = safeInitial.part_id ?? safeInitial.id;
-        await api.updatePart(id, payload);
+      if (imageFile) {
+        const fd = new FormData();
+        Object.entries(formData).forEach(([key, value]) => {
+          fd.append(key, value ?? "");
+        });
+        fd.append("image", imageFile);
+
+        const url = safeInitial?.part_id
+          ? `/parts/${safeInitial.part_id}`
+          : `/parts`;
+
+        res = await apiRaw.post(url, fd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
       } else {
-        await api.createPart(payload);
+        const payload = { ...formData };
+        delete payload.unit_price;
+
+        if (safeInitial?.part_id) {
+          res = await api.updatePart(safeInitial.part_id, payload);
+        } else {
+          res = await api.createPart(payload);
+        }
       }
 
       alert("✅ Part saved successfully!");
@@ -90,7 +123,6 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 relative">
-      {/* ✅ Added close (X) button */}
       <button
         type="button"
         onClick={onCancel}
@@ -100,24 +132,44 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
       </button>
 
       <h2 className="text-lg font-semibold text-gray-700 mb-2">
-        {safeInitial && (safeInitial.part_id || safeInitial.id)
-          ? "Edit Part"
-          : "Add New Part"}
+        {safeInitial?.part_id || safeInitial?.id ? "Edit Part" : "Add New Part"}
       </h2>
 
+      {/* Image Upload */}
+      <div className="flex flex-col mb-2">
+        <label className="text-sm font-medium text-gray-700 mb-1">Part Image</label>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => setImageFile(e.target.files[0])}
+          className="border p-2 rounded"
+        />
+
+        {previewUrl && (
+          <img
+            src={previewUrl}
+            alt="preview"
+            className="mt-2 w-24 h-24 object-cover rounded border"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = "/no-image.png";
+            }}
+          />
+        )}
+      </div>
+
+      {/* Form Fields */}
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col">
           <span className="text-sm font-medium text-gray-700 mb-1">
             Part Number <span className="text-red-500">*</span>
           </span>
           <input
-            required
             name="part_number"
             value={formData.part_number}
             onChange={handleChange}
-            className={`border p-2 rounded ${
-              errors.part_number ? "border-red-500 animate-pulse" : ""
-            }`}
+            className={`border p-2 rounded ${errors.part_number ? "border-red-500" : ""}`}
+            required
           />
         </label>
 
@@ -126,141 +178,38 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
             Part Name <span className="text-red-500">*</span>
           </span>
           <input
-            required
             name="part_name"
             value={formData.part_name}
             onChange={handleChange}
-            className={`border p-2 rounded ${
-              errors.part_name ? "border-red-500 animate-pulse" : ""
-            }`}
+            className={`border p-2 rounded ${errors.part_name ? "border-red-500" : ""}`}
+            required
           />
         </label>
 
-        <input
-          name="category"
-          value={formData.category}
-          onChange={handleChange}
-          placeholder="Category"
-          className="border p-2 rounded"
-        />
-        <input
-          name="uom"
-          value={formData.uom}
-          onChange={handleChange}
-          placeholder="UOM"
-          className="border p-2 rounded"
-        />
-        <input
-          name="quantity_on_hand"
-          type="number"
-          value={formData.quantity_on_hand}
-          onChange={handleChange}
-          placeholder="Quantity on Hand"
-          className="border p-2 rounded"
-        />
-        <input
-          name="minimum_stock_level"
-          type="number"
-          value={formData.minimum_stock_level}
-          onChange={handleChange}
-          placeholder="Minimum Stock"
-          className="border p-2 rounded"
-        />
-        <input
-          name="current_unit_price"
-          type="number"
-          step="0.01"
-          value={formData.current_unit_price}
-          onChange={handleChange}
-          placeholder="Unit Price"
-          className="border p-2 rounded"
-        />
-        <input
-          name="supplier_name"
-          value={formData.supplier_name}
-          onChange={handleChange}
-          placeholder="Supplier Name"
-          className="border p-2 rounded"
-        />
-        <input
-          name="location"
-          value={formData.location}
-          onChange={handleChange}
-          placeholder="Location"
-          className="border p-2 rounded"
-        />
-        <input
-          name="lead_time_days"
-          type="number"
-          value={formData.lead_time_days}
-          onChange={handleChange}
-          placeholder="Lead Time (days)"
-          className="border p-2 rounded"
-        />
-        <input
-          name="weight_kg"
-          type="number"
-          step="0.01"
-          value={formData.weight_kg}
-          onChange={handleChange}
-          placeholder="Weight (kg)"
-          className="border p-2 rounded"
-        />
-        <input
-          name="material"
-          value={formData.material}
-          onChange={handleChange}
-          placeholder="Material"
-          className="border p-2 rounded"
-        />
-        <input
-          name="last_po_date"
-          type="date"
-          value={formData.last_po_date}
-          onChange={handleChange}
-          className="border p-2 rounded"
-        />
-        <select
-          name="status"
-          value={formData.status}
-          onChange={handleChange}
-          className="border p-2 rounded"
-        >
-          <option value="Active">Active</option>
-          <option value="Inactive">Inactive</option>
+        <input name="category" value={formData.category} onChange={handleChange} placeholder="Category" className="border p-2 rounded" />
+        <input name="uom" value={formData.uom} onChange={handleChange} placeholder="UOM" className="border p-2 rounded" />
+        <input name="quantity_on_hand" type="number" value={formData.quantity_on_hand} onChange={handleChange} placeholder="Quantity on Hand" className="border p-2 rounded" />
+        <input name="minimum_stock_level" type="number" value={formData.minimum_stock_level} onChange={handleChange} placeholder="Minimum Stock" className="border p-2 rounded" />
+        <input name="current_unit_price" type="number" step="0.01" value={formData.current_unit_price} onChange={handleChange} placeholder="Unit Price" className="border p-2 rounded" />
+        <input name="supplier_name" value={formData.supplier_name} onChange={handleChange} placeholder="Supplier Name" className="border p-2 rounded" />
+        <input name="location" value={formData.location} onChange={handleChange} placeholder="Location" className="border p-2 rounded" />
+        <input name="lead_time_days" type="number" value={formData.lead_time_days} onChange={handleChange} placeholder="Lead Time (days)" className="border p-2 rounded" />
+        <input name="weight_kg" type="number" step="0.01" value={formData.weight_kg} onChange={handleChange} placeholder="Weight (kg)" className="border p-2 rounded" />
+        <input name="material" value={formData.material} onChange={handleChange} placeholder="Material" className="border p-2 rounded" />
+        <input name="last_po_date" type="date" value={formData.last_po_date} onChange={handleChange} className="border p-2 rounded" />
+        <select name="status" value={formData.status} onChange={handleChange} className="border p-2 rounded">
+          <option>Active</option>
+          <option>Inactive</option>
         </select>
       </div>
 
-      <textarea
-        name="description"
-        value={formData.description}
-        onChange={handleChange}
-        placeholder="Description"
-        className="border p-2 rounded w-full"
-      />
-      <textarea
-        name="remarks"
-        value={formData.remarks}
-        onChange={handleChange}
-        placeholder="Remarks"
-        className="border p-2 rounded w-full"
-      />
+      <textarea name="description" value={formData.description} onChange={handleChange} placeholder="Description" className="border p-2 rounded w-full" />
+      <textarea name="remarks" value={formData.remarks} onChange={handleChange} placeholder="Remarks" className="border p-2 rounded w-full" />
 
       <div className="flex justify-end gap-2 pt-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 rounded border hover:bg-gray-100"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
-        >
-          {safeInitial && (safeInitial.part_id || safeInitial.id)
-            ? "Update"
-            : "Add Part"}
+        <button type="button" onClick={onCancel} className="px-4 py-2 rounded border hover:bg-gray-100">Cancel</button>
+        <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">
+          {safeInitial?.part_id || safeInitial?.id ? "Update" : "Add Part"}
         </button>
       </div>
     </form>

@@ -14,6 +14,8 @@ import productsRoutes from "./routes/products.js";
 import purchaseOrdersBulkRouter from "./routes/purchase_orders_bulk.js";
 import purchaseOrderImportRoutes from "./routes/purchase_orders_import.js";
 import vendorRoutes from "./routes/vendors.js"; // ✅ single correct import
+import purchaseOrdersReportRoutes from "./routes/purchase_orders_report.js";
+
 
 dotenv.config();
 
@@ -29,7 +31,8 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 // ✅ Static route for uploaded files
-app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
+// ✅ Serve uploaded images from /uploads folder
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 // ✅ Connect DB
 connectDB();
@@ -43,9 +46,12 @@ app.use("/api/users", usersRoutes);
 app.use("/api/purchase_orders", purchaseOrdersRoutes);
 app.use("/api/purchase_orders_bulk", purchaseOrdersBulkRouter);
 
+
 // --- Dedicated Import routes (now safe, isolated path) ---
 app.use("/api/po_import", purchaseOrderImportRoutes);
 
+// Reports PO
+app.use("/api/purchase_orders_report", purchaseOrdersReportRoutes);
 
 
 // --- Other modules ---

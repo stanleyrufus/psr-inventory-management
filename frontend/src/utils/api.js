@@ -81,6 +81,13 @@ export const uploadPurchaseOrderFiles = async (id, files) => {
   ).data;
 };
 
+export const fetchPurchaseOrdersReport = async (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  const res = await apiClient.get(`/purchase_orders_report${qs ? `?${qs}` : ""}`);
+  return res.data?.data || [];
+};
+
+
 /* --------------------------
    🧩 VENDORS API
 --------------------------- */
@@ -113,6 +120,7 @@ export default {
   updatePurchaseOrder,
   updatePurchaseOrderStatus,
   uploadPurchaseOrderFiles,
+  fetchPurchaseOrdersReport,
   fetchVendors,
   createVendor,
   updateVendor,
