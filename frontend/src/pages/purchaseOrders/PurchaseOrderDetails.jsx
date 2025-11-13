@@ -12,7 +12,6 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
   const [fetchedOrder, setFetchedOrder] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // 🔧 Load from backend if no propOrder provided (route-based)
   useEffect(() => {
     if (propOrder) return;
     if (!id) return;
@@ -20,9 +19,7 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
     setLoading(true);
     axios
       .get(`${BASE}/api/purchase_orders/${id}`)
-      .then((res) => {
-        setFetchedOrder(res.data?.data || res.data || null);
-      })
+      .then((res) => setFetchedOrder(res.data?.data || res.data || null))
       .catch((err) => {
         console.error("❌ Error loading PO:", err);
         alert("Failed to load Purchase Order details.");
@@ -30,7 +27,6 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
       .finally(() => setLoading(false));
   }, [id, propOrder]);
 
-  // Choose the correct order source
   const po = useMemo(() => {
     if (propOrder) return propOrder.data || propOrder;
     return fetchedOrder;
@@ -42,14 +38,11 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
   const items = Array.isArray(po.items) ? po.items : [];
   const files = Array.isArray(po.files) ? po.files : [];
 
-  // Determine close/back behavior
   const handleClose = () => {
     if (onClose) onClose();
     else navigate("/purchase-orders");
   };
 
-  // ✅ When used as route → full-page layout
-  // ✅ When used as modal → overlay centered
   const isModal = !!onClose;
 
   const Wrapper = ({ children }) =>
@@ -75,12 +68,16 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
           <h2 className="text-2xl font-semibold text-gray-800">
             Purchase Order — {po.psr_po_number}
           </h2>
-          <button
-            onClick={handleClose}
-            className="text-gray-500 hover:text-gray-700 text-lg"
-          >
-            ✕
-          </button>
+
+          <div className="flex items-center gap-3">
+            
+            <button
+              onClick={handleClose}
+              className="text-gray-500 hover:text-gray-700 text-lg"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Top Meta */}
@@ -217,9 +214,7 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-gray-500 mt-2">
-            No attachments uploaded.
-          </p>
+          <p className="text-sm text-gray-500 mt-2">No attachments uploaded.</p>
         )}
       </div>
     </Wrapper>

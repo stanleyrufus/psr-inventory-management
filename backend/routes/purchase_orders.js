@@ -104,6 +104,22 @@ router.get("/status/monthly", async (req, res) => {
 //
 // ✅ CREATE PURCHASE ORDER
 //
+// ✅ CHECK IF PO NUMBER EXISTS
+router.get("/check-number/:psr_po_number", async (req, res) => {
+  try {
+    const { psr_po_number } = req.params;
+
+    const existing = await db("purchase_orders")
+      .where({ psr_po_number })
+      .first();
+
+    res.json({ exists: !!existing });
+  } catch (err) {
+    console.error("❌ check-number error:", err);
+    res.status(500).json({ exists: false });
+  }
+});
+
 router.post("/", async (req, res) => {
   const body = req.body || {};
   const {
@@ -120,6 +136,18 @@ router.post("/", async (req, res) => {
   }
 
   if (!items.length) return res.status(400).json({ success: 0, errormsg: "At least one item is required" });
+// ✅ Prevent duplicate PO numbers (backend enforcement)
+const exists = await db("purchase_orders")
+  .where({ psr_po_number })
+  .first();
+
+if (exists) {
+  return res.status(400).json({
+    success: 0,
+    errormsg: "PO Number already exists. Please use a unique PO Number.",
+  });
+}
+
 
   const trx = await db.transaction();
   try {

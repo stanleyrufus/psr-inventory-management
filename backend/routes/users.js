@@ -1,4 +1,3 @@
-// backend/routes/users.js
 import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -6,57 +5,56 @@ import { db } from "../db.js";
 
 const router = express.Router();
 
-// ✅ Register user
-router.post("/register", async (req, res) => {
+/* ===========================================================
+ ✅ CREATE USER (correct route)
+=========================================================== */
+router.post("/", async (req, res) => {
   try {
     const { username, email, password, role } = req.body;
-    if (!username || !email || !password)
-      return res.status(400).json({ message: "Username, email, and password are required" });
 
-    const existing = await db("users").where({ username }).orWhere({ email }).first();
-    if (existing)
+    if (!username || !email || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const existing = await db("users")
+      .where({ username })
+      .orWhere({ email })
+      .first();
+
+    if (existing) {
       return res.status(400).json({ message: "Username or email already exists" });
+    }
 
     const hashed = bcrypt.hashSync(password, 10);
 
     const [newUser] = await db("users")
-      .insert({ username, email, password: hashed, role: role || "user" })
-      .returning(["id", "username", "email", "role"]);
+      .insert({ username, email, password: hashed, role })
+      .returning(["id", "username", "email", "role", "created_at"]);
 
-    res.status(201).json({ message: "User registered successfully", user: newUser });
+    res.status(201).json(newUser);
+
   } catch (err) {
-    console.error("Registration error:", err);
-    res.status(500).json({ message: "Server error", error: err.message });
+    console.error("Create user error:", err);
+    res.status(500).json({ message: "Failed to create user", error: err.message });
   }
 });
 
-// ✅ Login (username or email)
+/* ===========================================================
+ ✅ LOGIN
+=========================================================== */
 router.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    if (!username || !password)
-      return res.status(400).json({ message: "Username and password required" });
-
-    // Try username OR email
     const user = await db("users")
       .where({ username })
       .orWhere({ email: username })
       .first();
 
-    if (!user) {
-      console.log("❌ Login failed: user not found for", username);
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
+    if (!user) return res.status(401).json({ message: "Invalid credentials" });
 
     const valid = bcrypt.compareSync(password, user.password);
-    if (!valid) {
-      console.log("❌ Login failed: wrong password for", username);
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    if (!process.env.JWT_SECRET)
-      return res.status(500).json({ message: "Server misconfiguration: missing JWT_SECRET" });
+    if (!valid) return res.status(401).json({ message: "Invalid credentials" });
 
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
@@ -64,23 +62,86 @@ router.post("/login", async (req, res) => {
       { expiresIn: "2h" }
     );
 
-    const { password: _pw, ...userData } = user;
-    res.json({ token, user: userData });
+    const { password: _, ...safeUser } = user;
+    res.json({ token, user: safeUser });
+
   } catch (err) {
-    console.error("Login error:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 
-// ✅ Get users list
+/* ===========================================================
+ ✅ GET USERS LIST
+=========================================================== */
 router.get("/", async (req, res) => {
   try {
-    const users = await db("users").select("id", "username", "email", "role");
+    const users = await db("users")
+      .select("id", "username", "email", "role", "created_at");
     res.json(users);
   } catch (err) {
-    console.error("Fetch users error:", err);
-    res.status(500).json({ message: "Error fetching users", error: err.message });
+    res.status(500).json({ message: "Error fetching users" });
   }
 });
+
+/* ===========================================================
+ ✅ UPDATE USER
+=========================================================== */
+router.put("/:id", async (req, res) => {
+  try {
+    const { username, email, role, password } = req.body;
+
+    const updateData = { username, email, role };
+    if (password && password.trim() !== "") {
+      updateData.password = bcrypt.hashSync(password, 10);
+    }
+
+    const [updated] = await db("users")
+      .where({ id: req.params.id })
+      .update(updateData)
+      .returning(["id", "username", "email", "role"]);
+
+    res.json({ message: "User updated", user: updated });
+
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update user" });
+  }
+});
+
+/* ===========================================================
+ ✅ DELETE USER
+=========================================================== */
+router.delete("/:id", async (req, res) => {
+  try {
+    await db("users").where({ id: req.params.id }).delete();
+    res.json({ message: "User deleted" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to delete user" });
+  }
+});
+
+/* ===========================================================
+ ✅ RESET PASSWORD
+=========================================================== */
+router.patch("/:id/reset-password", async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    if (!password || password.trim() === "") {
+      return res.status(400).json({ message: "Password required" });
+    }
+
+    const hashed = bcrypt.hashSync(password, 10);
+
+    await db("users")
+      .where({ id: req.params.id })
+      .update({ password: hashed });
+
+    res.json({ message: "Password reset successfully" });
+  } catch (err) {
+    console.error("Reset password error:", err);
+    res.status(500).json({ message: "Failed to reset password" });
+  }
+});
+
 
 export default router;

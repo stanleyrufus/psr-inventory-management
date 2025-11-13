@@ -1,4 +1,5 @@
 // src/pages/DashboardPage.jsx
+import PurchaseOrderForm from "../pages/purchaseOrders/PurchaseOrderForm";
 import { useEffect, useState } from "react";
 import {
   LineChart, Line, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer
@@ -23,71 +24,80 @@ export default function DashboardPage() {
   const [poMonthly, setPoMonthly] = useState([]);
   const [recentPOs, setRecentPOs] = useState([]);
   const [lowStockList, setLowStockList] = useState([]);
+
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [showPartModal, setShowPartModal] = useState(false);
+  const [showPoModal, setShowPoModal] = useState(false);
+
+  // Disable background scroll when PO modal is open
+  useEffect(() => {
+    if (showPoModal) document.body.classList.add("overflow-hidden");
+    else document.body.classList.remove("overflow-hidden");
+  }, [showPoModal]);
+
+  // --- Loaders split so we can call them again ---
+  const loadCards = async () => {
+    try {
+      const [partsRes, lowStockRes, vendorsRes, poRes] = await Promise.all([
+        api.get("/parts/count"),
+        api.get("/parts/low-stock/count"),
+        api.get("/vendors/count"),
+        api.get("/purchase_orders/count"),
+      ]);
+      setSummary({
+        partsCount: partsRes.data?.count ?? 0,
+        lowStock: lowStockRes.data?.count ?? 0,
+        vendorsCount: vendorsRes.data?.count ?? 0,
+        purchaseOrders: poRes.data?.count ?? 0,
+      });
+    } catch (err) {
+      console.error("Dashboard cards error:", err);
+    }
+  };
+
+  const loadCharts = async () => {
+    try {
+      const [trendRes, statusRes] = await Promise.all([
+        api.get("/parts/trend/monthly?months=6"),
+        api.get("/purchase_orders/status/monthly?months=6"),
+      ]);
+      setInventoryTrend((trendRes.data?.data || []).map((r) => ({
+        month: r.ym,
+        count: r.count,
+      })));
+      setPoMonthly((statusRes.data?.data || []).map((r) => ({
+        month: r.ym,
+        draft: r.draft,
+        pending: r.pending,
+        sent: r.sent,
+        completed: r.completed,
+      })));
+    } catch (err) {
+      console.error("Dashboard charts error:", err);
+    }
+  };
+
+  const loadTables = async () => {
+    try {
+      const [recentRes, lowRes] = await Promise.all([
+        api.get("/purchase_orders/recent?limit=5"),
+        api.get("/parts/low-stock?limit=10"),
+      ]);
+      setRecentPOs(recentRes.data?.data || []);
+      setLowStockList(lowRes.data?.data || []);
+    } catch (err) {
+      console.error("Dashboard tables error:", err);
+    }
+  };
+
+  // ✅ NEW: a single refresher you can call from anywhere
+  const refreshCounts = async () => {
+    await Promise.all([loadCards(), loadCharts(), loadTables()]);
+  };
 
   useEffect(() => {
-    async function loadCards() {
-      try {
-        const [partsRes, lowStockRes, vendorsRes, poRes] = await Promise.all([
-          api.get("/parts/count"),
-          api.get("/parts/low-stock/count"),
-          api.get("/vendors/count"),
-          api.get("/purchase_orders/count"),
-        ]);
-
-        setSummary({
-          partsCount: partsRes.data?.count ?? 0,
-          lowStock: lowStockRes.data?.count ?? 0,
-          vendorsCount: vendorsRes.data?.count ?? 0,
-          purchaseOrders: poRes.data?.count ?? 0,
-        });
-      } catch (err) {
-        console.error("Dashboard cards error:", err);
-      }
-    }
-
-    async function loadCharts() {
-      try {
-        const [trendRes, statusRes] = await Promise.all([
-          api.get("/parts/trend/monthly?months=6"),
-          api.get("/purchase_orders/status/monthly?months=6"),
-        ]);
-
-        setInventoryTrend((trendRes.data?.data || []).map((r) => ({
-          month: r.ym,
-          count: r.count,
-        })));
-
-        setPoMonthly((statusRes.data?.data || []).map((r) => ({
-          month: r.ym,
-          draft: r.draft,
-          pending: r.pending,
-          sent: r.sent,
-          completed: r.completed,
-        })));
-      } catch (err) {
-        console.error("Dashboard charts error:", err);
-      }
-    }
-
-    async function loadTables() {
-      try {
-        const [recentRes, lowRes] = await Promise.all([
-          api.get("/purchase_orders/recent?limit=5"),
-          api.get("/parts/low-stock?limit=10"),
-        ]);
-
-        setRecentPOs(recentRes.data?.data || []);
-        setLowStockList(lowRes.data?.data || []);
-      } catch (err) {
-        console.error("Dashboard tables error:", err);
-      }
-    }
-
-    loadCards();
-    loadCharts();
-    loadTables();
+    refreshCounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const StatCard = ({ title, value, color }) => (
@@ -112,13 +122,14 @@ export default function DashboardPage() {
           >
             Export Report
           </button>
+
           <button
             className="px-4 py-2 bg-gray-800 text-white rounded-xl hover:bg-black"
-            onClick={() => navigate("/purchase-orders/new")}
+            onClick={() => setShowPoModal(true)}
           >
             + Add PO
           </button>
-          {/* ✅ Updated: open modal instead of navigating */}
+
           <button
             className="px-4 py-2 bg-gray-800 text-white rounded-xl hover:bg-black"
             onClick={() => setShowPartModal(true)}
@@ -200,19 +211,13 @@ export default function DashboardPage() {
                     <td className="py-2 pr-4 font-medium text-gray-800">{po.psr_po_number}</td>
                     <td className="py-2 pr-4">{po.vendor_name || "-"}</td>
                     <td className="py-2 pr-4">
-                      {po.order_date
-                        ? new Date(po.order_date).toISOString().split("T")[0]
-                        : "-"}
+                      {po.order_date ? new Date(po.order_date).toISOString().split("T")[0] : "-"}
                     </td>
                     <td className="py-2 pr-4">
-                      <span className="px-2 py-1 rounded-full text-xs bg-gray-100">
-                        {po.status}
-                      </span>
+                      <span className="px-2 py-1 rounded-full text-xs bg-gray-100">{po.status}</span>
                     </td>
                     <td className="py-2 pr-0 text-right">
-                      {po.grand_total != null
-                        ? `$${Number(po.grand_total).toFixed(2)}`
-                        : "-"}
+                      {po.grand_total != null ? `$${Number(po.grand_total).toFixed(2)}` : "-"}
                     </td>
                   </tr>
                 ))}
@@ -265,7 +270,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ✅ Vendor Modal */}
+      {/* Vendor Modal */}
       {showVendorModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-3xl w-full relative">
@@ -286,27 +291,43 @@ export default function DashboardPage() {
         </div>
       )}
 
-     {/* ✅ Part Modal */}
-{showPartModal && (
-  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-    <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-6 overflow-y-auto max-h-[90vh] relative">
-      <PartForm
-        initial={{}}
-        onSaved={() => {
-          setShowPartModal(false);
-          api.get("/parts/count").then((res) =>
-            setSummary((prev) => ({
-              ...prev,
-              partsCount: res.data?.count ?? prev.partsCount,
-            }))
-          );
-        }}
-        onCancel={() => setShowPartModal(false)}
-      />
-    </div>
-  </div>
-)}
+      {/* Part Modal */}
+      {showPartModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-6 overflow-y-auto max-h-[90vh] relative">
+            <PartForm
+              initial={{}}
+              onSaved={() => {
+                setShowPartModal(false);
+                api.get("/parts/count").then((res) =>
+                  setSummary((prev) => ({
+                    ...prev,
+                    partsCount: res.data?.count ?? prev.partsCount,
+                  }))
+                );
+              }}
+              onCancel={() => setShowPartModal(false)}
+            />
+          </div>
+        </div>
+      )}
 
+      {/* PO Modal */}
+      {showPoModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+            <PurchaseOrderForm
+              isModal
+              initialPo={null}
+              onSaved={() => {
+                setShowPoModal(false);
+                refreshCounts(); // ✅ defined now
+              }}
+              onCancel={() => setShowPoModal(false)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

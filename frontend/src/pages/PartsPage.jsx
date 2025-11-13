@@ -1,5 +1,6 @@
 // frontend/src/pages/PartsPage.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import { AgGridReact } from "ag-grid-react";
 import api from "../utils/api";
 import PartForm from "../components/forms/PartForm";
 import BulkUploadModal from "../components/modals/BulkUploadModal";
@@ -9,27 +10,9 @@ export default function PartsPage() {
   const [parts, setParts] = useState([]);
   const [filtered, setFiltered] = useState([]);
 
-  // ✅ Sorting state + function
-  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
-
-  const sortBy = (key) => {
-    setSortConfig((prev) => ({
-      key,
-      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
-    }));
-  };
-
-  const SortIcon = ({ col }) => {
-    if (sortConfig.key !== col) return <span className="ml-1 text-gray-400">▲</span>;
-    return (
-      <span className="ml-1">
-        {sortConfig.direction === "asc" ? "▲" : "▼"}
-      </span>
-    );
-  };
-
   const [editingPart, setEditingPart] = useState(null);
   const [viewingPart, setViewingPart] = useState(null);
+
   const [showForm, setShowForm] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
 
@@ -39,7 +22,12 @@ export default function PartsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  const [zoomImage, setZoomImage] = useState(null); // ✅ for image zoom modal
+  const [zoomImage, setZoomImage] = useState(null);
+
+  const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
+    /\/$/,
+    ""
+  );
 
   const loadParts = async () => {
     try {
@@ -62,28 +50,26 @@ export default function PartsPage() {
 
   useEffect(() => {
     const f = parts.filter((p) => {
+      const q = search.toLowerCase();
+
       const matchSearch =
-        p.part_name?.toLowerCase().includes(search.toLowerCase()) ||
-        p.part_number?.toLowerCase().includes(search.toLowerCase()) ||
-        p.description?.toLowerCase().includes(search.toLowerCase());
+        p.part_name?.toLowerCase().includes(q) ||
+        p.part_number?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q);
+
       const matchCategory = categoryFilter ? p.category === categoryFilter : true;
       const matchStatus = statusFilter ? p.status === statusFilter : true;
+
       return matchSearch && matchCategory && matchStatus;
     });
+
     setFiltered(f);
     setCurrentPage(1);
   }, [search, categoryFilter, statusFilter, parts]);
 
-  const sortedFiltered = [...filtered].sort((a, b) => {
-    if (!sortConfig.key) return filtered;
-    const x = a[sortConfig.key] ?? "";
-    const y = b[sortConfig.key] ?? "";
-    return sortConfig.direction === "asc" ? (x > y ? 1 : -1) : (x < y ? 1 : -1);
-  });
+  const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
 
-  const totalPages = Math.ceil(sortedFiltered.length / itemsPerPage) || 1;
-
-  const paginated = sortedFiltered.slice(
+  const paginated = filtered.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
@@ -110,7 +96,93 @@ export default function PartsPage() {
     }
   };
 
-const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
+  /*************************************
+   ✅ CELL RENDERERS
+  *************************************/
+  const ImageRenderer = (props) => {
+    const url = props.value ? `${BASE}${props.value}` : null;
+    return url ? (
+      <img
+        src={url}
+        className="w-12 h-12 object-cover rounded border cursor-pointer"
+        onClick={() => setZoomImage(url)}
+        onError={(e) => (e.target.src = "/no-image.png")}
+      />
+    ) : (
+      <span className="text-gray-400 text-xs italic">No image</span>
+    );
+  };
+
+  const StatusRenderer = (props) => {
+    const s = props.value || "Unknown";
+    return (
+      <span
+        className={`px-2 py-1 rounded-full text-xs font-medium ${
+          s === "Active"
+            ? "bg-green-100 text-green-700"
+            : "bg-gray-200 text-gray-600"
+        }`}
+      >
+        {s}
+      </span>
+    );
+  };
+
+  const ActionsRenderer = (props) => {
+    const row = props.data;
+    return (
+      <div className="flex gap-2 justify-start">
+        <button
+          className="text-blue-600 text-sm underline"
+          onClick={() => setViewingPart(row)}
+        >
+          View
+        </button>
+        <button
+          className="text-gray-700 text-sm underline"
+          onClick={() => {
+            setEditingPart(row);
+            setShowForm(true);
+          }}
+        >
+          Edit
+        </button>
+        <button
+          className="text-red-600 text-sm underline"
+          onClick={() => handleDelete(row.part_id, row.part_name)}
+        >
+          Delete
+        </button>
+      </div>
+    );
+  };
+
+  /*************************************
+   ✅ AG GRID COLUMNS 
+   ✅ ONLY CHANGE = MACHINE COLUMN REMOVED
+  *************************************/
+  const columnDefs = [
+    { headerName: "Image", field: "image_url", width: 100, cellRenderer: ImageRenderer },
+    { headerName: "Part #", field: "part_number", width: 120, flex: 1 },
+    { headerName: "Part Name", field: "part_name", width: 160, flex: 1 },
+    // ✅ CATEGORY STILL HERE
+    { headerName: "Category", field: "category", width: 140, flex: 1 },
+
+    // ❌ MACHINE COLUMN REMOVED
+
+    {
+      headerName: "Last Price",
+      width: 110,
+      valueFormatter: (p) => {
+        const v = p.data.last_unit_price ?? p.data.unit_price ?? null;
+        return v ? `$${Number(v).toFixed(2)}` : "-";
+      },
+    },
+
+    { headerName: "Last Vendor", field: "last_vendor_name", width: 160, flex: 1 },
+    { headerName: "Status", field: "status", width: 110, cellRenderer: StatusRenderer },
+    { headerName: "Actions", width: 170, cellRenderer: ActionsRenderer },
+  ];
 
   return (
     <div className="p-6">
@@ -124,19 +196,21 @@ const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/
             Manage all parts, components, and materials
           </p>
         </div>
+
         <div className="flex gap-3">
           <button
             onClick={() => {
               setEditingPart(null);
               setShowForm(true);
             }}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow"
+            className="bg-blue-600 text-white px-4 py-2 rounded shadow"
           >
             ➕ Add Part
           </button>
+
           <button
             onClick={() => setShowBulk(true)}
-            className="border border-blue-600 text-blue-600 hover:bg-blue-50 px-4 py-2 rounded shadow-sm"
+            className="border border-blue-600 text-blue-600 px-4 py-2 rounded"
           >
             ⬆️ Bulk Upload
           </button>
@@ -147,7 +221,7 @@ const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/
       <div className="flex flex-wrap gap-4 mb-4 items-center">
         <input
           type="text"
-          placeholder="🔍 Search by name, number, or description..."
+          placeholder="Search..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="border rounded px-3 py-2 w-64"
@@ -160,12 +234,7 @@ const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/
         >
           <option value="">All Categories</option>
           {[...new Set(parts.map((p) => p.category))].map(
-            (cat) =>
-              cat && (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              )
+            (cat) => cat && <option key={cat}>{cat}</option>
           )}
         </select>
 
@@ -195,207 +264,35 @@ const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/
         </select>
       </div>
 
-      {/* Table */}
-      <div className="bg-white shadow-md rounded-lg overflow-x-auto">
-        <table className="min-w-full border text-sm text-left">
-          <thead className="bg-gray-100 text-gray-700 uppercase text-xs font-semibold">
-            <tr>
-              {/* ✅ Image Column */}
-              <th className="py-3 px-4 border-b text-center">Image</th>
-
-              <th
-                className="py-3 px-4 border-b cursor-pointer"
-                onClick={() => sortBy("part_number")}
-              >
-                <div className="flex items-center">
-                  Part # <SortIcon col="part_number" />
-                </div>
-              </th>
-
-              <th
-                className="py-3 px-4 border-b cursor-pointer"
-                onClick={() => sortBy("part_name")}
-              >
-                <div className="flex items-center">
-                  Part Name <SortIcon col="part_name" />
-                </div>
-              </th>
-
-              <th
-                className="py-3 px-4 border-b cursor-pointer"
-                onClick={() => sortBy("category")}
-              >
-                <div className="flex items-center">
-                  Category <SortIcon col="category" />
-                </div>
-              </th>
-
-              <th
-                className="py-3 px-4 border-b cursor-pointer"
-                onClick={() => sortBy("machine_name")}
-              >
-                <div className="flex items-center">
-                  Machine <SortIcon col="machine_name" />
-                </div>
-              </th>
-
-              <th
-                className="py-3 px-4 border-b text-right cursor-pointer"
-                onClick={() => sortBy("last_unit_price")}
-              >
-                <div className="flex items-center justify-end">
-                  Last Price <SortIcon col="last_unit_price" />
-                </div>
-              </th>
-
-              <th
-                className="py-3 px-4 border-b cursor-pointer"
-                onClick={() => sortBy("last_vendor_name")}
-              >
-                <div className="flex items-center">
-                  Last Vendor <SortIcon col="last_vendor_name" />
-                </div>
-              </th>
-
-              <th
-                className="py-3 px-4 border-b text-center cursor-pointer"
-                onClick={() => sortBy("status")}
-              >
-                <div className="flex items-center justify-center">
-                  Status <SortIcon col="status" />
-                </div>
-              </th>
-
-              <th className="py-3 px-4 border-b text-center">Actions</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {paginated.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="text-center py-6 text-gray-500 font-medium">
-                  No parts found
-                </td>
-              </tr>
-            ) : (
-              paginated.map((p) => (
-                <tr
-                  key={p.part_id ?? p.id ?? p.part_number}
-                  className="border-t hover:bg-gray-50 transition"
-                >
-                  {/* ✅ Thumbnail */}
-                  <td className="py-2 px-4 text-center">
-  {p.image_url ? (
-    <img
-      src={`${BASE}${p.image_url}`}
-      alt="img"
-      className="w-12 h-12 object-cover rounded cursor-pointer border"
-      onClick={() => setZoomImage(`${BASE}${p.image_url}`)}
-      onError={(e) => { e.target.src = "/no-image.png"; }}
-    />
-  ) : (
-    <span className="text-gray-400 text-xs italic">No image</span>
-  )}
-</td>
-
-
-                  <td className="py-2 px-4">{p.part_number}</td>
-                  <td className="py-2 px-4">{p.part_name}</td>
-                  <td className="py-2 px-4">{p.category || "-"}</td>
-                  <td className="py-2 px-4">{p.machine_name || "-"}</td>
-                  <td className="py-2 px-4 text-right">
-                    {p.last_unit_price
-                      ? `$${Number(p.last_unit_price).toFixed(2)}`
-                      : p.unit_price
-                      ? `$${Number(p.unit_price).toFixed(2)}`
-                      : "-"}
-                  </td>
-                  <td className="py-2 px-4">{p.last_vendor_name || "—"}</td>
-                  <td className="py-2 px-4 text-center">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        p.status === "Active"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-200 text-gray-600"
-                      }`}
-                    >
-                      {p.status || "Unknown"}
-                    </span>
-                  </td>
-                  <td className="py-2 px-4 text-center">
-                    <div className="flex justify-center gap-3">
-                      <button onClick={() => setViewingPart(p)} className="text-blue-600 hover:underline text-sm">
-                        View
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingPart(p);
-                          setShowForm(true);
-                        }}
-                        className="text-gray-700 hover:underline text-sm"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(p.part_id, p.part_name)}
-                        className="text-red-600 hover:underline text-sm"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      {/* ✅ AG Grid */}
+      <div className="ag-theme-quartz" style={{ height: 500, width: "100%" }}>
+        <AgGridReact
+          rowData={paginated}
+          columnDefs={columnDefs}
+          animateRows={true}
+          suppressMovableColumns={true}
+        />
       </div>
-
-      {/* ✅ Image Zoom Modal */}
-      {zoomImage && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
-          <div className="bg-white p-4 rounded shadow-lg relative">
-            <button
-              className="absolute top-2 right-2 text-gray-600"
-              onClick={() => setZoomImage(null)}
-            >
-              ✖
-            </button>
-            <img
-              src={zoomImage}
-              className="max-h-[80vh] max-w-[80vw] object-contain rounded"
-            />
-
-            <div className="text-center mt-2">
-              <a
-                href={zoomImage}
-                download
-                className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
-              >
-                ⬇ Download
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center items-center mt-4 gap-3 text-sm">
           <button
-            onClick={() => goToPage(currentPage - 1)}
             disabled={currentPage === 1}
-            className="px-3 py-1 border rounded disabled:opacity-50"
+            onClick={() => goToPage(currentPage - 1)}
+            className="px-3 py-1 border rounded"
           >
             Prev
           </button>
+
           <span>
             Page {currentPage} of {totalPages}
           </span>
+
           <button
-            onClick={() => goToPage(currentPage + 1)}
             disabled={currentPage === totalPages}
-            className="px-3 py-1 border rounded disabled:opacity-50"
+            onClick={() => goToPage(currentPage + 1)}
+            className="px-3 py-1 border rounded"
           >
             Next
           </button>
@@ -424,16 +321,50 @@ const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/
 
       {showBulk && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl p-6 relative overflow-y-auto max-h-[90vh]">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl p-6">
             <BulkUploadModal
               onClose={() => setShowBulk(false)}
-              onComplete={() => {
-                loadParts();
-              }}
+              onComplete={() => loadParts()}
             />
           </div>
         </div>
       )}
+
+      {/* ✅ Image Zoom */}
+      {zoomImage && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white p-4 rounded shadow-lg relative">
+            <button
+              className="absolute top-2 right-2 text-gray-600"
+              onClick={() => setZoomImage(null)}
+            >
+              ✖
+            </button>
+
+            <img
+              src={zoomImage}
+              className="max-h-[80vh] max-w-[80vw] object-contain rounded"
+            />
+
+            <div className="text-center mt-2">
+              <a
+                href={zoomImage}
+                download
+                className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
+              >
+                ⬇ Download
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Bold AG Grid Column Headers */}
+      <style>{`
+        .ag-theme-quartz {
+          --ag-header-font-weight: 700;
+        }
+      `}</style>
     </div>
   );
 }

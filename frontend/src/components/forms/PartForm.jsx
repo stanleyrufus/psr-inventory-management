@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import api, { apiRaw } from "../../utils/api";
 
+
 export default function PartForm({ initial = {}, onSaved, onCancel }) {
   const safeInitial = initial || {};
-  const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
 
   const [formData, setFormData] = useState({
     part_number: "",
@@ -25,10 +25,10 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
   });
 
   const [imageFile, setImageFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(safeInitial.image_url || null);
+
   const [errors, setErrors] = useState({});
 
-  // ✅ Load initial values + image
   useEffect(() => {
     if (safeInitial && Object.keys(safeInitial).length > 0) {
       setFormData((prev) => ({
@@ -50,21 +50,9 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
         last_po_date: safeInitial.last_po_date ?? prev.last_po_date,
         remarks: safeInitial.remarks ?? prev.remarks,
       }));
-
-      // ✅ Build correct preview URL
-      if (safeInitial.image_url) {
-        const url = safeInitial.image_url.startsWith("/")
-          ? `${BASE}${safeInitial.image_url}`
-          : `${BASE}/uploads/parts/${safeInitial.image_url}`;
-        setPreviewUrl(url);
-      }
+      setPreviewUrl(safeInitial.image_url || null);
     }
   }, [safeInitial]);
-
-  // ✅ Local image preview
-  useEffect(() => {
-    if (imageFile) setPreviewUrl(URL.createObjectURL(imageFile));
-  }, [imageFile]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -72,54 +60,63 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
     setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
+  useEffect(() => {
+    if (imageFile) setPreviewUrl(URL.createObjectURL(imageFile));
+  }, [imageFile]);
+
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    const newErrors = {};
-    if (!formData.part_number.trim()) newErrors.part_number = "Required";
-    if (!formData.part_name.trim()) newErrors.part_name = "Required";
+  const newErrors = {};
+  if (!formData.part_number.trim()) newErrors.part_number = "Required";
+  if (!formData.part_name.trim()) newErrors.part_name = "Required";
 
-    setErrors(newErrors);
-    if (Object.keys(newErrors).length > 0) {
-      alert("⚠️ Please fill all required fields.");
-      return;
-    }
+  setErrors(newErrors);
+  if (Object.keys(newErrors).length > 0) {
+    alert("⚠️ Please fill all required fields.");
+    return;
+  }
 
-    try {
-      let res;
+  try {
+    let res;
 
-      if (imageFile) {
-        const fd = new FormData();
-        Object.entries(formData).forEach(([key, value]) => {
-          fd.append(key, value ?? "");
-        });
-        fd.append("image", imageFile);
+    // ✅ If image chosen → use FormData
+    if (imageFile) {
+      const fd = new FormData();
+      Object.entries(formData).forEach(([key, value]) => {
+        fd.append(key, value ?? "");
+      });
+      fd.append("image", imageFile);
 
-        const url = safeInitial?.part_id
-          ? `/parts/${safeInitial.part_id}`
-          : `/parts`;
+      const url = safeInitial?.part_id
+        ? `/parts/${safeInitial.part_id}`
+        : `/parts`;
 
-        res = await apiRaw.post(url, fd, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+      res = await apiRaw.post(url, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+    } else {
+      // ✅ No image → fallback to existing JSON API flow
+      const payload = { ...formData };
+      delete payload.unit_price;
+
+      if (safeInitial?.part_id) {
+        res = await api.updatePart(safeInitial.part_id, payload);
       } else {
-        const payload = { ...formData };
-        delete payload.unit_price;
-
-        if (safeInitial?.part_id) {
-          res = await api.updatePart(safeInitial.part_id, payload);
-        } else {
-          res = await api.createPart(payload);
-        }
+        res = await api.createPart(payload);
       }
-
-      alert("✅ Part saved successfully!");
-      onSaved && onSaved();
-    } catch (err) {
-      console.error("❌ Error saving part:", err);
-      alert(`Failed to save part: ${err.response?.data?.message || err.message}`);
     }
-  };
+
+    alert("✅ Part saved successfully!");
+    onSaved && onSaved();
+
+  } catch (err) {
+    console.error("❌ Error saving part:", err);
+    alert(`Failed to save part: ${err.response?.data?.message || err.message}`);
+  }
+};
+
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 relative">
@@ -150,15 +147,11 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
             src={previewUrl}
             alt="preview"
             className="mt-2 w-24 h-24 object-cover rounded border"
-            onError={(e) => {
-              e.target.onerror = null;
-              e.target.src = "/no-image.png";
-            }}
           />
         )}
       </div>
 
-      {/* Form Fields */}
+      {/* Form fields */}
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col">
           <span className="text-sm font-medium text-gray-700 mb-1">

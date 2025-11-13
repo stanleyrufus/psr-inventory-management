@@ -1,14 +1,24 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";  // ✅ imported correctly
+import { useNavigate } from "react-router-dom";
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const n = (v) => Number(v ?? 0);
 const money = (v) => n(v).toFixed(2);
 
-export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
-  const navigate = useNavigate();  // ✅ add this line here
+export default function PurchaseOrderForm({
+  initialPo,
+  onSaved,
+  onCancel,
+  isModal = false, // ✅ tells the form it lives inside a modal
+}) {
+  const navigate = useNavigate();
+
+  const handleCancel = () => {
+    if (onCancel) onCancel();
+    else navigate("/purchase-orders");
+  };
 
   const [vendors, setVendors] = useState([]);
   const [parts, setParts] = useState([]);
@@ -16,6 +26,8 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
   const [staffList] = useState(["Stanley Medikonda", "Pawan Kumar", "Alex Johnson"]);
   const [submitting, setSubmitting] = useState(false);
 
+  // ✅ NEW: lock submit after successful save
+  const [saved, setSaved] = useState(false);
 
   // inline vendor "add new vendor" state
   const [addingNewVendor, setAddingNewVendor] = useState(false);
@@ -49,8 +61,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
       description: i.description || i.part_name || "",
       quantity: i.quantity || 1,
       unitPrice: i.unit_price || i.current_unit_price || 0,
-      totalPrice:
-        (i.quantity || 1) * (i.unit_price || i.current_unit_price || 0),
+      totalPrice: (i.quantity || 1) * (i.unit_price || i.current_unit_price || 0),
       lastUnitPrice: i.last_unit_price || null,
     }));
     return { ...poData, items };
@@ -88,21 +99,19 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
       .catch(() => setVendors([]));
 
     axios
-  .get(`${BASE}/api/parts`)
-  .then((res) => {
-    const raw = res.data?.data || res.data || [];
-    const normalized = raw.map((p) => ({
-      part_id: p.part_id || p.id,
-      part_number: p.part_number,
-      description: p.description || "", // ✅ Added this line
-      current_unit_price: p.current_unit_price || p.unit_price || 0,
-      last_unit_price: p.last_unit_price || null,
-    }));
-    setParts(normalized);
-  })
-  .catch(() => setParts([]));
-
-
+      .get(`${BASE}/api/parts`)
+      .then((res) => {
+        const raw = res.data?.data || res.data || [];
+        const normalized = raw.map((p) => ({
+          part_id: p.part_id || p.id,
+          part_number: p.part_number,
+          description: p.description || "",
+          current_unit_price: p.current_unit_price || p.unit_price || 0,
+          last_unit_price: p.last_unit_price || null,
+        }));
+        setParts(normalized);
+      })
+      .catch(() => setParts([]));
   }, []);
 
   const nNum = (v) =>
@@ -215,7 +224,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
     }
   };
 
-  // ✅ FIXED PART SELECTION LOGIC
+  // ✅ PART SELECTION
   const handlePartSelect = (index, value) => {
     if (value === "new") {
       openNewPartFormForRow(index);
@@ -358,10 +367,55 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (submitting) return;
+    if (submitting || saved) return; // ✅ prevent double submit if already saved
     setSubmitting(true);
+// ✅ Validation: Must have at least 1 line item
+if (!po.items || po.items.length === 0) {
+  alert("At least one Part must be added to the Purchase Order.");
+  setSubmitting(false);
+  return;
+}
+
+// ✅ Validation: Each item must have Part + Quantity
+for (let i of po.items) {
+  if (!i.partId) {
+    alert("Each line item must have a selected Part.");
+    setSubmitting(false);
+    return;
+  }
+  if (!i.quantity || Number(i.quantity) <= 0) {
+    alert("Quantity must be greater than 0.");
+    setSubmitting(false);
+    return;
+  }
+}
+
+// ✅ Validation: Unit Price must not be blank or zero
+for (let i of po.items) {
+  if (i.unitPrice === "" || i.unitPrice === null || Number(i.unitPrice) <= 0) {
+    alert("Unit Price is required and must be greater than 0 for all items.");
+    setSubmitting(false);
+    return;
+  }
+}
+
 
     recalcTotals(po.items);
+// ✅ Frontend validation: PO Number must be unique
+try {
+  const exists = await axios
+    .get(`${BASE}/api/purchase_orders/check-number/${po.psr_po_number}`)
+    .then((res) => res.data.exists)
+    .catch(() => false);
+
+  if (exists) {
+    alert("This PO Number already exists. Please use a unique PO Number.");
+    setSubmitting(false);
+    return;
+  }
+} catch {
+  // fail silently, backend will catch duplicates anyway
+}
 
     try {
       const payload = {
@@ -400,26 +454,53 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
           await axios.post(`${BASE}/api/purchase_orders/${poId}/upload`, fd);
         }
 
-        alert("✅ PO created successfully.");
-      }
+alert("✅ PO created successfully.");
+}
 
-      if (onSaved) onSaved();
-    } catch (err) {
-      console.error("❌ PO save error:", err);
-      alert("Save failed. See console.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+// ✅ After successful save, lock the form
+setSaved(true);
 
-  return (
+// ✅ If opened inside a modal (Dashboard) → close modal using onSaved()
+if (onSaved) {
+  onSaved();
+} else {
+  // ✅ If opened from PO tab (full page) → redirect to PO list
+  navigate("/purchase-orders");
+}
+} catch (err) {
+  console.error("❌ PO save error:", err);
+  alert("Save failed. See console.");
+} finally {
+  setSubmitting(false);
+}
+};
+
+// ✅ Only apply internal scroll when NOT in a modal
+const formScrollClasses = isModal ? "" : "max-h-[90vh] overflow-y-auto";
+
+return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white p-6 rounded shadow max-h-[90vh] overflow-y-auto"
+      className={`bg-white p-6 rounded shadow ${formScrollClasses}`}
     >
-      <h2 className="text-xl font-bold mb-4 text-blue-700">
-        {initialPo ? "Edit Purchase Order" : "New Purchase Order"}
-      </h2>
+      {/* Header with inline X only when used as a modal */}
+      <div className="flex items-start justify-between mb-4">
+        <h2 className="text-xl font-bold text-blue-700">
+          {initialPo ? "Edit Purchase Order" : "New Purchase Order"}
+        </h2>
+
+        {isModal && (
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="text-gray-700 hover:text-black text-2xl font-bold leading-none"
+            aria-label="Close"
+            title="Close"
+          >
+            ×
+          </button>
+        )}
+      </div>
 
       {/* --- Basic Details --- */}
       <div className="grid grid-cols-2 gap-4 mb-4">
@@ -431,7 +512,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
             value={po.psr_po_number}
             onChange={(e) => setPo({ ...po, psr_po_number: e.target.value })}
             required
-            disabled={submitting}
+            disabled={submitting || saved}
           />
         </div>
 
@@ -441,7 +522,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
             className="border p-2 rounded w-full"
             value={po.status}
             onChange={(e) => setPo({ ...po, status: e.target.value })}
-            disabled={submitting}
+            disabled={submitting || saved}
           >
             <option value="Draft">Draft</option>
             <option value="Sent">Sent</option>
@@ -459,7 +540,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
             onChange={(e) =>
               setPo({ ...po, expected_delivery_date: e.target.value })
             }
-            disabled={submitting}
+            disabled={submitting || saved}
           />
         </div>
 
@@ -470,7 +551,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
             value={po.created_by}
             onChange={(e) => setPo({ ...po, created_by: e.target.value })}
             required
-            disabled={submitting}
+            disabled={submitting || saved}
           >
             <option value="">Select</option>
             {staffList.map((s) => (
@@ -488,7 +569,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
             type="button"
             className="text-sm text-blue-700 hover:underline"
             onClick={() => setAddingNewVendor(true)}
-            disabled={submitting}
+            disabled={submitting || saved}
           >
             + Add New Vendor
           </button>
@@ -500,7 +581,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
             value={po.vendor_id || ""}
             onChange={(e) => setPo({ ...po, vendor_id: e.target.value })}
             required
-            disabled={submitting}
+            disabled={submitting || saved}
           >
             <option value="">Select Vendor</option>
             {vendors.map((v) => (
@@ -518,7 +599,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
               onChange={(e) =>
                 setNewVendor({ ...newVendor, vendor_name: e.target.value })
               }
-              disabled={submitting}
+              disabled={submitting || saved}
             />
             <input
               placeholder="Contact Name"
@@ -527,7 +608,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
               onChange={(e) =>
                 setNewVendor({ ...newVendor, contact_name: e.target.value })
               }
-              disabled={submitting}
+              disabled={submitting || saved}
             />
             <input
               placeholder="Email"
@@ -536,7 +617,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
               onChange={(e) =>
                 setNewVendor({ ...newVendor, email: e.target.value })
               }
-              disabled={submitting}
+              disabled={submitting || saved}
             />
             <input
               placeholder="Phone"
@@ -545,7 +626,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
               onChange={(e) =>
                 setNewVendor({ ...newVendor, phone: e.target.value })
               }
-              disabled={submitting}
+              disabled={submitting || saved}
             />
             <div className="flex gap-2">
               <input
@@ -555,7 +636,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
                 onChange={(e) =>
                   setNewVendor({ ...newVendor, city: e.target.value })
                 }
-                disabled={submitting}
+                disabled={submitting || saved}
               />
               <input
                 placeholder="Country"
@@ -564,7 +645,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
                 onChange={(e) =>
                   setNewVendor({ ...newVendor, country: e.target.value })
                 }
-                disabled={submitting}
+                disabled={submitting || saved}
               />
             </div>
 
@@ -573,7 +654,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
                 type="button"
                 className="px-3 py-1 bg-gray-200 rounded"
                 onClick={() => setAddingNewVendor(false)}
-                disabled={submitting}
+                disabled={submitting || saved}
               >
                 Cancel
               </button>
@@ -581,7 +662,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
                 type="button"
                 className="px-3 py-1 bg-blue-600 text-white rounded"
                 onClick={saveNewVendor}
-                disabled={submitting}
+                disabled={submitting || saved}
               >
                 Save Vendor
               </button>
@@ -598,7 +679,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
             type="button"
             className="text-sm text-green-700 hover:underline"
             onClick={() => setAddingGlobalPart(true)}
-            disabled={submitting}
+            disabled={submitting || saved}
           >
             + Add New Part
           </button>
@@ -614,7 +695,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
               onChange={(e) =>
                 setGlobalPart({ ...globalPart, part_number: e.target.value })
               }
-              disabled={submitting}
+              disabled={submitting || saved}
             />
             <input
               placeholder="Part Name"
@@ -623,7 +704,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
               onChange={(e) =>
                 setGlobalPart({ ...globalPart, part_name: e.target.value })
               }
-              disabled={submitting}
+              disabled={submitting || saved}
             />
             <input
               placeholder="Description"
@@ -632,7 +713,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
               onChange={(e) =>
                 setGlobalPart({ ...globalPart, description: e.target.value })
               }
-              disabled={submitting}
+              disabled={submitting || saved}
             />
             <input
               type="number"
@@ -645,14 +726,14 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
                   current_unit_price: e.target.value,
                 })
               }
-              disabled={submitting}
+              disabled={submitting || saved}
             />
             <div className="flex justify-end gap-2 mt-2">
               <button
                 type="button"
                 className="px-2 py-1 bg-gray-200 rounded"
                 onClick={() => setAddingGlobalPart(false)}
-                disabled={submitting}
+                disabled={submitting || saved}
               >
                 Cancel
               </button>
@@ -660,7 +741,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
                 type="button"
                 className="px-2 py-1 bg-green-600 text-white rounded"
                 onClick={saveGlobalPart}
-                disabled={submitting}
+                disabled={submitting || saved}
               >
                 Save Part
               </button>
@@ -687,29 +768,27 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
               <td className="border p-2">
                 {!addingNewPartRow[i] ? (
                   <>
-                <select
-  className="border p-1 rounded w-full"
-  value={item.partId}
-  onChange={(e) => handlePartSelect(i, e.target.value)}
-  disabled={submitting}
->
-  <option value="">Select</option>
-  {parts.map((p) => (
-    <option key={p.part_id || p.id} value={p.part_id || p.id}>
-      {p.part_number}
-    </option>
-  ))}
-  <option value="new">+ Add New Part</option>
-</select>
+                    <select
+                      className="border p-1 rounded w-full"
+                      value={item.partId}
+                      onChange={(e) => handlePartSelect(i, e.target.value)}
+                      disabled={submitting || saved}
+                    >
+                      <option value="">Select</option>
+                      {parts.map((p) => (
+                        <option key={p.part_id || p.id} value={p.part_id || p.id}>
+                          {p.part_number}
+                        </option>
+                      ))}
+                      <option value="new">+ Add New Part</option>
+                    </select>
 
-{/* ✅ Inline description display */}
-{item.partId && (
-  <div className="text-xs text-gray-500 mt-1">
-    {parts.find((p) => String(p.part_id) === String(item.partId))?.description ||
-      "No description available"}
-  </div>
-)}
-
+                    {item.partId && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        {parts.find((p) => String(p.part_id) === String(item.partId))
+                          ?.description || "No description available"}
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="bg-gray-50 border rounded p-2 space-y-1">
@@ -726,7 +805,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
                           },
                         })
                       }
-                      disabled={submitting}
+                      disabled={submitting || saved}
                     />
                     <input
                       placeholder="Part Name"
@@ -741,7 +820,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
                           },
                         })
                       }
-                      disabled={submitting}
+                      disabled={submitting || saved}
                     />
                     <input
                       placeholder="Description"
@@ -756,7 +835,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
                           },
                         })
                       }
-                      disabled={submitting}
+                      disabled={submitting || saved}
                     />
                     <input
                       type="number"
@@ -772,14 +851,14 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
                           },
                         })
                       }
-                      disabled={submitting}
+                      disabled={submitting || saved}
                     />
                     <div className="flex justify-end gap-2 mt-2">
                       <button
                         type="button"
                         className="px-2 py-1 bg-gray-200 rounded"
                         onClick={() => cancelNewPartForRow(i)}
-                        disabled={submitting}
+                        disabled={submitting || saved}
                       >
                         Cancel
                       </button>
@@ -787,7 +866,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
                         type="button"
                         className="px-2 py-1 bg-blue-600 text-white rounded"
                         onClick={() => saveNewPartForRow(i)}
-                        disabled={submitting}
+                        disabled={submitting || saved}
                       >
                         Save Part
                       </button>
@@ -802,7 +881,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
                   value={item.quantity}
                   className="border p-1 rounded w-full"
                   onChange={(e) => updateItem(i, "quantity", e.target.value)}
-                  disabled={submitting}
+                  disabled={submitting || saved}
                 />
               </td>
 
@@ -812,7 +891,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
                   value={item.unitPrice}
                   className="border p-1 rounded w-full"
                   onChange={(e) => updateItem(i, "unitPrice", e.target.value)}
-                  disabled={submitting}
+                  disabled={submitting || saved}
                 />
                 {item.lastUnitPrice && (
                   <div className="text-xs text-gray-500">
@@ -833,7 +912,7 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
           type="button"
           className="text-sm text-green-700 hover:underline"
           onClick={addItemRow}
-          disabled={submitting}
+          disabled={submitting || saved}
         >
           + Add Part
         </button>
@@ -844,13 +923,13 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
         <div>Subtotal: ${money(po.subtotal)}</div>
         <div>Tax ({po.tax_percent}%): ${money(po.tax_amount)}</div>
         <div>
-          Shipping: $
+          Shipping:{" "}
           <input
             type="number"
             value={po.shipping_charges}
             onChange={recalcShipping}
-            className="border rounded p-1 w-20 text-right"
-            disabled={submitting}
+            className="border rounded p-1 w-24 text-right"
+            disabled={submitting || saved}
           />
         </div>
         <div className="font-bold mt-2">Grand Total: ${money(po.grand_total)}</div>
@@ -864,33 +943,32 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
           multiple
           onChange={handleFileChange}
           className="border p-2 rounded w-full"
-          disabled={submitting}
+          disabled={submitting || saved}
         />
       </div>
-{/* --- Existing Attachments (for Edit mode) --- */}
-{initialPo?.files?.length > 0 && (
-  <div className="mt-2 border p-3 bg-gray-50 rounded">
-    <p className="font-semibold mb-1 text-gray-700">Existing Attachments:</p>
-    <ul className="list-disc pl-6 text-sm">
-      {initialPo.files.map((f) => (
-        <li key={f.id || f.filepath}>
-          <a
-            href={`${import.meta.env.VITE_API_URL || "http://localhost:5000"}${
-              f.filepath?.startsWith("/") ? "" : "/"
-            }${f.filepath}`}
-            target="_blank"
-            rel="noreferrer"
-            className="text-blue-700 hover:underline"
-          >
-            {f.original_filename || "File"} ({f.mime_type || ""},{" "}
-            {f.size_bytes?.toLocaleString() || 0} bytes)
-          </a>
-        </li>
-      ))}
-    </ul>
-  </div>
-)}
 
+      {initialPo?.files?.length > 0 && (
+        <div className="mt-2 border p-3 bg-gray-50 rounded">
+          <p className="font-semibold mb-1 text-gray-700">Existing Attachments:</p>
+          <ul className="list-disc pl-6 text-sm">
+            {initialPo.files.map((f) => (
+              <li key={f.id || f.filepath}>
+                <a
+                  href={`${import.meta.env.VITE_API_URL || "http://localhost:5000"}${
+                    f.filepath?.startsWith("/") ? "" : "/"
+                  }${f.filepath}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-700 hover:underline"
+                >
+                  {f.original_filename || "File"} ({f.mime_type || ""},{" "}
+                  {f.size_bytes?.toLocaleString() || 0} bytes)
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* --- Remarks --- */}
       <div className="mt-4">
@@ -901,39 +979,39 @@ export default function PurchaseOrderForm({ initialPo, onSaved, onCancel }) {
           value={po.remarks}
           onChange={(e) => setPo({ ...po, remarks: e.target.value })}
           placeholder="Special instructions or comments"
-          disabled={submitting}
+          disabled={submitting || saved}
         />
       </div>
 
       {/* --- Buttons --- */}
-      {/* --- Buttons --- */}
-<div className="mt-6 flex justify-end space-x-4">
-  <button
-    type="button"
-    onClick={() => navigate("/purchase-orders")}
-    className="bg-gray-300 hover:bg-gray-400 text-black px-4 py-2 rounded shadow"
-    disabled={submitting}
-  >
-    Cancel
-  </button>
-
-  <button
-    type="submit"
-    disabled={submitting}
-    className={`px-4 py-2 rounded shadow text-white ${
-      submitting
-        ? "bg-gray-400 cursor-not-allowed"
-        : "bg-green-600 hover:bg-green-700"
-    }`}
-  >
-    {submitting
-      ? "Saving..."
-      : initialPo
-      ? "Update Purchase Order"
-      : "Submit Purchase Order"}
-  </button>
-</div>
-
+      <div className="mt-6 flex justify-end space-x-4">
+        <button
+          type="button"
+          onClick={handleCancel}
+          className="bg-gray-300 hover:bg-gray-400 text-black px-4 py-2 rounded shadow"
+          disabled={submitting}
+        >
+          {saved ? "Close" : "Cancel"}
+        </button>
+{/* ✅ stays disabled after success */}
+        <button
+          type="submit"
+          disabled={submitting || saved}  
+          className={`px-4 py-2 rounded shadow text-white ${
+            submitting || saved
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-green-600 hover:bg-green-700"
+          }`}
+        >
+          {submitting
+            ? "Saving..."
+            : saved
+            ? "Saved"
+            : initialPo
+            ? "Update Purchase Order"
+            : "Submit Purchase Order"}
+        </button>
+      </div>
     </form>
   );
 }
