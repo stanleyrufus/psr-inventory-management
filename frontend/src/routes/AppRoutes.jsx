@@ -15,7 +15,7 @@ import Sidebar from "../components/Sidebar";
 import SettingsIndex from "../pages/settings/SettingsIndex";
 import UserManagement from "../pages/settings/UserManagement";
 import RolesManagement from "../pages/settings/RolesManagement";
-import SystemSettings from "../pages/settings/SystemSettings";
+import SystemPreferences from "../pages/settings/SystemPreferences";
 
 /* Reports */
 import ReportsIndex from "../pages/reports/ReportsIndex";
@@ -46,12 +46,71 @@ import ProductDetail from "../pages/ProductDetail";
 export default function AppRoutes() {
   const { user } = useContext(AuthContext);
 
-  const PrivateLayout = ({ children }) => (
+// PrivateLayout inside AppRoutes.jsx
+
+const PrivateLayout = ({ children }) => {
+  const { user, logout } = useContext(AuthContext);
+
+  return (
     <div className="flex h-screen bg-psr-sky overflow-hidden">
+
+      {/* Sidebar */}
       <Sidebar />
-      <main className="flex-1 p-6 overflow-y-auto">{children}</main>
+
+      {/* MAIN AREA */}
+      <main className="flex-1 flex flex-col">
+
+        {/* 🔹 MATCHED HEADER — same border style as Sidebar header */}
+       <header
+  className="
+    w-full
+    bg-blue-50
+    border-b border-white/10
+    px-6
+    py-3.5
+    flex
+    justify-between
+    items-center
+    shadow-sm
+  "
+>
+ {/* Center Title */}
+<div className="flex-1 text-center">
+  <h1 
+    className="text-xl font-bold text-gray-700 tracking-wide"
+    style={{ fontFamily: "Times New Roman, serif" }}
+  >
+    Inventory & Purchase Order Management Portal
+  </h1>
+</div>
+
+
+  {/* User + Logout */}
+  <div className="flex items-center gap-4">
+    <span className="text-sm text-gray-700 font-medium">
+      {user?.username} ({user?.role})
+    </span>
+
+    <button
+      onClick={logout}
+      className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded shadow"
+    >
+      Logout
+    </button>
+  </div>
+</header>
+
+
+        {/* PAGE CONTENT */}
+        <div className="flex-1 p-6 overflow-y-auto">
+          {children}
+        </div>
+
+      </main>
     </div>
   );
+};
+
 
   const Protected = (element) =>
     user ? element : <Navigate to="/login" replace />;
@@ -285,14 +344,15 @@ export default function AppRoutes() {
         )}
       />
 
-      <Route
-        path="/settings/system"
-        element={Protected(
-          <PrivateLayout>
-            <SystemSettings />
-          </PrivateLayout>
-        )}
-      />
+     <Route
+  path="/settings/system"
+  element={Protected(
+    <PrivateLayout>
+      <SystemPreferences />
+    </PrivateLayout>
+  )}
+/>
+
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />

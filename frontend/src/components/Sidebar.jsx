@@ -1,6 +1,6 @@
+// frontend/src/components/Sidebar.jsx
 import React, { useContext } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { AuthContext } from "../context/AuthContext";
+import { Link, useLocation } from "react-router-dom";
 
 const NavItem = ({ to, children, onClick, active }) => (
   <Link
@@ -17,43 +17,38 @@ const NavItem = ({ to, children, onClick, active }) => (
 );
 
 export default function Sidebar() {
-  const { logout } = useContext(AuthContext);
-  const navigate = useNavigate();
   const location = useLocation();
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
-
   return (
-    // ✅ Sidebar is fixed-height and does NOT scroll unless nav becomes too long
     <aside className="w-64 bg-psr-primary text-white flex flex-col h-screen overflow-hidden">
 
-      {/* Header */}
-      <div className="px-6 py-6 border-b border-white/10 shrink-0">
-        <div className="text-xl font-bold">PSR Automation Inc</div>
-        <div className="text-xs text-psr-muted mt-1">
-          Inventory Management System
-        </div>
+      {/* ⭐ REDUCED HEADER HEIGHT */}
+      <div className="px-5 py-4 border-b border-white/10 shrink-1">
+        <div className="text-lg font-bold">PSR Automation Inc.</div>
+        
       </div>
 
-      {/* Nav Items (scrolls only if necessary) */}
+      {/* NAV */}
       <nav className="p-4 space-y-1 flex-1 overflow-y-auto">
         <NavItem to="/" active={location.pathname === "/"}>Dashboard</NavItem>
         <NavItem to="/products" active={location.pathname.startsWith("/products")}>Products</NavItem>
         <NavItem to="/parts" active={location.pathname.startsWith("/parts")}>Inventory / Parts</NavItem>
         <NavItem to="/vendors" active={location.pathname.startsWith("/vendors")}>Vendors</NavItem>
-        <NavItem to="/purchase-orders" active={location.pathname.startsWith("/purchase-orders")}>Purchase Orders</NavItem>
+        <NavItem to="/purchase-orders" active={location.pathname.startsWith("/purchase-orders")}>
+          Purchase Orders
+        </NavItem>
+        <NavItem to="/sales-orders" active={location.pathname.startsWith("/sales-orders")}>
+          Sales Orders
+        </NavItem>
         <NavItem to="/reports" active={location.pathname.startsWith("/reports")}>Reports</NavItem>
         <NavItem to="/settings" active={location.pathname.startsWith("/settings")}>Settings</NavItem>
-        <NavItem onClick={handleLogout}>Logout</NavItem>
       </nav>
 
-      {/* Footer (fixed at bottom) */}
-      <div className="mt-auto p-4 border-t border-white/10 shrink-0">
-        <div className="text-sm">Admin</div>
-        <div className="text-xs text-psr-muted">admin@psr.com</div>
+      {/* ⭐ REDUCED FOOTER HEIGHT + CONTACT INFO */}
+      <div className="mt-auto p-3 border-t border-white/10 text-[15px] leading-tight">
+        <div className="font-semibold text-white">Contact</div>
+        <div className="text-white/80">📞 952-233-1441</div>
+        <div className="text-white/80">✉️ info@psrautomation.com</div>
       </div>
 
     </aside>

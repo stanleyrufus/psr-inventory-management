@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, Title, Button, TextInput, Badge } from "@tremor/react";
 import { apiRaw as api } from "../../utils/api";
+import { PlusIcon } from "@heroicons/react/24/outline";
+
 
 /* -------------------------------------------------------
    Confirm Modal
@@ -220,24 +222,39 @@ export default function UserManagement() {
   };
 
   async function saveUser(form) {
-    try {
-      if (selectedUser?.id) {
-        await api.put(`/users/${selectedUser.id}`, {
-          username: form.username,
-          email: form.email,
-          role: form.role,
-        });
-      } else {
-        await api.post("/users/register", form);
-      }
+  try {
+    let msg = "";
 
-      setFormOpen(false);
-      setSelectedUser(null);
-      loadAll();
-    } catch (e) {
-      alert(e.response?.data?.message || "Save failed");
+    if (selectedUser?.id) {
+      // UPDATE
+      await api.put(`/users/${selectedUser.id}`, {
+        username: form.username,
+        email: form.email,
+        role: form.role,
+      });
+      msg = "User updated successfully!";
+    } else {
+      // CREATE
+      await api.post("/users", {
+        username: form.username,
+        email: form.email,
+        password: form.password,
+        role: form.role,
+      });
+      msg = "User created successfully!";
     }
+
+    alert(msg); // 🔥 SUCCESS POPUP
+
+    setFormOpen(false);
+    setSelectedUser(null);
+    loadAll();
+
+  } catch (e) {
+    alert(e.response?.data?.message || "Save failed");
   }
+}
+
 
   async function deleteUser() {
     try {
@@ -276,15 +293,20 @@ export default function UserManagement() {
 
       <Title className="text-xl font-bold">User Management</Title>
 
-      <Card className="p-4">
+      <Card className="p-4"	>
 
         <div className="flex justify-between items-center mb-4">
           <div className="text-gray-700">Manage application users</div>
 
           {/* ✅ FIXED BUTTON */}
-          <Button onClick={openAddUser}>
-            ➕ Add User
-          </Button>
+          <button
+  onClick={openAddUser}
+  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded shadow flex items-center gap-2"
+>
+  <PlusIcon className="h-5 w-5 text-white" />
+  <span>Add User</span>
+</button>
+
         </div>
 
         <table className="w-full text-sm border rounded overflow-hidden">

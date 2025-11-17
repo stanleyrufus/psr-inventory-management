@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import { connectDB } from "./db.js";
 
 // ✅ Import all route files
+import systemPreferencesRoute from "./routes/system_preferences.js";
 import inventoryRoutes from "./routes/inventory.js";
 import purchaseOrdersRoutes from "./routes/purchase_orders.js";
 import productsRoutes from "./routes/products.js";
@@ -15,6 +16,7 @@ import purchaseOrderImportRoutes from "./routes/purchase_orders_import.js";
 import vendorRoutes from "./routes/vendors.js"; // ✅ single correct import
 import purchaseOrdersReportRoutes from "./routes/purchase_orders_report.js";
 import rfqRouter from "./routes/purchase_orders_rfq.js";   // ✅ ADD THIS
+import permissionsRoute from "./routes/permissions.js";
 
 
 import usersRoute from "./routes/users.js";
@@ -46,6 +48,10 @@ app.use("/api/parts", inventoryRoutes);
 app.use("/api/vendors", vendorRoutes);
 app.use("/api/users", usersRoute);
 app.use("/api/roles", rolesRoute);
+app.use("/api/system-preferences", systemPreferencesRoute);
+app.use("/api/permissions", permissionsRoute);
+
+
 
 // --- Purchase Orders core + bulk ---
 app.use("/api/purchase_orders", purchaseOrdersRoutes);

@@ -1,19 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
-import { Card, Title, Text, Button, TextInput } from "@tremor/react";
+// frontend/src/pages/settings/RolesManagement.jsx
+import { useEffect, useState } from "react";
+import { Card, Title, Button, TextInput } from "@tremor/react";
 import { apiRaw as api } from "../../utils/api";
+import PermissionsModal from "./PermissionsModal";
 import {
   PencilIcon,
   TrashIcon,
   Cog6ToothIcon,
   PlusIcon,
 } from "@heroicons/react/24/outline";
-import RoleForm from "./RoleForm";
-
-/* Simple Confirm Modal (same pattern as UserManagement) */
+/* -------------------------------------------------------
+   Confirm Modal
+------------------------------------------------------- */
 function Confirm({ open, title, body, onConfirm, onClose }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 bg-black/40 z-[1000] flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md rounded-xl shadow-xl p-6">
         <div className="flex justify-between mb-3">
           <h3 className="text-lg font-semibold">{title}</h3>
@@ -22,28 +24,98 @@ function Confirm({ open, title, body, onConfirm, onClose }) {
         <p className="text-gray-700 text-sm">{body}</p>
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button color="red" onClick={onConfirm}>Delete</Button>
+
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded shadow"
+          >
+            Delete
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
+/* -------------------------------------------------------
+   Add/Edit Role Modal
+------------------------------------------------------- */
+function RoleForm({ open, initial, onSave, onClose }) {
+  const [form, setForm] = useState({ name: "", description: "" });
+  const isEdit = Boolean(initial?.id);
+
+  useEffect(() => {
+    if (initial) {
+      setForm({
+        name: initial.name || "",
+        description: initial.description || "",
+      });
+    } else {
+      setForm({ name: "", description: "" });
+    }
+  }, [initial, open]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-lg rounded-xl shadow-xl p-6">
+        <div className="flex justify-between mb-3">
+          <h3 className="text-lg font-semibold">{isEdit ? "Edit Role" : "Add Role"}</h3>
+          <button className="text-gray-500 text-xl" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="space-y-3">
+          <label>
+            <span className="text-sm text-gray-600">Role Name</span>
+            <TextInput
+              value={form.name}
+              onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+              placeholder="Enter role name"
+            />
+          </label>
+
+          <label>
+            <span className="text-sm text-gray-600">Description</span>
+            <TextInput
+              value={form.description}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, description: e.target.value }))
+              }
+              placeholder="Short description"
+            />
+          </label>
+        </div>
+
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button onClick={() => onSave(form)}>
+            {isEdit ? "Update" : "Create"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------
+   MAIN PAGE
+------------------------------------------------------- */
 export default function RolesManagement() {
   const [roles, setRoles] = useState([]);
   const [search, setSearch] = useState("");
-
-  // pagination (manual)
   const [page, setPage] = useState(1);
-  const pageSize = 10;
 
-  // modals
-  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState(null);
 
-  // delete confirm
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [toDelete, setToDelete] = useState(null);
+  const [confirmTarget, setConfirmTarget] = useState(null);
+
+  const [permOpen, setPermOpen] = useState(false);
+  const [permRole, setPermRole] = useState(null);
+
+  const pageSize = 10;
 
   useEffect(() => {
     loadRoles();
@@ -51,161 +123,162 @@ export default function RolesManagement() {
 
   async function loadRoles() {
     try {
-      const res = await api.get("/roles"); // expects [{id, name, description}]
+      const res = await api.get("/roles");
       const data = res.data?.data || res.data || [];
       setRoles(Array.isArray(data) ? data : []);
-      setPage(1);
     } catch (err) {
       console.error("Failed loading roles:", err);
     }
   }
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return roles;
-    const q = search.toLowerCase();
-    return roles.filter(
-      (r) =>
-        r.name?.toLowerCase().includes(q) ||
-        r.description?.toLowerCase().includes(q)
-    );
-  }, [roles, search]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
-
-  // actions
-  const openAddRole = () => {
+  function openAddRole() {
     setSelectedRole(null);
-    setShowRoleModal(true);
-  };
+    setFormOpen(true);
+  }
 
-  const openEditRole = (role) => {
-    setSelectedRole(role);
-    setShowRoleModal(true);
-  };
-
-  const openDelete = (role) => {
-    setToDelete(role);
-    setConfirmOpen(true);
-  };
-
-  async function doDelete() {
+  async function saveRole(form) {
     try {
-      await api.delete(`/roles/${toDelete.id}`);
-      setConfirmOpen(false);
-      setToDelete(null);
-      await loadRoles();
-    } catch (e) {
-      alert(e?.response?.data?.message || "Delete failed");
+      if (selectedRole?.id) {
+        await api.put(`/roles/${selectedRole.id}`, form);
+	alert("Role updated successfully!");
+      } else {
+        await api.post("/roles", form);
+	alert("Role created successfully!");
+
+      }
+
+      setFormOpen(false);
+      loadRoles();
+    } catch (err) {
+      alert(err.response?.data?.message || "Save failed");
     }
   }
 
-  const onRoleSaved = async () => {
-    setShowRoleModal(false);
-    await loadRoles();
-  };
+  async function deleteRole() {
+    try {
+      await api.delete(`/roles/${confirmTarget.id}`);
+      setConfirmOpen(false);
+      loadRoles();
+    } catch {
+      alert("Delete failed");
+    }
+  }
+
+  const filtered = roles.filter((r) =>
+    r.name?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filtered.length / pageSize) || 1;
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 w-full">
-        <div>
-          <Title className="text-2xl font-bold">Roles & Permissions</Title>
-          <Text className="text-gray-600">Manage system roles and permissions</Text>
+      <Title className="text-xl font-bold">Roles & Permissions</Title>
+
+      <Card className="p-4">
+
+        {/* HEADER */}
+        <div className="flex justify-between items-center mb-4">
+          <div className="text-gray-700">Manage system roles</div>
+
+          <button
+            onClick={openAddRole}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded shadow flex items-center gap-2"
+          >
+            <PlusIcon className="h-5 w-5 text-white" />
+            <span>Add Role</span>
+          </button>
         </div>
 
-        {/* ✅ Add Role button — always visible and clickable */}
-        <Button icon={PlusIcon} color="blue" onClick={openAddRole}>
-          Add Role
-        </Button>
-      </div>
+        {/* SEARCH + PAGINATION */}
+        <div className="flex justify-between items-center mb-4">
+          <TextInput
+            placeholder="Search roles…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-64"
+          />
 
-      {/* Search + Pagination row */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between gap-3 w-full">
-          <div className="flex items-center gap-2">
-            <TextInput
-              placeholder="Search roles…"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              className="w-64"
-            />
-            {/* Show count ONLY when searching */}
-            {search.trim() && (
-              <span className="text-sm text-gray-500">
-                {filtered.length} result{filtered.length === 1 ? "" : "s"}
-              </span>
-            )}
-          </div>
-
-          {/* Manual pagination (Quartz style) */}
           <div className="flex items-center gap-3">
             <Button
               size="xs"
               variant="secondary"
               disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              onClick={() => setPage((p) => p - 1)}
             >
               Prev
             </Button>
+
             <span className="text-sm text-gray-700">
               Page {page} of {totalPages}
             </span>
+
             <Button
               size="xs"
               variant="secondary"
               disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() => setPage((p) => p + 1)}
             >
               Next
             </Button>
           </div>
         </div>
-      </Card>
 
-      {/* Roles table */}
-      <Card className="p-0 overflow-hidden">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-100 text-gray-700 font-semibold">
+        {/* TABLE */}
+        <table className="w-full text-sm border rounded overflow-hidden">
+          <thead className="bg-gray-100 text-gray-700">
             <tr>
-              <th className="px-3 py-2 text-left">ID</th>
-              <th className="px-3 py-2 text-left">Role</th>
-              <th className="px-3 py-2 text-left">Description</th>
-              <th className="px-3 py-2 text-left w-56">Actions</th>
+              <th className="p-2 text-left">ID</th>
+              <th className="p-2 text-left">Role Name</th>
+              <th className="p-2 text-left">Description</th>
+              <th className="p-2 text-center">Actions</th>
             </tr>
           </thead>
+
           <tbody>
             {paginated.map((r) => (
               <tr key={r.id} className="border-t hover:bg-gray-50">
-                <td className="px-3 py-2">{r.id}</td>
-                <td className="px-3 py-2 capitalize">{r.name}</td>
-                <td className="px-3 py-2">{r.description || "-"}</td>
-                <td className="px-3 py-2">
-                  <div className="flex items-center gap-3">
+                <td className="p-2">{r.id}</td>
+                <td className="p-2 capitalize">{r.name}</td>
+                <td className="p-2">{r.description || "-"}</td>
+
+                <td className="p-2 text-center">
+                  <div className="flex justify-center gap-4">
+
+                    {/* EDIT */}
                     <button
-                      className="text-blue-600 hover:underline inline-flex items-center gap-1"
-                      onClick={() => openEditRole(r)}
+                      className="text-blue-600"
+                      onClick={() => {
+                        setSelectedRole(r);
+                        setFormOpen(true);
+                      }}
                     >
-                      <PencilIcon className="h-4 w-4" />
                       Edit
                     </button>
+
+                    {/* PERMISSIONS */}
                     <button
-                      className="text-gray-700 hover:underline inline-flex items-center gap-1"
-                      onClick={() => alert("TODO: open permissions modal")}
-                    >
-                      <Cog6ToothIcon className="h-4 w-4" />
-                      Permissions
-                    </button>
+  className="text-gray-700 flex items-center gap-1"
+  onClick={() => {
+    setPermRole(r);
+    setPermOpen(true);
+  }}
+>
+  <Cog6ToothIcon className="h-4 w-4 inline-block" />
+  <span>Permissions</span>
+</button>
+
+                    {/* DELETE */}
                     <button
-                      className="text-red-600 hover:underline inline-flex items-center gap-1"
-                      onClick={() => openDelete(r)}
+                      className="text-red-600"
+                      onClick={() => {
+                        setConfirmTarget(r);
+                        setConfirmOpen(true);
+                      }}
                     >
-                      <TrashIcon className="h-4 w-4" />
                       Delete
                     </button>
+
                   </div>
                 </td>
               </tr>
@@ -213,7 +286,7 @@ export default function RolesManagement() {
 
             {paginated.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-3 py-6 text-center text-gray-500">
+                <td colSpan={4} className="p-6 text-center text-gray-500">
                   No roles found.
                 </td>
               </tr>
@@ -222,21 +295,31 @@ export default function RolesManagement() {
         </table>
       </Card>
 
-      {/* Add/Edit Role Modal (custom fixed overlay to avoid overlap issues) */}
+      {/* ROLE EDIT / ADD MODAL */}
       <RoleForm
-        open={showRoleModal}
+        open={formOpen}
         initial={selectedRole}
-        onClose={() => setShowRoleModal(false)}
-        onSaved={onRoleSaved}
+        onSave={saveRole}
+        onClose={() => {
+          setFormOpen(false);
+          setSelectedRole(null);
+        }}
       />
 
-      {/* Delete confirm */}
+      {/* DELETE CONFIRM */}
       <Confirm
         open={confirmOpen}
         title="Delete Role?"
-        body={`This will permanently delete the role "${toDelete?.name}".`}
-        onConfirm={doDelete}
+        body={`This will permanently delete "${confirmTarget?.name}".`}
+        onConfirm={deleteRole}
         onClose={() => setConfirmOpen(false)}
+      />
+
+      {/* PERMISSIONS MODAL */}
+      <PermissionsModal
+        open={permOpen}
+        role={permRole}
+        onClose={() => setPermOpen(false)}
       />
     </div>
   );
