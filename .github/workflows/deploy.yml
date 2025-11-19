@@ -3,7 +3,7 @@ name: Deploy to PSR Production
 on:
   push:
     branches:
-      - main   # deploy only when you push to main
+      - main   # deploy only when pushing to main
 
 jobs:
   deploy:
@@ -35,29 +35,26 @@ jobs:
           cd /var/www/psr-inventory-management
           git pull origin main
 
-          echo "📦 Install backend dependencies"
+          echo "📦 Backend: Install dependencies"
           cd backend
-          npm install
+          npm install --omit=dev
 
-          echo "🔧 Apply database migrations (if any)"
+          echo "🛠 Backend: Run migrations (optional)"
           npm run migrate || true
 
-          echo "🚀 Restart backend (PM2)"
+          echo "🔁 Restart backend PM2 process"
           pm2 restart psr-backend || pm2 start server.js --name psr-backend
 
-          echo "📦 Install frontend deps"
+          echo "📦 Frontend: Install dependencies"
           cd ../frontend
-          npm install
+          npm install --omit=dev
 
-          echo "🏗️ Build frontend"
+          echo "🏗️ Building frontend"
           npm run build
 
-          echo "🧹 Clean old dist and deploy new build"
+          echo "🧹 Cleaning old dist and deploying new build"
           rm -rf /var/www/psr-inventory-management/frontend/dist
           mv dist /var/www/psr-inventory-management/frontend/dist
 
-          echo "🔁 Restart frontend (if using PM2 serve)"
-          # pm2 restart psr-frontend || true
-
-          echo "🎉 Deployment complete"
+          echo "🎉 Deployment complete!"
           EOF
