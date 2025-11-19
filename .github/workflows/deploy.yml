@@ -1,14 +1,10 @@
 name: Deploy to PSR Production
-on:
-  workflow_dispatch:    # ← enables Run Workflow button
-  push:
-    branches:
-      - main
 
 on:
+  workflow_dispatch:    # manually trigger
   push:
     branches:
-      - main   # deploy only when pushing to main
+      - main            # auto deploy on push to main
 
 jobs:
   deploy:
