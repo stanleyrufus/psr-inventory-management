@@ -1,0 +1,63 @@
+name: Deploy to PSR Production
+
+on:
+  push:
+    branches:
+      - main   # deploy only when you push to main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # -----------------------
+      # 1. Checkout repository
+      # -----------------------
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # -----------------------
+      # 2. Install SSH key
+      # -----------------------
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      # -----------------------
+      # 3. Deploy to VPS
+      # -----------------------
+      - name: Deploy to VPS
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_HOST }} << 'EOF'
+
+          echo "🚀 Pull latest code"
+          cd /var/www/psr-inventory-management
+          git pull origin main
+
+          echo "📦 Install backend dependencies"
+          cd backend
+          npm install
+
+          echo "🔧 Apply database migrations (if any)"
+          npm run migrate || true
+
+          echo "🚀 Restart backend (PM2)"
+          pm2 restart psr-backend || pm2 start server.js --name psr-backend
+
+          echo "📦 Install frontend deps"
+          cd ../frontend
+          npm install
+
+          echo "🏗️ Build frontend"
+          npm run build
+
+          echo "🧹 Clean old dist and deploy new build"
+          rm -rf /var/www/psr-inventory-management/frontend/dist
+          mv dist /var/www/psr-inventory-management/frontend/dist
+
+          echo "🔁 Restart frontend (if using PM2 serve)"
+          # pm2 restart psr-frontend || true
+
+          echo "🎉 Deployment complete"
+          EOF
