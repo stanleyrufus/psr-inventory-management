@@ -1,5 +1,5 @@
 // frontend/src/pages/PartsPage.jsx
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
 import api from "../utils/api";
 import PartForm from "../components/forms/PartForm";
@@ -7,6 +7,15 @@ import BulkUploadModal from "../components/modals/BulkUploadModal";
 import PartDetail from "../components/PartDetail";
 
 export default function PartsPage() {
+  // ⭐ NEW – moved inside component to follow React rules
+  const [selectedPart, setSelectedPart] = useState(null);
+  const [showDetail, setShowDetail] = useState(false);
+
+  const handleViewPart = (row) => {
+    setSelectedPart(row);
+    setShowDetail(true);
+  };
+
   const [parts, setParts] = useState([]);
   const [filtered, setFiltered] = useState([]);
 
@@ -24,10 +33,7 @@ export default function PartsPage() {
 
   const [zoomImage, setZoomImage] = useState(null);
 
-  const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
-    /\/$/,
-    ""
-  );
+  const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
 
   const loadParts = async () => {
     try {
@@ -159,16 +165,25 @@ export default function PartsPage() {
 
   /*************************************
    ✅ AG GRID COLUMNS 
-   ✅ ONLY CHANGE = MACHINE COLUMN REMOVED
+   – Part # becomes clickable link → opens Detail modal
   *************************************/
   const columnDefs = [
     { headerName: "Image", field: "image_url", width: 100, cellRenderer: ImageRenderer },
-    { headerName: "Part #", field: "part_number", width: 120, flex: 1 },
-    { headerName: "Part Name", field: "part_name", width: 160, flex: 1 },
-    // ✅ CATEGORY STILL HERE
-    { headerName: "Category", field: "category", width: 140, flex: 1 },
 
-    // ❌ MACHINE COLUMN REMOVED
+    {
+      headerName: "Part #",
+      field: "part_number",
+      width: 120,
+      flex: 1,
+      cellRenderer: (params) => (
+        <span
+          className="text-blue-700 hover:underline cursor-pointer"
+          onClick={() => handleViewPart(params.data)}
+        >
+          {params.value}
+        </span>
+      ),
+    },
 
     {
       headerName: "Last Price",
@@ -180,7 +195,9 @@ export default function PartsPage() {
     },
 
     { headerName: "Last Vendor", field: "last_vendor_name", width: 160, flex: 1 },
+
     { headerName: "Status", field: "status", width: 110, cellRenderer: StatusRenderer },
+
     { headerName: "Actions", width: 170, cellRenderer: ActionsRenderer },
   ];
 
@@ -264,7 +281,7 @@ export default function PartsPage() {
         </select>
       </div>
 
-      {/* ✅ AG Grid */}
+      {/* AG Grid */}
       <div className="ag-theme-quartz" style={{ height: 500, width: "100%" }}>
         <AgGridReact
           rowData={paginated}
@@ -330,7 +347,7 @@ export default function PartsPage() {
         </div>
       )}
 
-      {/* ✅ Image Zoom */}
+      {/* Image Zoom */}
       {zoomImage && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-white p-4 rounded shadow-lg relative">
@@ -359,12 +376,20 @@ export default function PartsPage() {
         </div>
       )}
 
-      {/* ✅ Bold AG Grid Column Headers */}
+      {/* Bold Headers */}
       <style>{`
         .ag-theme-quartz {
           --ag-header-font-weight: 700;
         }
       `}</style>
+
+      {/* ⭐ NEW — PART DETAIL MODAL for clicking Part # */}
+      {showDetail && (
+        <PartDetail
+          part={selectedPart}
+          onClose={() => setShowDetail(false)}
+        />
+      )}
     </div>
   );
 }

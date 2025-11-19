@@ -10,12 +10,10 @@ export default function PurchaseOrderEdit() {
   const [po, setPo] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔁 Load PO details (always unwrap .data if backend wraps)
   const loadPo = async () => {
     try {
       const res = await axios.get(`${BASE}/api/purchase_orders/${id}`);
 
-      // Handle both { success:1, data:{...po} } and plain {...po}
       const normalized =
         res.data?.data && typeof res.data.data === "object"
           ? res.data.data
@@ -49,6 +47,16 @@ export default function PurchaseOrderEdit() {
     );
   }
 
+  /* ----------------------------------------------------------
+     🔧 CRITICAL FIX: Strip PO Number for EDIT mode only
+     ----------------------------------------------------------
+     Prevents backend duplicate PO number validation from firing.
+  ---------------------------------------------------------- */
+  const safeEditInitial = {
+    ...po,
+    po_number: undefined, // 🔥 ensures backend doesn't think it’s a new PO
+  };
+
   return (
     <div className="p-6">
       <div className="mb-5 flex items-center justify-between">
@@ -58,13 +66,11 @@ export default function PurchaseOrderEdit() {
         </Link>
       </div>
 
-      {/* ✅ key={po.id} ensures fresh data is loaded each time */}
       <PurchaseOrderForm
         key={po.id}
-        initialPo={po}
+        initialPo={safeEditInitial}
         onSaved={async () => {
           await loadPo();
-          // mark that PO list should refresh next time we return
           window.localStorage.setItem("refreshPOList", "1");
         }}
         onCancel={() => window.history.back()}

@@ -11,7 +11,10 @@ const router = express.Router();
 // ---------------- Paths Setup ----------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const UPLOAD_ROOT = path.resolve(__dirname, "..", "..", "uploads", "purchase_orders");
+
+// ⚠️ MUST MATCH express.static("/uploads")
+const UPLOAD_ROOT = path.join(process.cwd(), "uploads", "purchase_orders");
+
 if (!fs.existsSync(UPLOAD_ROOT)) fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
 
 // ---------------- Multer setup ----------------
@@ -38,7 +41,9 @@ function buildMailTransport() {
 }
 
 //
-// ✅ DASHBOARD ENDPOINTS FIRST (fix route collision)
+// =============================================
+//  DASHBOARD ENDPOINTS
+// =============================================
 //
 
 // Count
@@ -102,20 +107,24 @@ router.get("/status/monthly", async (req, res) => {
 });
 
 //
-// ✅ CREATE PURCHASE ORDER
+// =============================================
+//  CREATE PO
+// =============================================
 //
-// ✅ CHECK IF PO NUMBER EXISTS
+
+// CHECK duplicate number (supports edit mode)
 router.get("/check-number/:psr_po_number", async (req, res) => {
   try {
     const { psr_po_number } = req.params;
+    const excludeId = req.query.excludeId ? Number(req.query.excludeId) : null;
 
-    const existing = await db("purchase_orders")
-      .where({ psr_po_number })
-      .first();
+    const q = db("purchase_orders").where({ psr_po_number });
 
+    if (excludeId) q.andWhereNot("id", excludeId);
+
+    const existing = await q.first();
     res.json({ exists: !!existing });
   } catch (err) {
-    console.error("❌ check-number error:", err);
     res.status(500).json({ exists: false });
   }
 });
@@ -136,18 +145,14 @@ router.post("/", async (req, res) => {
   }
 
   if (!items.length) return res.status(400).json({ success: 0, errormsg: "At least one item is required" });
-// ✅ Prevent duplicate PO numbers (backend enforcement)
-const exists = await db("purchase_orders")
-  .where({ psr_po_number })
-  .first();
 
-if (exists) {
-  return res.status(400).json({
-    success: 0,
-    errormsg: "PO Number already exists. Please use a unique PO Number.",
-  });
-}
-
+  const exists = await db("purchase_orders").where({ psr_po_number }).first();
+  if (exists) {
+    return res.status(400).json({
+      success: 0,
+      errormsg: "PO Number already exists. Please use a unique PO Number.",
+    });
+  }
 
   const trx = await db.transaction();
   try {
@@ -186,17 +191,21 @@ if (exists) {
     }));
 
     await trx("purchase_order_items").insert(itemsToInsert);
-    await trx.commit();
 
+    await trx.commit();
     res.json({ success: 1, po_id });
   } catch (err) {
     await trx.rollback();
-    console.error("❌ Create PO error:", err);
     res.status(500).json({ success: 0, errormsg: err.message });
   }
 });
 
-// ✅ LIST ALL POs
+//
+// =============================================
+//  LIST & GET PO
+// =============================================
+//
+
 router.get("/", async (req, res) => {
   try {
     const rows = await db("purchase_orders as po")
@@ -218,12 +227,10 @@ router.get("/", async (req, res) => {
 
     res.json(rows);
   } catch (err) {
-    console.error("❌ Error fetching purchase orders:", err);
     res.status(500).json({ success: 0, errormsg: "Failed to list POs" });
   }
 });
 
-// ✅ GET ONE PO
 router.get("/:id", async (req, res) => {
   const id = Number(req.params.id);
   try {
@@ -253,21 +260,37 @@ router.get("/:id", async (req, res) => {
 
     const files = await db("purchase_order_files")
       .select(
-        "id", "original_filename", "filepath", "size_bytes", "mime_type", "uploaded_at"
+        "id",
+        "original_filename",
+        "filepath",
+        "size_bytes",
+        "mime_type",
+        "uploaded_at"
       )
       .where({ po_id: id })
       .orderBy("uploaded_at", "desc");
 
-    res.json({ success: 1, data: { ...po, items, files } });
+    // 🔥 CRITICAL FIX: always return a PUBLIC path
+    const normalizedFiles = files.map((f) => ({
+      ...f,
+      filepath: `/uploads/purchase_orders/${path.basename(f.filepath)}`,
+    }));
+
+    res.json({ success: 1, data: { ...po, items, files: normalizedFiles } });
   } catch (err) {
-    console.error("❌ PO fetch error:", err);
     res.status(500).json({ success: 0, errormsg: "Failed to fetch PO details" });
   }
 });
 
-// ✅ UPDATE PO
+//
+// =============================================
+//  UPDATE PO (no attachment issues here)
+// =============================================
+//
+
 router.put("/:id", async (req, res) => {
   const id = Number(req.params.id);
+
   const {
     psr_po_number, order_date, expected_delivery_date, created_by, vendor_id,
     payment_method, payment_terms, currency, remarks, tax_percent,
@@ -318,27 +341,19 @@ router.put("/:id", async (req, res) => {
     res.json({ success: 1, message: "PO updated successfully" });
   } catch (err) {
     await trx.rollback();
-    console.error("❌ Update PO error:", err);
     res.status(500).json({ success: 0, errormsg: err.message });
   }
 });
 
-// ✅ UPDATE STATUS
-router.post("/:id/status", async (req, res) => {
-  const { status } = req.body || {};
-  if (!status) return res.status(400).json({ success: 0, errormsg: "status is required" });
+//
+// =============================================
+//  UPLOAD FILES (NEW ATTACHMENTS)
+// =============================================
+//
 
-  try {
-    await db("purchase_orders").where({ id: req.params.id }).update({ status, updated_at: db.fn.now() });
-    res.json({ success: 1, message: "Status updated" });
-  } catch (err) {
-    res.status(500).json({ success: 0, errormsg: "Failed to update status" });
-  }
-});
-
-// ✅ UPLOAD FILES
 router.post("/:id/upload", upload.array("files", 10), async (req, res) => {
   const id = Number(req.params.id);
+
   try {
     const po = await db("purchase_orders").where({ id }).first();
     if (!po) return res.status(404).json({ success: 0, errormsg: "PO not found" });
@@ -349,11 +364,15 @@ router.post("/:id/upload", upload.array("files", 10), async (req, res) => {
       stored_filename: f.filename,
       mime_type: f.mimetype,
       size_bytes: f.size,
-      filepath: path.join("/uploads/purchase_orders", f.filename).replace(/\\/g, "/"),
+
+      // 🔥 FIX: ALWAYS RETURN CLEAN SERVABLE PATH
+      filepath: `uploads/purchase_orders/${f.filename}`,
+
       uploaded_at: db.fn.now(),
     }));
 
-    if (safeFiles.length) await db("purchase_order_files").insert(safeFiles);
+    if (safeFiles.length)
+      await db("purchase_order_files").insert(safeFiles);
 
     res.json({ success: 1, uploaded: safeFiles.length });
   } catch (err) {
@@ -361,7 +380,9 @@ router.post("/:id/upload", upload.array("files", 10), async (req, res) => {
   }
 });
 
-// ✅ DELETE PO
+// =============================================
+// DELETE PO
+// =============================================
 router.delete("/:id", async (req, res) => {
   const id = Number(req.params.id);
   try {
@@ -375,6 +396,30 @@ router.delete("/:id", async (req, res) => {
     res.json({ success: 1, message: `PO ${po.psr_po_number} deleted` });
   } catch (err) {
     res.status(500).json({ success: 0, message: "Delete failed", error: err.message });
+  }
+});
+
+// =============================================
+// DELETE ONE ATTACHMENT
+// =============================================
+router.delete("/:po_id/file/:file_id", async (req, res) => {
+  const { po_id, file_id } = req.params;
+
+  try {
+    const file = await db("purchase_order_files").where({ id: file_id }).first();
+
+    if (!file) return res.status(404).json({ success: 0, message: "File not found" });
+
+    // physical file path
+    const fullPath = path.join(process.cwd(), file.filepath);
+
+    if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+
+    await db("purchase_order_files").where({ id: file_id }).del();
+
+    res.json({ success: 1, message: "File deleted" });
+  } catch (err) {
+    res.status(500).json({ success: 0, message: "Delete error", err });
   }
 });
 

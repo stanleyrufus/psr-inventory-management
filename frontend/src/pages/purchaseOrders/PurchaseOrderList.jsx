@@ -107,7 +107,13 @@ export default function PurchaseOrderList() {
         </span>
       ),
     },
-    { headerName: "Vendor", field: "vendor_name", flex: 1 },
+{
+    headerName: "Vendor",
+    field: "vendor_name",
+    minWidth: 180,   // ⭐ FIX #1
+    flex: 1,         // ⭐ FIX #2
+    cellClass: "flex items-center",
+  },
     {
       headerName: "Grand Total",
       field: "grand_total",
@@ -120,16 +126,11 @@ export default function PurchaseOrderList() {
       width: 160,
       valueFormatter: (p) => (p.value ? new Date(p.value).toLocaleDateString() : "-"),
     },
-    {
-      headerName: "Status",
-      field: "status",
-      width: 120,
-      cellClass: "text-center",
-    },
+    
     {
       headerName: "RFQ",
       field: "rfq",
-      width: 180,
+      width: 140,
       cellRenderer: (params) => {
         const s = rfqStatusMap?.[params.data.id];
         if (s && s.sentCount > 0) {

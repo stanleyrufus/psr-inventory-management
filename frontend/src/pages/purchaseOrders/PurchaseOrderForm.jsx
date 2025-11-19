@@ -2,7 +2,11 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
+
+
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+// ✅ NEW: Use FILE_BASE for downloads (no /api prefix)
+const FILE_BASE = BASE.replace(/\/api$/, "");
 
 const n = (v) => Number(v ?? 0);
 const money = (v) => n(v).toFixed(2);
@@ -23,11 +27,24 @@ export default function PurchaseOrderForm({
   const [vendors, setVendors] = useState([]);
   const [parts, setParts] = useState([]);
   const [attachments, setAttachments] = useState([]);
-  const [staffList] = useState(["Stanley Medikonda", "Pawan Kumar", "Alex Johnson"]);
+  const [staffList] = useState([
+    "Stanley Medikonda",
+    "Pawan Kumar",
+    "Alex Johnson",
+  ]);
   const [submitting, setSubmitting] = useState(false);
 
   // ✅ NEW: lock submit after successful save
   const [saved, setSaved] = useState(false);
+
+  // ✅ NEW: local state for existing uploaded files (so we can delete & update UI)
+  const [existingFiles, setExistingFiles] = useState(initialPo?.files || []);
+  const [deletingFileIds, setDeletingFileIds] = useState([]);
+
+  // ✅ NEW: keep existingFiles in sync if initialPo changes
+  useEffect(() => {
+    setExistingFiles(initialPo?.files || []);
+  }, [initialPo]);
 
   // inline vendor "add new vendor" state
   const [addingNewVendor, setAddingNewVendor] = useState(false);
@@ -53,6 +70,10 @@ export default function PurchaseOrderForm({
     current_unit_price: "",
   });
 
+  // ✅ helper: normalize date values coming from backend (e.g. "2025-11-28T00:00:00.000Z")
+  const toDateOnly = (val) =>
+    val ? String(val).slice(0, 10) : "";
+
   // Normalize the initialPo items shape if editing
   const normalizePo = (poData) => {
     if (!poData) return null;
@@ -61,10 +82,17 @@ export default function PurchaseOrderForm({
       description: i.description || i.part_name || "",
       quantity: i.quantity || 1,
       unitPrice: i.unit_price || i.current_unit_price || 0,
-      totalPrice: (i.quantity || 1) * (i.unit_price || i.current_unit_price || 0),
+      totalPrice:
+        (i.quantity || 1) * (i.unit_price || i.current_unit_price || 0),
       lastUnitPrice: i.last_unit_price || null,
     }));
-    return { ...poData, items };
+    return {
+      ...poData,
+      // ✅ CHANGED: make sure dates are in yyyy-MM-dd for the <input type="date">
+      order_date: toDateOnly(poData.order_date),
+      expected_delivery_date: toDateOnly(poData.expected_delivery_date),
+      items,
+    };
   };
 
   const [po, setPo] = useState(
@@ -232,7 +260,8 @@ export default function PurchaseOrderForm({
     }
 
     const selected = parts.find(
-      (p) => String(p.part_id) === String(value) || String(p.id) === String(value)
+      (p) =>
+        String(p.part_id) === String(value) || String(p.id) === String(value)
     );
 
     if (!selected) return;
@@ -266,7 +295,8 @@ export default function PurchaseOrderForm({
     updatedItems[index][field] = value;
     if (field === "quantity" || field === "unitPrice") {
       updatedItems[index].totalPrice =
-        nNum(updatedItems[index].quantity) * nNum(updatedItems[index].unitPrice);
+        nNum(updatedItems[index].quantity) *
+        nNum(updatedItems[index].unitPrice);
     }
     setPo({ ...po, items: updatedItems });
     recalcTotals(updatedItems);
@@ -365,120 +395,173 @@ export default function PurchaseOrderForm({
 
   const handleFileChange = (e) => setAttachments([...e.target.files]);
 
+  // ✅ NEW: delete a single existing file
+  const handleDeleteFile = async (fileId) => {
+    if (!initialPo?.id) return;
+    const confirm = window.confirm("Delete this attachment?");
+    if (!confirm) return;
+
+    try {
+      setDeletingFileIds((prev) => [...prev, fileId]);
+      await axios.delete(
+        `${BASE}/api/purchase_orders/${initialPo.id}/file/${fileId}`
+      );
+      // remove from local list so UI updates
+      setExistingFiles((prev) => prev.filter((f) => f.id !== fileId));
+    } catch (err) {
+      console.error("❌ File delete error:", err);
+      alert("Failed to delete file. See console.");
+    } finally {
+      setDeletingFileIds((prev) => prev.filter((id) => id !== fileId));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (submitting || saved) return; // ✅ prevent double submit if already saved
     setSubmitting(true);
-// ✅ Validation: Must have at least 1 line item
-if (!po.items || po.items.length === 0) {
-  alert("At least one Part must be added to the Purchase Order.");
-  setSubmitting(false);
-  return;
-}
 
-// ✅ Validation: Each item must have Part + Quantity
-for (let i of po.items) {
-  if (!i.partId) {
-    alert("Each line item must have a selected Part.");
-    setSubmitting(false);
-    return;
-  }
-  if (!i.quantity || Number(i.quantity) <= 0) {
-    alert("Quantity must be greater than 0.");
-    setSubmitting(false);
-    return;
-  }
-}
+    // ✅ Validation: Must have at least 1 line item
+    if (!po.items || po.items.length === 0) {
+      alert("At least one Part must be added to the Purchase Order.");
+      setSubmitting(false);
+      return;
+    }
 
-// ✅ Validation: Unit Price must not be blank or zero
-for (let i of po.items) {
-  if (i.unitPrice === "" || i.unitPrice === null || Number(i.unitPrice) <= 0) {
-    alert("Unit Price is required and must be greater than 0 for all items.");
-    setSubmitting(false);
-    return;
-  }
-}
+    // ✅ Validation: Each item must have Part + Quantity
+    for (let i of po.items) {
+      if (!i.partId) {
+        alert("Each line item must have a selected Part.");
+        setSubmitting(false);
+        return;
+      }
+      if (!i.quantity || Number(i.quantity) <= 0) {
+        alert("Quantity must be greater than 0.");
+        setSubmitting(false);
+        return;
+      }
+    }
 
+    // ✅ Validation: Unit Price must not be blank or zero
+    for (let i of po.items) {
+      if (
+        i.unitPrice === "" ||
+        i.unitPrice === null ||
+        Number(i.unitPrice) <= 0
+      ) {
+        alert(
+          "Unit Price is required and must be greater than 0 for all items."
+        );
+        setSubmitting(false);
+        return;
+      }
+    }
 
     recalcTotals(po.items);
-// ✅ Frontend validation: PO Number must be unique
-try {
-  const exists = await axios
-    .get(`${BASE}/api/purchase_orders/check-number/${po.psr_po_number}`)
-    .then((res) => res.data.exists)
-    .catch(() => false);
 
-  if (exists) {
-    alert("This PO Number already exists. Please use a unique PO Number.");
-    setSubmitting(false);
-    return;
+    // -----------------------------------------------------
+// ✅ CHANGED: Only run duplicate check for NEW PO
+// -----------------------------------------------------
+if (!initialPo?.id) {
+  try {
+    const exists = await axios
+      .get(`${BASE}/api/purchase_orders/check-number/${po.psr_po_number}`)
+      .then((res) => res.data.exists)
+      .catch(() => false);
+
+    if (exists) {
+      alert("This PO Number already exists. Please use a unique PO Number.");
+      setSubmitting(false);
+      return;
+    }
+  } catch {
+    // backend will still enforce unique number
   }
-} catch {
-  // fail silently, backend will catch duplicates anyway
 }
 
-    try {
-      const payload = {
-        psr_po_number: po.psr_po_number,
-        order_date: po.order_date,
-        expected_delivery_date: po.expected_delivery_date,
-        created_by: po.created_by,
-        vendor_id: po.vendor_id,
-        payment_terms: po.payment_terms,
-        currency: po.currency,
-        remarks: po.remarks,
-        tax_percent: nNum(po.tax_percent),
-        shipping_charges: nNum(po.shipping_charges),
-        subtotal: nNum(po.subtotal),
-        tax_amount: nNum(po.tax_amount),
-        grand_total: nNum(po.grand_total),
-        items: po.items.map((i) => ({
-          part_id: Number(i.partId),
-          quantity: nNum(i.quantity),
-          unit_price: nNum(i.unitPrice),
-          total_price: nNum(i.totalPrice),
-        })),
-        status: po.status,
-      };
-
-      if (initialPo?.id) {
-        await axios.put(`${BASE}/api/purchase_orders/${initialPo.id}`, payload);
-        alert("✅ PO updated successfully.");
-      } else {
-        const res = await axios.post(`${BASE}/api/purchase_orders`, payload);
-        const poId = res.data?.po_id;
-
-        if (poId && attachments.length) {
-          const fd = new FormData();
-          attachments.forEach((f) => fd.append("files", f));
-          await axios.post(`${BASE}/api/purchase_orders/${poId}/upload`, fd);
-        }
-
-alert("✅ PO created successfully.");
-}
-
-// ✅ After successful save, lock the form
-setSaved(true);
-
-// ✅ If opened inside a modal (Dashboard) → close modal using onSaved()
-if (onSaved) {
-  onSaved();
-} else {
-  // ✅ If opened from PO tab (full page) → redirect to PO list
-  navigate("/purchase-orders");
-}
-} catch (err) {
-  console.error("❌ PO save error:", err);
-  alert("Save failed. See console.");
-} finally {
-  setSubmitting(false);
-}
+// -----------------------------------------------------
+// ⭐ BUILD PAYLOAD (same for create/update)
+// -----------------------------------------------------
+const payload = {
+  psr_po_number: po.psr_po_number,
+  order_date: po.order_date,
+  expected_delivery_date: po.expected_delivery_date,
+  created_by: po.created_by,
+  vendor_id: po.vendor_id,
+  payment_terms: po.payment_terms,
+  currency: po.currency,
+  remarks: po.remarks,
+  tax_percent: nNum(po.tax_percent),
+  shipping_charges: nNum(po.shipping_charges),
+  subtotal: nNum(po.subtotal),
+  tax_amount: nNum(po.tax_amount),
+  grand_total: nNum(po.grand_total),
+  items: po.items.map((i) => ({
+    part_id: Number(i.partId),
+    quantity: nNum(i.quantity),
+    unit_price: nNum(i.unitPrice),
+    total_price: nNum(i.totalPrice),
+  })),
+  status: po.status,
 };
 
-// ✅ Only apply internal scroll when NOT in a modal
-const formScrollClasses = isModal ? "" : "max-h-[90vh] overflow-y-auto";
+try {
+  // -----------------------------------------------------
+  // ✅ EDIT MODE
+  // -----------------------------------------------------
+  if (initialPo?.id) {
+    await axios.put(`${BASE}/api/purchase_orders/${initialPo.id}`, payload);
 
-return (
+    // ⭐ NEW: upload new files during EDIT
+    if (attachments.length > 0) {
+      const fd = new FormData();
+      attachments.forEach((f) => fd.append("files", f));
+      await axios.post(
+        `${BASE}/api/purchase_orders/${initialPo.id}/upload`,
+        fd
+      );
+    }
+
+    alert("✅ PO updated successfully.");
+
+  } else {
+    // -----------------------------------------------------
+    // ✅ CREATE MODE
+    // -----------------------------------------------------
+    const res = await axios.post(`${BASE}/api/purchase_orders`, payload);
+    const poId = res.data?.po_id;
+
+    if (poId && attachments.length) {
+      const fd = new FormData();
+      attachments.forEach((f) => fd.append("files", f));
+      await axios.post(`${BASE}/api/purchase_orders/${poId}/upload`, fd);
+    }
+
+    alert("✅ PO created successfully.");
+  }
+
+      // ✅ After successful save, lock the form
+      setSaved(true);
+
+      // ✅ If opened inside a modal (Dashboard) → close modal using onSaved()
+      if (onSaved) {
+        onSaved();
+      } else {
+        // ✅ If opened from PO tab (full page) → redirect to PO list
+        navigate("/purchase-orders");
+      }
+    } catch (err) {
+      console.error("❌ PO save error:", err);
+      alert("Save failed. See console.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ✅ Only apply internal scroll when NOT in a modal
+  const formScrollClasses = isModal ? "" : "max-h-[90vh] overflow-y-auto";
+
+  return (
     <form
       onSubmit={handleSubmit}
       className={`bg-white p-6 rounded shadow ${formScrollClasses}`}
@@ -510,7 +593,9 @@ return (
             type="text"
             className="border p-2 rounded w-full"
             value={po.psr_po_number}
-            onChange={(e) => setPo({ ...po, psr_po_number: e.target.value })}
+            onChange={(e) =>
+              setPo({ ...po, psr_po_number: e.target.value })
+            }
             required
             disabled={submitting || saved}
           />
@@ -549,7 +634,9 @@ return (
           <select
             className="border p-2 rounded w-full"
             value={po.created_by}
-            onChange={(e) => setPo({ ...po, created_by: e.target.value })}
+            onChange={(e) =>
+              setPo({ ...po, created_by: e.target.value })
+            }
             required
             disabled={submitting || saved}
           >
@@ -579,7 +666,9 @@ return (
           <select
             className="border p-2 rounded w-full"
             value={po.vendor_id || ""}
-            onChange={(e) => setPo({ ...po, vendor_id: e.target.value })}
+            onChange={(e) =>
+              setPo({ ...po, vendor_id: e.target.value })
+            }
             required
             disabled={submitting || saved}
           >
@@ -606,7 +695,10 @@ return (
               className="border p-2 rounded w-full"
               value={newVendor.contact_name}
               onChange={(e) =>
-                setNewVendor({ ...newVendor, contact_name: e.target.value })
+                setNewVendor({
+                  ...newVendor,
+                  contact_name: e.target.value,
+                })
               }
               disabled={submitting || saved}
             />
@@ -643,7 +735,10 @@ return (
                 className="border p-2 rounded w-full"
                 value={newVendor.country}
                 onChange={(e) =>
-                  setNewVendor({ ...newVendor, country: e.target.value })
+                  setNewVendor({
+                    ...newVendor,
+                    country: e.target.value,
+                  })
                 }
                 disabled={submitting || saved}
               />
@@ -693,7 +788,10 @@ return (
               className="border p-2 rounded w-full"
               value={globalPart.part_number}
               onChange={(e) =>
-                setGlobalPart({ ...globalPart, part_number: e.target.value })
+                setGlobalPart({
+                  ...globalPart,
+                  part_number: e.target.value,
+                })
               }
               disabled={submitting || saved}
             />
@@ -702,7 +800,10 @@ return (
               className="border p-2 rounded w-full"
               value={globalPart.part_name}
               onChange={(e) =>
-                setGlobalPart({ ...globalPart, part_name: e.target.value })
+                setGlobalPart({
+                  ...globalPart,
+                  part_name: e.target.value,
+                })
               }
               disabled={submitting || saved}
             />
@@ -711,7 +812,10 @@ return (
               className="border p-2 rounded w-full"
               value={globalPart.description}
               onChange={(e) =>
-                setGlobalPart({ ...globalPart, description: e.target.value })
+                setGlobalPart({
+                  ...globalPart,
+                  description: e.target.value,
+                })
               }
               disabled={submitting || saved}
             />
@@ -771,12 +875,17 @@ return (
                     <select
                       className="border p-1 rounded w-full"
                       value={item.partId}
-                      onChange={(e) => handlePartSelect(i, e.target.value)}
+                      onChange={(e) =>
+                        handlePartSelect(i, e.target.value)
+                      }
                       disabled={submitting || saved}
                     >
                       <option value="">Select</option>
                       {parts.map((p) => (
-                        <option key={p.part_id || p.id} value={p.part_id || p.id}>
+                        <option
+                          key={p.part_id || p.id}
+                          value={p.part_id || p.id}
+                        >
                           {p.part_number}
                         </option>
                       ))}
@@ -785,8 +894,10 @@ return (
 
                     {item.partId && (
                       <div className="text-xs text-gray-500 mt-1">
-                        {parts.find((p) => String(p.part_id) === String(item.partId))
-                          ?.description || "No description available"}
+                        {parts.find(
+                          (p) =>
+                            String(p.part_id) === String(item.partId)
+                        )?.description || "No description available"}
                       </div>
                     )}
                   </>
@@ -880,7 +991,9 @@ return (
                   type="number"
                   value={item.quantity}
                   className="border p-1 rounded w-full"
-                  onChange={(e) => updateItem(i, "quantity", e.target.value)}
+                  onChange={(e) =>
+                    updateItem(i, "quantity", e.target.value)
+                  }
                   disabled={submitting || saved}
                 />
               </td>
@@ -890,7 +1003,9 @@ return (
                   type="number"
                   value={item.unitPrice}
                   className="border p-1 rounded w-full"
-                  onChange={(e) => updateItem(i, "unitPrice", e.target.value)}
+                  onChange={(e) =>
+                    updateItem(i, "unitPrice", e.target.value)
+                  }
                   disabled={submitting || saved}
                 />
                 {item.lastUnitPrice && (
@@ -900,7 +1015,9 @@ return (
                 )}
               </td>
 
-              <td className="border p-2 text-right">${money(item.totalPrice)}</td>
+              <td className="border p-2 text-right">
+                ${money(item.totalPrice)}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -932,7 +1049,9 @@ return (
             disabled={submitting || saved}
           />
         </div>
-        <div className="font-bold mt-2">Grand Total: ${money(po.grand_total)}</div>
+        <div className="font-bold mt-2">
+          Grand Total: ${money(po.grand_total)}
+        </div>
       </div>
 
       {/* --- Attachments --- */}
@@ -947,23 +1066,41 @@ return (
         />
       </div>
 
-      {initialPo?.files?.length > 0 && (
+      {/* ✅ CHANGED: use existingFiles and FILE_BASE, plus Delete button */}
+      {existingFiles.length > 0 && (
         <div className="mt-2 border p-3 bg-gray-50 rounded">
-          <p className="font-semibold mb-1 text-gray-700">Existing Attachments:</p>
-          <ul className="list-disc pl-6 text-sm">
-            {initialPo.files.map((f) => (
-              <li key={f.id || f.filepath}>
-                <a
-                  href={`${import.meta.env.VITE_API_URL || "http://localhost:5000"}${
-                    f.filepath?.startsWith("/") ? "" : "/"
-                  }${f.filepath}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-blue-700 hover:underline"
-                >
+          <p className="font-semibold mb-1 text-gray-700">
+            Existing Attachments:
+          </p>
+          <ul className="list-disc pl-6 text-sm space-y-1">
+            {existingFiles.map((f) => (
+              <li key={f.id || f.filepath} className="flex items-center gap-3">
+           {/* ✅ FIX: Always ensure exactly ONE slash between base URL + filepath */}
+{/* FIXED: remove accidental /api from URL */}
+<a
+  href={`${import.meta.env.VITE_API_URL || "http://localhost:5000"}${f.filepath}`}
+  target="_blank"
+  rel="noreferrer"
+  className="text-blue-700 hover:underline"
+>
+
                   {f.original_filename || "File"} ({f.mime_type || ""},{" "}
                   {f.size_bytes?.toLocaleString() || 0} bytes)
                 </a>
+                {initialPo?.id && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteFile(f.id)}
+                    disabled={
+                      submitting || deletingFileIds.includes(f.id)
+                    }
+                    className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200"
+                  >
+                    {deletingFileIds.includes(f.id)
+                      ? "Deleting..."
+                      : "Delete"}
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -977,7 +1114,9 @@ return (
           className="border p-2 rounded w-full"
           rows="3"
           value={po.remarks}
-          onChange={(e) => setPo({ ...po, remarks: e.target.value })}
+          onChange={(e) =>
+            setPo({ ...po, remarks: e.target.value })
+          }
           placeholder="Special instructions or comments"
           disabled={submitting || saved}
         />
@@ -993,10 +1132,10 @@ return (
         >
           {saved ? "Close" : "Cancel"}
         </button>
-{/* ✅ stays disabled after success */}
+        {/* ✅ stays disabled after success */}
         <button
           type="submit"
-          disabled={submitting || saved}  
+          disabled={submitting || saved}
           className={`px-4 py-2 rounded shadow text-white ${
             submitting || saved
               ? "bg-gray-400 cursor-not-allowed"
