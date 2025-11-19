@@ -1,3 +1,9 @@
+on:
+  workflow_dispatch:    # ← enables Run Workflow button
+  push:
+    branches:
+      - main
+
 name: Deploy to PSR Production
 
 on:
