@@ -11,10 +11,23 @@ export default function SendRfqModal({ poId, onClose, defaultTo = [], defaultCc 
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    axios.get(`${BASE}/api/purchase_orders/${poId}/rfq/preview`)
-      .then(res => setPreview({ subject: res.data.subject, html: res.data.html }))
-      .finally(() => setLoading(false));
-  }, [poId]);
+  axios.get(`${BASE}/api/purchase_orders/${poId}/rfq/preview`)
+    .then(res => {
+      setPreview({
+        subject: res.data.subject,
+        html: res.data.html
+      });
+
+      // ⭐ NEW: vendor email from backend preview
+      const vEmail = res.data.vendor_email || "";
+      setTo(vEmail);
+
+      // ⭐ NEW: default CC
+      setCc("purchasing@psr.com");
+    })
+    .finally(() => setLoading(false));
+}, [poId]);
+
 
   const parseList = (s) => s.split(",").map(e => e.trim()).filter(Boolean);
 
