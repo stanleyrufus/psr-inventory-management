@@ -3,7 +3,7 @@ name: Deploy to PSR Production
 on:
   workflow_dispatch:
   push:
-    branches:
+    branches: 
       - main
 
 jobs:
@@ -21,7 +21,9 @@ jobs:
 
       - name: Deploy to VPS
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no \
+          -p ${{ secrets.SSH_PORT }} \
+          ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
 
           echo "🚀 Pull latest code"
           cd /var/www/psr-inventory-management
@@ -31,20 +33,20 @@ jobs:
           cd backend
           npm install --omit=dev
 
-          echo "🛠 Backend: Run migrations (optional)"
+          echo "🛠 Run backend migrations"
           npm run migrate || true
 
-          echo "🔁 Restart backend PM2 process"
+          echo "🔁 Restart backend"
           pm2 restart psr-backend || pm2 start server.js --name psr-backend
 
           echo "📦 Frontend: Install dependencies"
           cd ../frontend
           npm install --omit=dev
 
-          echo "🏗️ Building frontend"
+          echo "🏗️ Build frontend"
           npm run build
 
-          echo "🧹 Cleaning old dist and deploying new build"
+          echo "🧹 Deploy frontend dist"
           rm -rf /var/www/psr-inventory-management/frontend/dist
           mv dist /var/www/psr-inventory-management/frontend/dist
 
