@@ -18,6 +18,7 @@ jobs:
         with:
           node-version: 20
 
+      # ---- FRONTEND BUILD ----
       - name: Install Frontend Dependencies
         working-directory: frontend
         run: npm ci
@@ -26,17 +27,31 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: Copy Files to VPS
+      # ---- COPY FRONTEND DIST ONLY ----
+      - name: Upload Frontend to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT }}
-          source: "frontend/dist/**,backend/**"
-          target: "/var/www/psr-inventory-management"
+          source: "frontend/dist/*"
+          target: "/var/www/psr-inventory-management/frontend/dist"
           overwrite: true
 
+      # ---- DEPLOY BACKEND (code-only, no node_modules) ----
+      - name: Upload Backend Files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: "backend/*.js,backend/routes/**,backend/utils/**"
+          target: "/var/www/psr-inventory-management/backend"
+          overwrite: true
+
+      # ---- RESTART SERVICES ----
       - name: Restart Services on VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -46,5 +61,6 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           script: |
             cd /var/www/psr-inventory-management/backend
-            pm2 restart all || pm2 start server.js --name psr-backend
+            npm install --omit=dev
+            pm2 restart psr-backend || pm2 start index.js --name psr-backend
             sudo systemctl restart nginx
