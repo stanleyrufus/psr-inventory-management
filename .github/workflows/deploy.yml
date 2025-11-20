@@ -1,63 +1,55 @@
-name: Deploy to PSR Production
+name: Deploy to VPS
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # -----------------------
-      # 1. Checkout repository
-      # -----------------------
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # -----------------------
-      # 2. Install SSH key
-      # -----------------------
-      - name: Install SSH key
-        uses: webfactory/ssh-agent@v0.7.0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          node-version: "20"
 
-      # -----------------------
-      # 3. Deploy to VPS
-      # -----------------------
-      - name: Deploy to VPS
+      # ======================
+      # BUILD FRONTEND
+      # ======================
+      - name: Install Frontend Dependencies
         run: |
-          ssh -o StrictHostKeyChecking=no \
-          -p ${{ secrets.SSH_PORT }} \
-          ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          cd frontend
+          npm ci
 
-          echo "📍 Enter project directory"
-          cd /var/www/psr-inventory-management
+      - name: Build Frontend
+        run: |
+          cd frontend
+          npm run build
 
-          echo "📦 Backend: Install dependencies"
-          cd backend
-          npm install --omit=dev
+      # ======================
+      # DEPLOY TO VPS
+      # ======================
+      - name: Copy Files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_KEY }}
+          source: "frontend/dist/**,backend/**"
+          target: "/var/www/psr-inventory-management"
+          overwrite: true
 
-          echo "🛠 Run backend migrations"
-          npm run migrate || true
-
-          echo "🔁 Restart backend"
-          pm2 restart psr-backend || pm2 start index.js --name psr-backend
-
-          echo "📦 Frontend: Install dependencies"
-          cd /var/www/psr-inventory-management/frontend
-          npm install --omit=dev
-
-          echo "🏗️ Building frontend"
-          NODE_OPTIONS="--max-old-space-size=2048" npm run build
-
-          echo "🧹 Replace old frontend build"
-          rm -rf /var/www/psr-inventory-management/frontend/dist
-          mv /var/www/psr-inventory-management/frontend/dist \
-             /var/www/psr-inventory-management/frontend/dist
-
-          echo "🎉 Deployment complete!"
-          EOF
+      - name: Restart PM2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_KEY }}
+          script: |
+            cd /var/www/psr-inventory-management/backend
+            pm2 restart all || pm2 start server.js --name psr-backend
+            sudo systemctl restart nginx
