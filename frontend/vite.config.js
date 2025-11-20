@@ -1,14 +1,24 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+
+  // ✅ REQUIRED for production hosting (Nginx)
+  base: "/",
+
+  // ✅ Ensure correct build folder
+  build: {
+    outDir: "dist",
+  },
+
+  // Dev server (local only)
   server: {
-    host: true,       // listen on all network interfaces
+    host: true,
     port: 5173,
-    strictPort: true, // optional: fail if port is already in use
+    strictPort: true,
     allowedHosts: [
-      'sueann-unextricable-yuette.ngrok-free.dev'
+      "sueann-unextricable-yuette.ngrok-free.dev"
     ]
-  }
-})
+  },
+});
