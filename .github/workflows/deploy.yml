@@ -1,38 +1,31 @@
 name: Deploy to VPS
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: 20
 
-      # ======================
-      # BUILD FRONTEND
-      # ======================
       - name: Install Frontend Dependencies
-        run: |
-          cd frontend
-          npm ci
+        working-directory: frontend
+        run: npm ci
 
       - name: Build Frontend
-        run: |
-          cd frontend
-          npm run build
+        working-directory: frontend
+        run: npm run build
 
-      # ======================
-      # DEPLOY TO VPS
-      # ======================
       - name: Copy Files to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -43,7 +36,7 @@ jobs:
           target: "/var/www/psr-inventory-management"
           overwrite: true
 
-      - name: Restart PM2
+      - name: Restart Services on VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
