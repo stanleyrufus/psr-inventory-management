@@ -32,6 +32,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_KEY }}
+          port: ${{ secrets.VPS_PORT }}
           source: "frontend/dist/**,backend/**"
           target: "/var/www/psr-inventory-management"
           overwrite: true
@@ -42,6 +43,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_KEY }}
+          port: ${{ secrets.VPS_PORT }}
           script: |
             cd /var/www/psr-inventory-management/backend
             pm2 restart all || pm2 start server.js --name psr-backend
