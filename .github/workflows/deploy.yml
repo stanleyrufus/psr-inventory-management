@@ -48,3 +48,5 @@ jobs:
             cd /var/www/psr-inventory-management/backend
             pm2 restart all || pm2 start server.js --name psr-backend
             /usr/sbin/nginx -s reload
+            deploy ALL=(ALL) NOPASSWD: /bin/systemctl restart nginx, /bin/systemctl reload nginx
+
