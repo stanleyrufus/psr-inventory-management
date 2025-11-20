@@ -11,20 +11,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # -----------------------
+      # 1. Checkout repository
+      # -----------------------
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # -----------------------
+      # 2. Install SSH key
+      # -----------------------
       - name: Install SSH key
         uses: webfactory/ssh-agent@v0.7.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-            
-            - name:Deploy to VPS
+
+      # -----------------------
+      # 3. Deploy to VPS
+      # -----------------------
+      - name: Deploy to VPS
         run: |
           ssh -o StrictHostKeyChecking=no \
           -p ${{ secrets.SSH_PORT }} \
           ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
 
+          echo "📍 Enter project directory"
           cd /var/www/psr-inventory-management
 
           echo "📦 Backend: Install dependencies"
@@ -44,9 +54,9 @@ jobs:
           echo "🏗️ Building frontend"
           NODE_OPTIONS="--max-old-space-size=2048" npm run build
 
-          echo "🧹 Deploy frontend dist"
+          echo "🧹 Replace old frontend build"
           rm -rf /var/www/psr-inventory-management/frontend/dist
-          mv /var/www/psr-inventory-management/frontend/dist_deploy/dist \
+          mv /var/www/psr-inventory-management/frontend/dist \
              /var/www/psr-inventory-management/frontend/dist
 
           echo "🎉 Deployment complete!"
