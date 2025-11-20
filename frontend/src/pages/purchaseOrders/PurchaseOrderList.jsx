@@ -147,42 +147,7 @@ export default function PurchaseOrderList() {
         );
       },
     },
-    {
-      headerName: "Actions",
-      width: 220,
-      cellRenderer: (params) => (
-        <div className="flex gap-2">
-          <button
-            className="text-blue-600"
-            onClick={() => navigate(`/purchase-orders/${params.data.id}`)}
-          >
-            View
-          </button>
-          <button
-            className="text-gray-700"
-            onClick={() => navigate(`/purchase-orders/edit/${params.data.id}`)}
-          >
-            Edit
-          </button>
-          <button
-            className="text-red-600"
-            onClick={async () => {
-              if (!window.confirm(`Delete PO "${params.data.psr_po_number}"?`)) return;
-              try {
-                await axios.delete(`${BASE}/api/purchase_orders/${params.data.id}`);
-                alert("✅ Purchase Order deleted");
-                loadOrders();
-              } catch (err) {
-                console.error(err);
-                alert("Delete failed");
-              }
-            }}
-          >
-            Delete
-          </button>
-        </div>
-      ),
-    },
+    
   ];
 
   // ✅ Match Vendors/Parts grid: use theme class and compact variables only

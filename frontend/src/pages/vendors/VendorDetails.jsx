@@ -107,6 +107,25 @@ export default function VendorDetail({ vendor, onClose }) {
           </p>
         </div>
 
+<div className="flex justify-end gap-3 mt-6 border-t pt-4">
+  <button
+    className="px-4 py-2 bg-blue-600 text-white rounded"
+    onClick={() => {
+      onClose();     // close details modal
+      window.__openVendorEdit?.(vendor); // trigger edit from parent
+    }}
+  >
+    Edit Vendor
+  </button>
+
+  <button
+    className="px-4 py-2 bg-red-600 text-white rounded"
+    onClick={() => window.__deleteVendor?.(vendor.vendor_id, vendor.vendor_name)}
+  >
+    Delete Vendor
+  </button>
+</div>
+
         {/* Footer Info */}
         <div className="mt-6 text-xs text-gray-500 border-t pt-3">
           <p>

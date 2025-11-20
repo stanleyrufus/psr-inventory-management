@@ -69,15 +69,49 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
             Purchase Order — {po.psr_po_number}
           </h2>
 
-          <div className="flex items-center gap-3">
-            
-            <button
-              onClick={handleClose}
-              className="text-gray-500 hover:text-gray-700 text-lg"
-            >
-              ✕
-            </button>
-          </div>
+<div className="flex items-center gap-3">
+
+  {/* EDIT BUTTON */}
+  <button
+    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
+    onClick={() => navigate(`/purchase-orders/edit/${po.id}`)}
+  >
+    ✏️ Edit
+  </button>
+
+  {/* DELETE BUTTON */}
+  <button
+    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm"
+    onClick={async () => {
+      if (!window.confirm(`Delete PO "${po.psr_po_number}" permanently?`)) return;
+
+      try {
+        await axios.delete(`${BASE}/api/purchase_orders/${po.id}`);
+        alert("✅ Purchase Order deleted");
+
+        // Close modal and refresh list
+        if (onClose) {
+          onClose();
+        } else {
+          navigate("/purchase-orders");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Error deleting Purchase Order");
+      }
+    }}
+  >
+    🗑 Delete
+  </button>
+
+  {/* CLOSE BUTTON */}
+  <button
+    onClick={handleClose}
+    className="text-gray-500 hover:text-gray-700 text-lg"
+  >
+    ✕
+  </button>
+</div>
         </div>
 
         {/* Top Meta */}

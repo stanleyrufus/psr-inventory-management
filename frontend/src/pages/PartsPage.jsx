@@ -102,6 +102,23 @@ export default function PartsPage() {
     }
   };
 
+useEffect(() => {
+  const editListener = (e) => {
+    setEditingPart(e.detail);
+    setShowForm(true);
+  };
+  const reloadListener = () => loadParts();
+
+  window.addEventListener("edit-part", editListener);
+  window.addEventListener("reload-parts", reloadListener);
+
+  return () => {
+    window.removeEventListener("edit-part", editListener);
+    window.removeEventListener("reload-parts", reloadListener);
+  };
+}, []);
+
+
   /*************************************
    ✅ CELL RENDERERS
   *************************************/
@@ -198,7 +215,6 @@ export default function PartsPage() {
 
     { headerName: "Status", field: "status", width: 110, cellRenderer: StatusRenderer },
 
-    { headerName: "Actions", width: 170, cellRenderer: ActionsRenderer },
   ];
 
   return (

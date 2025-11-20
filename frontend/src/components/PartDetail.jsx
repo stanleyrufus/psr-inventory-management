@@ -5,8 +5,9 @@ export default function PartDetail({ part, onClose }) {
 
   const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
   const imageUrl = part.image_url
-    ? `${BASE}${part.image_url?.startsWith("/") ? part.image_url : `/uploads/parts/${part.image_url}`}`
-    : null;
+  ? `${BASE}${part.image_url.startsWith("/") ? part.image_url : `/uploads/parts/${part.image_url}`}`
+  : null;
+
 
   const [zoom, setZoom] = useState(false);
 
@@ -112,6 +113,43 @@ export default function PartDetail({ part, onClose }) {
           <h3 className="font-semibold text-gray-800 mb-1">Remarks</h3>
           <p className="text-gray-600 text-sm whitespace-pre-line">{part.remarks || "—"}</p>
         </div>
+{/* ⭐ ACTION BUTTONS: Edit + Delete */}
+<div className="mt-6 flex gap-3 border-t pt-4">
+  <button
+    className="bg-blue-600 text-white px-4 py-2 rounded text-sm"
+    onClick={() => {
+      onClose();              // close the detail modal
+      window.dispatchEvent(
+        new CustomEvent("edit-part", { detail: part })
+      );
+    }}
+  >
+    ✏️ Edit Part
+  </button>
+
+  <button
+    className="bg-red-600 text-white px-4 py-2 rounded text-sm"
+    onClick={() => {
+      if (!window.confirm("Delete this part permanently?")) return;
+
+      fetch(`${import.meta.env.VITE_API_URL}/api/parts/${part.part_id}`, {
+        method: "DELETE",
+      })
+        .then(() => {
+          alert("Deleted successfully.");
+          onClose();
+          window.dispatchEvent(new Event("reload-parts"));
+        })
+        .catch((err) => {
+          console.error(err);
+          alert("Delete failed.");
+        });
+    }}
+  >
+    🗑 Delete
+  </button>
+</div>
+
 
         {/* Footer */}
         <div className="mt-6 text-xs text-gray-500 border-t pt-3">

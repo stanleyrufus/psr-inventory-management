@@ -94,15 +94,43 @@ export default function VendorsPage() {
     }
   }, []);
 
+// Allow VendorDetails modal to trigger Edit/Delete
+window.__openVendorEdit = (vendor) => {
+  setEditingVendor(vendor);
+  setShowForm(true);
+};
+
+window.__deleteVendor = async (id, name) => {
+  if (!window.confirm(`Delete vendor "${name}" permanently?`)) return;
+  try {
+    await deleteVendor(id);
+    alert("Vendor deleted");
+    loadVendors();
+  } catch (err) {
+    console.error(err);
+    alert("Delete failed");
+  }
+};
+
+
   /* ---------------- AG Grid columns ---------------- */
   const columnDefs = useMemo(
     () => [
       {
-        headerName: "Vendor Name",
-        field: "vendor_name",
-        flex: 1.2,
-        sortable: true,
-      },
+  headerName: "Vendor Name",
+  field: "vendor_name",
+  flex: 1.2,
+  sortable: true,
+  cellRenderer: (params) => (
+    <span
+      className="text-blue-700 hover:underline cursor-pointer"
+      onClick={() => setViewingVendor(params.data)}
+    >
+      {params.value}
+    </span>
+  ),
+},
+
       { headerName: "Contact", field: "contact_name", flex: 1 },
       { headerName: "Phone", field: "phone", flex: 1 },
       { headerName: "Email", field: "email", flex: 1.2 },
@@ -135,35 +163,7 @@ export default function VendorsPage() {
           );
         },
       },
-      {
-        headerName: "Actions",
-        flex: 1,
-        cellRenderer: (p) => {
-          const v = p.data;
-          return (
-            <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-              <button
-                className="text-blue-600 hover:underline text-sm"
-                onClick={() => onView(v)}
-              >
-                View
-              </button>
-              <button
-                className="text-gray-700 hover:underline text-sm"
-                onClick={() => onEdit(v)}
-              >
-                Edit
-              </button>
-              <button
-                className="text-red-600 hover:underline text-sm"
-                onClick={() => onDelete(v)}
-              >
-                Delete
-              </button>
-            </div>
-          );
-        },
-      },
+      
     ],
     [onView, onEdit, onDelete]
   );
