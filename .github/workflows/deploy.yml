@@ -18,37 +18,36 @@ jobs:
         uses: webfactory/ssh-agent@v0.7.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Deploy to VPS
+            
+            - name:Deploy to VPS
         run: |
           ssh -o StrictHostKeyChecking=no \
           -p ${{ secrets.SSH_PORT }} \
           ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
 
-          echo "🚀 Pulling latest code"
           cd /var/www/psr-inventory-management
-          git pull origin main
 
-          echo "📦 Backend: Install all deps"
+          echo "📦 Backend: Install dependencies"
           cd backend
-          npm install
+          npm install --omit=dev
 
-          echo "🛠 Running migrations (if any)"
+          echo "🛠 Run backend migrations"
           npm run migrate || true
 
-          echo "🔁 Restart backend with PM2"
+          echo "🔁 Restart backend"
           pm2 restart psr-backend || pm2 start index.js --name psr-backend
 
-          echo "📦 Frontend: Install deps"
-          cd ../frontend
-          npm install
+          echo "📦 Frontend: Install dependencies"
+          cd /var/www/psr-inventory-management/frontend
+          npm install --omit=dev
 
-          echo "🏗️ Building frontend (vite)"
+          echo "🏗️ Building frontend"
           NODE_OPTIONS="--max-old-space-size=2048" npm run build
 
-          echo "🧹 Replacing dist folder"
+          echo "🧹 Deploy frontend dist"
           rm -rf /var/www/psr-inventory-management/frontend/dist
-          mv dist /var/www/psr-inventory-management/frontend/dist
+          mv /var/www/psr-inventory-management/frontend/dist_deploy/dist \
+             /var/www/psr-inventory-management/frontend/dist
 
           echo "🎉 Deployment complete!"
           EOF
