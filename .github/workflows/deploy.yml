@@ -38,13 +38,13 @@ jobs:
           overwrite: true
 
       - name: Restart Services on VPS
-  uses: appleboy/ssh-action@v1.0.3
-  with:
-    host: ${{ secrets.SSH_HOST }}
-    username: ${{ secrets.SSH_USER }}
-    key: ${{ secrets.SSH_PRIVATE_KEY }}
-    port: ${{ secrets.SSH_PORT }}
-    script: |
-      cd /var/www/psr-inventory-management/backend
-      pm2 restart all || pm2 start server.js --name psr-backend
-      /usr/sbin/nginx -s reload
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            cd /var/www/psr-inventory-management/backend
+            pm2 restart all || pm2 start server.js --name psr-backend
+            /usr/sbin/nginx -s reload
