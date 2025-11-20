@@ -64,3 +64,5 @@ jobs:
             npm install --omit=dev
             pm2 restart psr-backend || pm2 start index.js --name psr-backend
             sudo systemctl restart nginx
+            deploy ALL=(ALL) NOPASSWD: /bin/systemctl restart nginx, /bin/systemctl reload nginx
+
