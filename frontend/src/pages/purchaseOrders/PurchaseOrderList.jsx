@@ -17,6 +17,7 @@ export default function PurchaseOrderList() {
   const navigate = useNavigate();
 
   const [orders, setOrders] = useState([]);
+const [viewingOrder, setViewingOrder] = useState(null);
   const [rfqStatusMap, setRfqStatusMap] = useState({});
   const [search, setSearch] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("");
@@ -126,6 +127,31 @@ export default function PurchaseOrderList() {
       width: 160,
       valueFormatter: (p) => (p.value ? new Date(p.value).toLocaleDateString() : "-"),
     },
+{
+  headerName: "Status",
+  field: "status",
+  width: 120,
+  cellRenderer: (params) => {
+    const s = params.value;
+    const color =
+      s === "Draft"
+        ? "bg-yellow-100 text-yellow-800"
+        : s === "Sent"
+        ? "bg-blue-100 text-blue-800"
+        : s === "Closed"
+        ? "bg-green-100 text-green-800"
+        : s === "Cancelled"
+        ? "bg-red-100 text-red-800"
+        : "bg-gray-100 text-gray-800";
+
+    return (
+      <span className={`px-2 py-1 rounded text-xs font-semibold ${color}`}>
+        {s || "-"}
+      </span>
+    );
+  },
+},
+
     
     {
       headerName: "RFQ",

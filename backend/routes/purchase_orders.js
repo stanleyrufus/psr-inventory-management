@@ -106,11 +106,11 @@ router.get("/status/monthly", async (req, res) => {
   }
 });
 
-//
+
 // =============================================
 //  CREATE PO
 // =============================================
-//
+
 
 // CHECK duplicate number (supports edit mode)
 router.get("/check-number/:psr_po_number", async (req, res) => {
@@ -129,28 +129,99 @@ router.get("/check-number/:psr_po_number", async (req, res) => {
   }
 });
 
+// =============================================
+//  CREATE PO  (supports Draft mode)
+// =============================================
 router.post("/", async (req, res) => {
   const body = req.body || {};
   const {
-    psr_po_number, order_date, expected_delivery_date, created_by, vendor_id,
-    payment_method, payment_terms, currency, remarks, tax_percent,
-    shipping_charges, subtotal, tax_amount, grand_total, status = "Draft", items = [],
+    psr_po_number,
+    order_date,
+    expected_delivery_date,
+    created_by,
+    vendor_id,
+    payment_method,
+    payment_terms,
+    currency,
+    remarks,
+    tax_percent,
+    shipping_charges,
+    subtotal,
+    tax_amount,
+    grand_total,
+    status = "Draft",
+    items = [],
   } = body;
+
+  // ======================================================
+  // ⭐ 1. DRAFT MODE (NO VALIDATION, NO ITEMS REQUIRED)
+  // ======================================================
+  if (status === "Draft") {
+    if (!psr_po_number) {
+      return res.status(400).json({
+        success: 0,
+        errormsg: "PO Number is required to save draft.",
+      });
+    }
+
+    try {
+      const inserted = await db("purchase_orders")
+        .insert({
+          psr_po_number,
+          status: "Draft",
+          remarks: remarks || null,
+          created_by: created_by || null,
+          vendor_id: vendor_id || null,
+          order_date: normalizeDate(order_date),
+          expected_delivery_date: normalizeDate(expected_delivery_date),
+          subtotal: 0,
+          tax_amount: 0,
+          grand_total: 0,
+          created_at: db.fn.now(),
+          updated_at: db.fn.now(),
+        })
+        .returning(["id"]);
+
+      return res.json({
+        success: 1,
+        po_id: inserted[0].id,
+        draft: true,
+        message: "Draft saved successfully.",
+      });
+    } catch (err) {
+      console.error("❌ Draft save error:", err);
+      return res.status(500).json({
+        success: 0,
+        errormsg: "Failed to save draft.",
+      });
+    }
+  }
+
+  // ======================================================
+  // ⭐ 2. NORMAL CREATE PO MODE (FULL VALIDATION)
+  // ======================================================
 
   if (!psr_po_number || !vendor_id || !created_by) {
     return res.status(400).json({
       success: 0,
-      errormsg: "Missing required fields: psr_po_number, vendor_id, or created_by.",
+      errormsg:
+        "Missing required fields: psr_po_number, vendor_id, created_by.",
     });
   }
 
-  if (!items.length) return res.status(400).json({ success: 0, errormsg: "At least one item is required" });
+  if (!items.length) {
+    return res.status(400).json({
+      success: 0,
+      errormsg: "At least one item is required.",
+    });
+  }
 
+  // Duplicate check (normal create only)
   const exists = await db("purchase_orders").where({ psr_po_number }).first();
   if (exists) {
     return res.status(400).json({
       success: 0,
-      errormsg: "PO Number already exists. Please use a unique PO Number.",
+      errormsg: "PO Number already exists. Use a unique number.",
     });
   }
 
@@ -187,18 +258,21 @@ router.post("/", async (req, res) => {
       part_id: item.part_id || item.partId,
       quantity: item.quantity,
       unit_price: item.unit_price || item.unitPrice,
-      total_price: (item.quantity || 0) * (item.unit_price || item.unitPrice || 0),
+      total_price:
+        (item.quantity || 0) * (item.unit_price || item.unitPrice || 0),
     }));
 
     await trx("purchase_order_items").insert(itemsToInsert);
 
     await trx.commit();
+
     res.json({ success: 1, po_id });
   } catch (err) {
     await trx.rollback();
     res.status(500).json({ success: 0, errormsg: err.message });
   }
 });
+
 
 //
 // =============================================

@@ -16,6 +16,7 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
     state: "",
     country: "",
     postal_code: "",
+    fax: "",
     website: "",
     remarks: "",
     is_active: true,
@@ -24,9 +25,9 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [fadeOut, setFadeOut] = useState(false); // ✅ for animation control
+  const [fadeOut, setFadeOut] = useState(false);
 
-  // ✅ preload existing vendor for edit
+  // preload edit values
   useEffect(() => {
     if (safeInitial && Object.keys(safeInitial).length > 0) {
       setFormData((prev) => ({
@@ -41,6 +42,7 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
         state: safeInitial.state ?? prev.state,
         country: safeInitial.country ?? prev.country,
         postal_code: safeInitial.postal_code ?? prev.postal_code,
+        fax: safeInitial.fax ?? prev.fax,
         website: safeInitial.website ?? prev.website,
         remarks: safeInitial.remarks ?? prev.remarks,
         is_active:
@@ -62,12 +64,14 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
   const validate = () => {
     const newErrors = {};
     if (!formData.vendor_name.trim()) newErrors.vendor_name = "Required";
+
     if (
       formData.email &&
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)
     ) {
       newErrors.email = "Invalid email";
     }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -98,13 +102,9 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
         setMessage(res.message || "✅ Vendor saved successfully.");
         setIsSubmitted(true);
         setFadeOut(false);
-
-        // ✅ trigger fade-out after 3 seconds only for success messages
         setTimeout(() => setFadeOut(true), 3000);
-
-        // ✅ Close modal and refresh dashboard/vendor list
         setTimeout(() => {
-          if (typeof onSaved === "function") onSaved();
+          if (onSaved) onSaved();
         }, 800);
       } else {
         setMessage(res.message || "⚠️ Vendor already exists or not saved.");
@@ -112,26 +112,21 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
       }
       scrollTop();
     } catch (err) {
-      console.error("❌ Error saving vendor:", err);
-      setMessage(
-        err.response?.data?.message ||
-          "❌ Error saving vendor. Please try again."
-      );
+      console.error("❌ Error:", err);
+      setMessage("❌ Error saving vendor.");
       setFadeOut(false);
       scrollTop();
     }
   };
 
-  const handleClose = () => {
-    if (typeof onCancel === "function") onCancel();
-  };
+  const handleClose = () => onCancel?.();
 
   return (
     <form
       onSubmit={handleSubmit}
       className="space-y-3 bg-white p-4 rounded-lg shadow-md max-h-[80vh] overflow-y-auto relative"
     >
-      {/* top-right close icon */}
+      {/* close button */}
       <button
         type="button"
         onClick={handleClose}
@@ -162,56 +157,45 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
         </div>
       )}
 
+      {/* FORM GRID */}
       <div className="grid grid-cols-2 gap-3">
+
         <label className="flex flex-col">
-          <span className="text-sm font-medium text-gray-700 mb-1">
-            Vendor Name <span className="text-red-500">*</span>
-          </span>
+          <span className="text-sm font-medium">Vendor Name *</span>
           <input
             name="vendor_name"
             value={formData.vendor_name}
             onChange={handleChange}
-            placeholder="Vendor Name"
             className={`border p-2 rounded ${
               errors.vendor_name ? "border-red-500 animate-pulse" : ""
             }`}
           />
-          {errors.vendor_name && (
-            <span className="text-xs text-red-500">{errors.vendor_name}</span>
-          )}
         </label>
 
         <label className="flex flex-col">
-          <span className="text-sm font-medium text-gray-700 mb-1">
-            Contact Name
-          </span>
+          <span className="text-sm font-medium">Contact Name</span>
           <input
             name="contact_name"
             value={formData.contact_name}
             onChange={handleChange}
-            placeholder="Contact Person"
             className="border p-2 rounded"
           />
         </label>
 
-        <label className="flex flex-col">
-          <span className="text-sm font-medium text-gray-700 mb-1">Phone</span>
-          <input
-            name="phone"
-            value={formData.phone}
-            onChange={handleChange}
-            placeholder="Phone Number"
-            className="border p-2 rounded"
-          />
-        </label>
+        <input
+          name="phone"
+          value={formData.phone}
+          onChange={handleChange}
+          placeholder="Phone"
+          className="border p-2 rounded"
+        />
 
         <label className="flex flex-col">
-          <span className="text-sm font-medium text-gray-700 mb-1">Email</span>
+          <span className="text-sm font-medium">Email</span>
           <input
             name="email"
             value={formData.email}
             onChange={handleChange}
-            placeholder="Email Address"
             className={`border p-2 rounded ${
               errors.email ? "border-red-500 animate-pulse" : ""
             }`}
@@ -222,12 +206,45 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
         </label>
 
         <input
+          name="fax"
+          value={formData.fax}
+          onChange={handleChange}
+          placeholder="Fax"
+          className="border p-2 rounded"
+        />
+
+        <input
+          name="website"
+          value={formData.website}
+          onChange={handleChange}
+          placeholder="Website"
+          className="border p-2 rounded"
+        />
+
+        <input
+          name="address1"
+          value={formData.address1}
+          onChange={handleChange}
+          placeholder="Address Line 1"
+          className="border p-2 rounded col-span-2"
+        />
+
+        <input
+          name="address2"
+          value={formData.address2}
+          onChange={handleChange}
+          placeholder="Address Line 2"
+          className="border p-2 rounded col-span-2"
+        />
+
+        <input
           name="city"
           value={formData.city}
           onChange={handleChange}
           placeholder="City"
           className="border p-2 rounded"
         />
+
         <input
           name="state"
           value={formData.state}
@@ -235,6 +252,7 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
           placeholder="State"
           className="border p-2 rounded"
         />
+
         <input
           name="country"
           value={formData.country}
@@ -242,6 +260,7 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
           placeholder="Country"
           className="border p-2 rounded"
         />
+
         <input
           name="postal_code"
           value={formData.postal_code}
