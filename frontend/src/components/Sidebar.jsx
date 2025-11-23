@@ -23,7 +23,7 @@ export default function Sidebar() {
     <aside className="w-64 bg-psr-primary text-white flex flex-col h-screen overflow-hidden">
 
       {/* ⭐ REDUCED HEADER HEIGHT */}
-      <div className="px-5 py-4 border-b border-white/10 shrink-1">
+      <div className="px-5 py-4 border-b border-white/10 shrink-0">
         <div className="text-lg font-bold">PSR Automation Inc.</div>
         
       </div>

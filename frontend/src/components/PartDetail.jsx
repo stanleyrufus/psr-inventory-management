@@ -5,9 +5,8 @@ export default function PartDetail({ part, onClose }) {
 
   const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
   const imageUrl = part.image_url
-  ? `${BASE}${part.image_url.startsWith("/") ? part.image_url : `/uploads/parts/${part.image_url}`}`
-  : null;
-
+    ? `${BASE}${part.image_url.startsWith("/") ? part.image_url : `/uploads/parts/${part.image_url}`}`
+    : null;
 
   const [zoom, setZoom] = useState(false);
 
@@ -16,13 +15,53 @@ export default function PartDetail({ part, onClose }) {
       {/* Main container */}
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl p-6 relative overflow-y-auto max-h-[90vh]">
 
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-xl"
-        >
-          ✕
-        </button>
+        {/* ⭐ TOP RIGHT ACTION BAR */}
+        <div className="absolute top-3 right-3 flex items-center gap-2">
+          
+          {/* Edit */}
+          <button
+            className="bg-blue-600 text-white px-3 py-1 rounded text-xs"
+            onClick={() => {
+              onClose();
+              window.dispatchEvent(
+                new CustomEvent("edit-part", { detail: part })
+              );
+            }}
+          >
+            ✏️ Edit
+          </button>
+
+          {/* Delete */}
+          <button
+            className="bg-red-600 text-white px-3 py-1 rounded text-xs"
+            onClick={() => {
+              if (!window.confirm("Delete this part permanently?")) return;
+
+              fetch(`${import.meta.env.VITE_API_URL}/api/parts/${part.part_id}`, {
+                method: "DELETE",
+              })
+                .then(() => {
+                  alert("Deleted successfully.");
+                  onClose();
+                  window.dispatchEvent(new Event("reload-parts"));
+                })
+                .catch((err) => {
+                  console.error(err);
+                  alert("Delete failed.");
+                });
+            }}
+          >
+            🗑 Delete
+          </button>
+
+          {/* Close */}
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-800 text-xl font-bold px-2"
+          >
+            ✕
+          </button>
+        </div>
 
         {/* Title */}
         <h2 className="text-2xl font-semibold text-gray-800 mb-5 pr-8">
@@ -32,7 +71,7 @@ export default function PartDetail({ part, onClose }) {
         {/* Image + Info Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
 
-          {/* ✅ Image Block */}
+          {/* Image */}
           <div className="flex flex-col items-center gap-3">
             {imageUrl ? (
               <>
@@ -56,7 +95,7 @@ export default function PartDetail({ part, onClose }) {
             )}
           </div>
 
-          {/* ✅ Primary Info */}
+          {/* Info */}
           <div className="md:col-span-2 grid grid-cols-2 gap-4 text-sm">
             <Detail label="Part Number" value={part.part_number} />
             <Detail label="Category" value={part.category} />
@@ -113,52 +152,15 @@ export default function PartDetail({ part, onClose }) {
           <h3 className="font-semibold text-gray-800 mb-1">Remarks</h3>
           <p className="text-gray-600 text-sm whitespace-pre-line">{part.remarks || "—"}</p>
         </div>
-{/* ⭐ ACTION BUTTONS: Edit + Delete */}
-<div className="mt-6 flex gap-3 border-t pt-4">
-  <button
-    className="bg-blue-600 text-white px-4 py-2 rounded text-sm"
-    onClick={() => {
-      onClose();              // close the detail modal
-      window.dispatchEvent(
-        new CustomEvent("edit-part", { detail: part })
-      );
-    }}
-  >
-    ✏️ Edit Part
-  </button>
 
-  <button
-    className="bg-red-600 text-white px-4 py-2 rounded text-sm"
-    onClick={() => {
-      if (!window.confirm("Delete this part permanently?")) return;
-
-      fetch(`${import.meta.env.VITE_API_URL}/api/parts/${part.part_id}`, {
-        method: "DELETE",
-      })
-        .then(() => {
-          alert("Deleted successfully.");
-          onClose();
-          window.dispatchEvent(new Event("reload-parts"));
-        })
-        .catch((err) => {
-          console.error(err);
-          alert("Delete failed.");
-        });
-    }}
-  >
-    🗑 Delete
-  </button>
-</div>
-
-
-        {/* Footer */}
+        {/* Footer timestamps */}
         <div className="mt-6 text-xs text-gray-500 border-t pt-3">
           <p><span className="font-medium">Created On:</span> {part.created_on ? new Date(part.created_on).toLocaleString() : "—"}</p>
           <p><span className="font-medium">Updated On:</span> {part.updated_on ? new Date(part.updated_on).toLocaleString() : "—"}</p>
         </div>
       </div>
 
-      {/* ✅ Zoom Overlay */}
+      {/* Fullscreen Zoom */}
       {zoom && imageUrl && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[999]">
           <img src={imageUrl} className="max-w-[90vw] max-h-[90vh] rounded shadow-lg" />

@@ -102,33 +102,61 @@ if (img) {
       return;
     }
 
+
     try {
+// Normalize numeric fields: convert "" → null
+// 🔥 Create safe copy so React state isn't mutated
+const cleanData = { ...formData };
+
+// Normalize numeric fields safely
+const numericFields = [
+  "quantity_on_hand",
+  "minimum_stock_level",
+  "current_unit_price",
+  "lead_time_days",
+  "weight_kg"
+];
+
+numericFields.forEach((key) => {
+  if (cleanData[key] === "" || cleanData[key] === undefined) {
+    cleanData[key] = null;
+  } else {
+    cleanData[key] = Number(cleanData[key]);
+  }
+});
+
+
       let res;
 
       // --------------------------
-      // CASE 1: Image upload
-      // --------------------------
-      if (imageFile) {
-        const fd = new FormData();
-        Object.entries(formData).forEach(([key, value]) => {
-          fd.append(key, value ?? "");
-        });
-        fd.append("image", imageFile);
+// CASE 1: Image upload
+// --------------------------
+if (imageFile) {
+  const fd = new FormData();
+ Object.entries(cleanData).forEach(([key, value]) => {
+  fd.append(key, value ?? "");
+});
 
-        const url = safeInitial?.part_id
-          ? `/parts/${safeInitial.part_id}` // PUT
-          : `/parts`; // POST
+  fd.append("image", imageFile);
 
-        res = await apiRaw.put(url, fd, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-      }
+  if (safeInitial?.part_id) {
+    // EDIT → PUT /api/parts/:id
+    res = await apiRaw.put(`/parts/${safeInitial.part_id}`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  } else {
+    // ADD → POST /api/parts
+    res = await apiRaw.post(`/parts`, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  }
+}
 
-      // --------------------------
+     // --------------------------
       // CASE 2: NO image (normal JSON)
       // --------------------------
       else {
-        const payload = { ...formData };
+const payload = { ...cleanData };
         delete payload.unit_price;
 
         if (safeInitial?.part_id) {
@@ -142,11 +170,14 @@ if (img) {
       onSaved && onSaved();
     } catch (err) {
       console.error("❌ Error saving part:", err);
-      alert(
-        `Failed to save part: ${
-          err.response?.data?.message || err.message
-        }`
-      );
+      const msg =
+  err?.response?.data?.message ||
+  err?.response?.data?.error ||
+  err.message;
+
+alert(`❌ ${msg}`);
+return;
+
     }
   };
 

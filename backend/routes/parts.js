@@ -27,8 +27,6 @@ router.get("/low-stock", async (req, res) => {
   }
 });
 
-
-
 // ✅ Update minimum stock level for a part
 router.put("/min-level/:id", async (req, res) => {
   try {
