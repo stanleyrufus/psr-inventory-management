@@ -15,16 +15,18 @@ export const AuthProvider = ({ children }) => {
     }
   });
 
-  const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  // ✅ Normalize BASE — remove trailing slash
+  const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000")
+    .replace(/\/$/, "");
 
   const login = async (username, password) => {
     try {
+      // ✅ This will now always become: http://<server>:5000/api/users/login
       const res = await axios.post(`${BASE}/api/users/login`, {
         username,
         password,
       });
 
-      // unified extraction
       const userData = res.data.user;
       const token = res.data.token;
 
@@ -32,7 +34,6 @@ export const AuthProvider = ({ children }) => {
         throw new Error("Invalid login response");
       }
 
-      // ensure permissions array always exists
       const normalizedUser = {
         ...userData,
         permissions: Array.isArray(userData.permissions)
@@ -41,7 +42,6 @@ export const AuthProvider = ({ children }) => {
       };
 
       setUser(normalizedUser);
-
       localStorage.setItem("user", JSON.stringify(normalizedUser));
       localStorage.setItem("token", token);
 

@@ -7,12 +7,13 @@ import api, { apiRaw } from "../../utils/api";
 export default function PartForm({ initial = {}, onSaved, onCancel }) {
   const safeInitial = initial || {};
 
+  const [vendors, setVendors] = useState([]);
+
   const [formData, setFormData] = useState({
     part_number: "",
-    part_name: "",
+    part_name: safeInitial.part_name || "", // 👉 REMOVED from UI but kept for backend
     category: "",
     description: "",
-    uom: "",
     quantity_on_hand: "",
     minimum_stock_level: "",
     current_unit_price: "",
@@ -20,7 +21,6 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
     location: "",
     status: "Active",
     lead_time_days: "",
-    weight_kg: "",
     material: "",
     last_po_date: "",
     remarks: "",
@@ -29,6 +29,21 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
   const [imageFile, setImageFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(safeInitial.image_url || null);
   const [errors, setErrors] = useState({});
+
+  // ----------------------------
+  // Load Vendors
+  // ----------------------------
+  useEffect(() => {
+    async function loadVendors() {
+      try {
+        const res = await apiRaw.get("/vendors");
+        setVendors(res.data || []);
+      } catch (err) {
+        console.error("Vendor load error:", err);
+      }
+    }
+    loadVendors();
+  }, []);
 
   // ----------------------------------------------------
   // Load initial data into form
@@ -41,7 +56,6 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
         part_name: safeInitial.part_name ?? prev.part_name,
         category: safeInitial.category ?? prev.category,
         description: safeInitial.description ?? prev.description,
-        uom: safeInitial.uom ?? prev.uom,
         quantity_on_hand: safeInitial.quantity_on_hand ?? prev.quantity_on_hand,
         minimum_stock_level:
           safeInitial.minimum_stock_level ?? prev.minimum_stock_level,
@@ -51,30 +65,26 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
         location: safeInitial.location ?? prev.location,
         status: safeInitial.status ?? prev.status,
         lead_time_days: safeInitial.lead_time_days ?? prev.lead_time_days,
-        weight_kg: safeInitial.weight_kg ?? prev.weight_kg,
         material: safeInitial.material ?? prev.material,
         last_po_date: safeInitial.last_po_date ?? prev.last_po_date,
         remarks: safeInitial.remarks ?? prev.remarks,
       }));
 
-// 🔥 FIX: Always normalize to a proper absolute URL
-const img = safeInitial.image_url;
-if (img) {
-  const base = BASE.replace(/\/$/, "");
-  const normalized = img.startsWith("/")
-    ? `${base}${img}`
-    : `${base}/${img}`;
-
-  setPreviewUrl(normalized);
-} else {
-  setPreviewUrl(null);
-}
-
+      const img = safeInitial.image_url;
+      if (img) {
+        const base = BASE.replace(/\/$/, "");
+        const normalized = img.startsWith("/")
+          ? `${base}${img}`
+          : `${base}/${img}`;
+        setPreviewUrl(normalized);
+      } else {
+        setPreviewUrl(null);
+      }
     }
   }, [safeInitial]);
 
   // ----------------------------------------------------
-  // Update preview on image select
+  // Preview image
   // ----------------------------------------------------
   useEffect(() => {
     if (imageFile) setPreviewUrl(URL.createObjectURL(imageFile));
@@ -87,14 +97,13 @@ if (img) {
   };
 
   // ----------------------------------------------------
-  // Submit handler (fixed)
+  // Submit handler
   // ----------------------------------------------------
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     const newErrors = {};
     if (!formData.part_number.trim()) newErrors.part_number = "Required";
-    if (!formData.part_name.trim()) newErrors.part_name = "Required";
 
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) {
@@ -102,61 +111,44 @@ if (img) {
       return;
     }
 
-
     try {
-// Normalize numeric fields: convert "" → null
-// 🔥 Create safe copy so React state isn't mutated
-const cleanData = { ...formData };
+      const cleanData = { ...formData };
 
-// Normalize numeric fields safely
-const numericFields = [
-  "quantity_on_hand",
-  "minimum_stock_level",
-  "current_unit_price",
-  "lead_time_days",
-  "weight_kg"
-];
+      const numericFields = [
+        "quantity_on_hand",
+        "minimum_stock_level",
+        "current_unit_price",
+        "lead_time_days",
+      ];
 
-numericFields.forEach((key) => {
-  if (cleanData[key] === "" || cleanData[key] === undefined) {
-    cleanData[key] = null;
-  } else {
-    cleanData[key] = Number(cleanData[key]);
-  }
-});
-
+      numericFields.forEach((key) => {
+        if (cleanData[key] === "" || cleanData[key] === undefined) {
+          cleanData[key] = null;
+        } else {
+          cleanData[key] = Number(cleanData[key]);
+        }
+      });
 
       let res;
 
-      // --------------------------
-// CASE 1: Image upload
-// --------------------------
-if (imageFile) {
-  const fd = new FormData();
- Object.entries(cleanData).forEach(([key, value]) => {
-  fd.append(key, value ?? "");
-});
+      if (imageFile) {
+        const fd = new FormData();
+        Object.entries(cleanData).forEach(([key, value]) =>
+          fd.append(key, value ?? "")
+        );
+        fd.append("image", imageFile);
 
-  fd.append("image", imageFile);
-
-  if (safeInitial?.part_id) {
-    // EDIT → PUT /api/parts/:id
-    res = await apiRaw.put(`/parts/${safeInitial.part_id}`, fd, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-  } else {
-    // ADD → POST /api/parts
-    res = await apiRaw.post(`/parts`, fd, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-  }
-}
-
-     // --------------------------
-      // CASE 2: NO image (normal JSON)
-      // --------------------------
-      else {
-const payload = { ...cleanData };
+        if (safeInitial?.part_id) {
+          res = await apiRaw.put(`/parts/${safeInitial.part_id}`, fd, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+        } else {
+          res = await apiRaw.post(`/parts`, fd, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+        }
+      } else {
+        const payload = { ...cleanData };
         delete payload.unit_price;
 
         if (safeInitial?.part_id) {
@@ -170,14 +162,26 @@ const payload = { ...cleanData };
       onSaved && onSaved();
     } catch (err) {
       console.error("❌ Error saving part:", err);
-      const msg =
-  err?.response?.data?.message ||
-  err?.response?.data?.error ||
-  err.message;
 
-alert(`❌ ${msg}`);
-return;
+      const rawMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err.message ||
+        "";
 
+      // -------------------------
+      // DUPLICATE HANDLING
+      // -------------------------
+      if (
+        rawMsg.toLowerCase().includes("duplicate") ||
+        rawMsg.toLowerCase().includes("unique") ||
+        rawMsg.toLowerCase().includes("violates")
+      ) {
+        alert("❌ Part number already exists.");
+        return;
+      }
+
+      alert(`❌ ${rawMsg}`);
     }
   };
 
@@ -185,7 +189,10 @@ return;
   // Render
   // ----------------------------------------------------
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 relative">
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-3 relative overflow-y-auto max-h-[80vh] p-2"
+    >
       <button
         type="button"
         onClick={onCancel}
@@ -221,6 +228,8 @@ return;
 
       {/* Form fields */}
       <div className="grid grid-cols-2 gap-3">
+
+        {/* Part Number */}
         <label className="flex flex-col">
           <span className="text-sm font-medium text-gray-700 mb-1">
             Part Number <span className="text-red-500">*</span>
@@ -236,140 +245,164 @@ return;
           />
         </label>
 
+        {/* Category Dropdown */}
         <label className="flex flex-col">
           <span className="text-sm font-medium text-gray-700 mb-1">
-            Part Name <span className="text-red-500">*</span>
+            Category
           </span>
-          <input
-            name="part_name"
-            value={formData.part_name}
+          <select
+            name="category"
+            value={formData.category}
             onChange={handleChange}
-            className={`border p-2 rounded ${
-              errors.part_name ? "border-red-500" : ""
-            }`}
-            required
+            className="border p-2 rounded"
+          >
+            <option value="">Select Category</option>
+            <option value="Electrical">Electrical</option>
+            <option value="Mechanical">Mechanical</option>
+          </select>
+        </label>
+
+        {/* Supplier Dropdown */}
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-gray-700 mb-1">
+            Supplier (Vendor)
+          </span>
+          <select
+            name="supplier_name"
+            value={formData.supplier_name}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          >
+            <option value="">Select Vendor</option>
+            {vendors.map((v) => (
+              <option key={v.vendor_id} value={v.vendor_name}>
+                {v.vendor_name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {/* Quantity */}
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-gray-700 mb-1">Quantity on Hand</span>
+          <input
+            name="quantity_on_hand"
+            type="number"
+            value={formData.quantity_on_hand}
+            onChange={handleChange}
+            className="border p-2 rounded"
           />
         </label>
 
-        <input
-          name="category"
-          value={formData.category}
-          onChange={handleChange}
-          placeholder="Category"
-          className="border p-2 rounded"
-        />
-        <input
-          name="uom"
-          value={formData.uom}
-          onChange={handleChange}
-          placeholder="UOM"
-          className="border p-2 rounded"
-        />
-        <input
-          name="quantity_on_hand"
-          type="number"
-          value={formData.quantity_on_hand}
-          onChange={handleChange}
-          placeholder="Quantity on Hand"
-          className="border p-2 rounded"
-        />
-        <input
-          name="minimum_stock_level"
-          type="number"
-          value={formData.minimum_stock_level}
-          onChange={handleChange}
-          placeholder="Minimum Stock"
-          className="border p-2 rounded"
-        />
+        {/* Minimum Stock */}
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-gray-700 mb-1">Minimum Stock Level</span>
+          <input
+            name="minimum_stock_level"
+            type="number"
+            value={formData.minimum_stock_level}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+        </label>
 
-        <input
-          name="current_unit_price"
-          type="number"
-          step="0.01"
-          value={formData.current_unit_price}
-          onChange={handleChange}
-          placeholder="Unit Price"
-          className="border p-2 rounded"
-        />
+        {/* Price */}
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-gray-700 mb-1">Unit Price</span>
+          <input
+            name="current_unit_price"
+            type="number"
+            step="0.01"
+            value={formData.current_unit_price}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+        </label>
 
-        <input
-          name="supplier_name"
-          value={formData.supplier_name}
-          onChange={handleChange}
-          placeholder="Supplier Name"
-          className="border p-2 rounded"
-        />
+        {/* Location */}
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-gray-700 mb-1">Location</span>
+          <input
+            name="location"
+            value={formData.location}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+        </label>
 
-        <input
-          name="location"
-          value={formData.location}
-          onChange={handleChange}
-          placeholder="Location"
-          className="border p-2 rounded"
-        />
+        {/* Lead Time */}
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-gray-700 mb-1">Lead Time (days)</span>
+          <input
+            name="lead_time_days"
+            type="number"
+            value={formData.lead_time_days}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+        </label>
 
-        <input
-          name="lead_time_days"
-          type="number"
-          value={formData.lead_time_days}
-          onChange={handleChange}
-          placeholder="Lead Time (days)"
-          className="border p-2 rounded"
-        />
+        {/* Material */}
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-gray-700 mb-1">Material</span>
+          <input
+            name="material"
+            value={formData.material}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+        </label>
 
-        <input
-          name="weight_kg"
-          type="number"
-          step="0.01"
-          value={formData.weight_kg}
-          onChange={handleChange}
-          placeholder="Weight (kg)"
-          className="border p-2 rounded"
-        />
+        {/* Last PO */}
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-gray-700 mb-1">Last PO Date</span>
+          <input
+            name="last_po_date"
+            type="date"
+            value={formData.last_po_date}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          />
+        </label>
 
-        <input
-          name="material"
-          value={formData.material}
-          onChange={handleChange}
-          placeholder="Material"
-          className="border p-2 rounded"
-        />
-
-        <input
-          name="last_po_date"
-          type="date"
-          value={formData.last_po_date}
-          onChange={handleChange}
-          className="border p-2 rounded"
-        />
-
-        <select
-          name="status"
-          value={formData.status}
-          onChange={handleChange}
-          className="border p-2 rounded"
-        >
-          <option>Active</option>
-          <option>Inactive</option>
-        </select>
+        {/* Status */}
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-gray-700 mb-1">Status</span>
+          <select
+            name="status"
+            value={formData.status}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          >
+            <option>Active</option>
+            <option>Inactive</option>
+          </select>
+        </label>
       </div>
 
-      <textarea
-        name="description"
-        value={formData.description}
-        onChange={handleChange}
-        placeholder="Description"
-        className="border p-2 rounded w-full"
-      />
+      {/* Description */}
+      <label className="flex flex-col">
+        <span className="text-sm font-medium text-gray-700 mb-1">Description</span>
+        <textarea
+          name="description"
+          value={formData.description}
+          onChange={handleChange}
+          className="border p-2 rounded w-full"
+        />
+      </label>
 
-      <textarea
-        name="remarks"
-        value={formData.remarks}
-        onChange={handleChange}
-        placeholder="Remarks"
-        className="border p-2 rounded w-full"
-      />
+      {/* Remarks */}
+      <label className="flex flex-col">
+        <span className="text-sm font-medium text-gray-700 mb-1">Remarks</span>
+        <textarea
+          name="remarks"
+          value={formData.remarks}
+          onChange={handleChange}
+          className="border p-2 rounded w-full"
+        />
+      </label>
 
+      {/* Buttons */}
       <div className="flex justify-end gap-2 pt-3">
         <button
           type="button"

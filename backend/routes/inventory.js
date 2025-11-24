@@ -28,6 +28,78 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
+/* ========================================================
+   DASHBOARD-RELATED ROUTES  (MUST BE BEFORE "/:id")
+   /api/parts/count
+   /api/parts/low-stock/count
+   /api/parts/low-stock
+   /api/parts/trend/monthly
+======================================================== */
+
+// Total parts count
+router.get("/count", async (req, res) => {
+  try {
+    const [{ count }] = await db("inventory").count("* as count");
+    res.json({ count: Number(count) });
+  } catch (err) {
+    console.error("❌ parts/count error:", err);
+    res.status(500).json({ message: "Failed to fetch parts count" });
+  }
+});
+
+// Low stock count
+router.get("/low-stock/count", async (req, res) => {
+  try {
+    const [{ count }] = await db("inventory")
+      .whereRaw('"quantity_on_hand" < "minimum_stock_level"')
+      .count("* as count");
+
+    res.json({ count: Number(count) });
+  } catch (err) {
+    console.error("❌ low-stock/count error:", err);
+    res.status(500).json({ message: "Failed to fetch low stock count" });
+  }
+});
+
+// Low stock list
+router.get("/low-stock", async (req, res) => {
+  const limit = Number(req.query.limit) || 10;
+
+  try {
+    const rows = await db("inventory")
+      .whereRaw('"quantity_on_hand" < "minimum_stock_level"')
+      .orderBy("quantity_on_hand", "asc")
+      .limit(limit);
+
+    res.json({ data: rows });
+  } catch (err) {
+    console.error("❌ low-stock error:", err);
+    res.status(500).json({ message: "Failed to fetch low stock list" });
+  }
+});
+
+// Inventory trend by month
+router.get("/trend/monthly", async (req, res) => {
+  const months = Number(req.query.months) || 6;
+
+  try {
+    const rows = await db.raw(`
+      SELECT 
+        to_char(date_trunc('month', created_on), 'YYYY-MM') AS ym,
+        COUNT(*) 
+      FROM inventory
+      WHERE created_on >= NOW() - interval '${months} months'
+      GROUP BY ym
+      ORDER BY ym ASC
+    `);
+
+    res.json({ data: rows.rows });
+  } catch (err) {
+    console.error("❌ trend/monthly error:", err);
+    res.status(500).json({ message: "Failed to fetch parts trend" });
+  }
+});
+
 /* --------------------------------------------------------
    GET ALL PARTS  ->  GET /api/parts
 ---------------------------------------------------------*/
@@ -77,6 +149,7 @@ router.get("/", async (req, res) => {
 
 /* --------------------------------------------------------
    GET SINGLE PART  ->  GET /api/parts/:id
+   ⚠️ THIS MUST COME AFTER ALL THE /xxx ROUTES ABOVE
 ---------------------------------------------------------*/
 router.get("/:id", async (req, res) => {
   const id = Number(req.params.id);
@@ -94,7 +167,6 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// CREATE PART
 // CREATE PART  (multipart + image upload support)
 router.post("/", upload.single("image"), async (req, res) => {
   try {
@@ -131,18 +203,17 @@ router.post("/", upload.single("image"), async (req, res) => {
 
     res.json({ success: 1, data: inserted[0] });
   } catch (err) {
-  console.error("❌ CREATE part error:", err);
+    console.error("❌ CREATE part error:", err);
 
-  // UNIQUE violation → part number exists
-  if (err.code === "23505") {
-    return res
-      .status(400)
-      .json({ success: 0, message: "Part number already exists" });
+    // UNIQUE violation → part number exists
+    if (err.code === "23505") {
+      return res
+        .status(400)
+        .json({ success: 0, message: "Part number already exists" });
+    }
+
+    res.status(500).json({ success: 0, message: "Failed to add part" });
   }
-
-  res.status(500).json({ success: 0, message: "Failed to add part" });
-}
-
 });
 
 router.put("/:id", upload.single("image"), async (req, res) => {
@@ -155,8 +226,8 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       return res.status(404).json({ success: 0, message: "Part not found" });
     }
 
-    // Helper to convert "" to null, numbers to Number()
-    const num = (v) => (v === "" || v === null || v === undefined ? null : Number(v));
+    const num = (v) =>
+      v === "" || v === null || v === undefined ? null : Number(v);
 
     const updateData = {
       part_number: body.part_number || exists.part_number,
@@ -179,7 +250,6 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       updated_on: db.fn.now(),
     };
 
-    // Image upload
     if (req.file) {
       const newUrl = `/uploads/parts/${req.file.filename}`;
       updateData.image_url = newUrl;
@@ -193,9 +263,22 @@ router.put("/:id", upload.single("image"), async (req, res) => {
 
     await db("inventory").where({ part_id: id }).update(updateData);
 
-    res.json({ success: 1, message: "Part updated successfully", image_updated: !!req.file });
+    res.json({
+      success: 1,
+      message: "Part updated successfully",
+      image_updated: !!req.file,
+    });
   } catch (err) {
     console.error("❌ PUT /api/parts/:id error:", err);
+
+    // 🔥 UNIQUE CONSTRAINT DUPLICATE FIX
+    if (err.code === "23505") {
+      return res.status(400).json({
+        success: 0,
+        message: "Part number already exists",
+      });
+    }
+
     res.status(500).json({ success: 0, message: "Failed to update part" });
   }
 });
