@@ -35,6 +35,31 @@ export default function PartsPage() {
 
   const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
 
+  // ⭐ NEW: safe image URL normalizer
+  const normalizeImageUrl = (raw) => {
+    if (!raw) return null;
+
+    let clean = String(raw).trim();
+
+    // If it's already an absolute URL, just use it
+    if (clean.startsWith("http://") || clean.startsWith("https://")) {
+      return clean;
+    }
+
+    // Strip any accidental host prefix, keep path from first /uploads
+    const uploadsIndex = clean.indexOf("/uploads");
+    if (uploadsIndex !== -1) {
+      clean = clean.substring(uploadsIndex);
+    }
+
+    // Ensure exactly one leading slash
+    if (!clean.startsWith("/")) {
+      clean = "/" + clean;
+    }
+
+    return `${BASE}${clean}`;
+  };
+
   const loadParts = async () => {
     try {
       const data = await api.fetchParts();
@@ -102,34 +127,38 @@ export default function PartsPage() {
     }
   };
 
-useEffect(() => {
-  const editListener = (e) => {
-    setEditingPart(e.detail);
-    setShowForm(true);
-  };
-  const reloadListener = () => loadParts();
+  useEffect(() => {
+    const editListener = (e) => {
+      setEditingPart(e.detail);
+      setShowForm(true);
+    };
+    const reloadListener = () => loadParts();
 
-  window.addEventListener("edit-part", editListener);
-  window.addEventListener("reload-parts", reloadListener);
+    window.addEventListener("edit-part", editListener);
+    window.addEventListener("reload-parts", reloadListener);
 
-  return () => {
-    window.removeEventListener("edit-part", editListener);
-    window.removeEventListener("reload-parts", reloadListener);
-  };
-}, []);
-
+    return () => {
+      window.removeEventListener("edit-part", editListener);
+      window.removeEventListener("reload-parts", reloadListener);
+    };
+  }, []);
 
   /*************************************
    ✅ CELL RENDERERS
   *************************************/
   const ImageRenderer = (props) => {
-    const url = props.value ? `${BASE}${props.value}` : null;
+    const url = normalizeImageUrl(props.value);
+
     return url ? (
       <img
         src={url}
         className="w-12 h-12 object-cover rounded border cursor-pointer"
         onClick={() => setZoomImage(url)}
-        onError={(e) => (e.target.src = "/no-image.png")}
+        onError={(e) => {
+          // Safe fallback: if real image fails, show placeholder and stop further errors
+          e.target.src = "/no-image.png";
+          e.target.onerror = null;
+        }}
       />
     ) : (
       <span className="text-gray-400 text-xs italic">No image</span>
@@ -214,7 +243,6 @@ useEffect(() => {
     { headerName: "Last Vendor", field: "last_vendor_name", width: 160, flex: 1 },
 
     { headerName: "Status", field: "status", width: 110, cellRenderer: StatusRenderer },
-
   ];
 
   return (
@@ -222,7 +250,7 @@ useEffect(() => {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-800">
+          <h2 className="className='text-2xl font-semibold text-gray-800'">
             Inventory Dashboard
           </h2>
           <p className="text-gray-500 text-sm">
@@ -401,10 +429,7 @@ useEffect(() => {
 
       {/* ⭐ NEW — PART DETAIL MODAL for clicking Part # */}
       {showDetail && (
-        <PartDetail
-          part={selectedPart}
-          onClose={() => setShowDetail(false)}
-        />
+        <PartDetail part={selectedPart} onClose={() => setShowDetail(false)} />
       )}
     </div>
   );

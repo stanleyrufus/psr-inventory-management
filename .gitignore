@@ -15,3 +15,7 @@ build/
 
 # System
 Thumbs.db
+
+backend/uploads/
+uploads/
+

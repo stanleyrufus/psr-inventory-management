@@ -5,6 +5,8 @@ import fs from "fs";
 import multer from "multer";
 import { fileURLToPath } from "url";
 import nodemailer from "nodemailer";
+import { makeUploader, resolveUploadPath } from "../middleware/uploads.js";
+
 
 const router = express.Router();
 
@@ -12,21 +14,7 @@ const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ⚠️ MUST MATCH express.static("/uploads")
-const UPLOAD_ROOT = path.join(process.cwd(), "uploads", "purchase_orders");
-
-if (!fs.existsSync(UPLOAD_ROOT)) fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
-
-// ---------------- Multer setup ----------------
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, UPLOAD_ROOT),
-  filename: (req, file, cb) => {
-    const ts = Date.now();
-    const safe = file.originalname.replace(/[^\w.\-]+/g, "_");
-    cb(null, `${ts}_${safe}`);
-  },
-});
-const upload = multer({ storage });
+const uploadPo = makeUploader("po-attachments");
 
 // -------- Helpers --------
 const normalizeDate = (d) => (d && String(d).trim() !== "" ? d : null);
@@ -421,36 +409,50 @@ router.put("/:id", async (req, res) => {
 
 //
 // =============================================
-//  UPLOAD FILES (NEW ATTACHMENTS)
+//  UPLOAD PO ATTACHMENTS (Permanent Storage)
 // =============================================
-//
-
-router.post("/:id/upload", upload.array("files", 10), async (req, res) => {
+router.post("/:id/upload", uploadPo.array("files", 10), async (req, res) => {
   const id = Number(req.params.id);
 
   try {
     const po = await db("purchase_orders").where({ id }).first();
-    if (!po) return res.status(404).json({ success: 0, errormsg: "PO not found" });
+    if (!po) {
+      return res.status(404).json({
+        success: 0,
+        errormsg: "PO not found",
+      });
+    }
 
-    const safeFiles = req.files.map((f) => ({
+    const uploadedFiles = req.files || [];
+
+    const toInsert = uploadedFiles.map((file) => ({
       po_id: id,
-      original_filename: f.originalname,
-      stored_filename: f.filename,
-      mime_type: f.mimetype,
-      size_bytes: f.size,
+      original_filename: file.originalname,
+      stored_filename: file.filename,
+      mime_type: file.mimetype,
+      size_bytes: file.size,
 
-      // 🔥 FIX: ALWAYS RETURN CLEAN SERVABLE PATH
-      filepath: `uploads/purchase_orders/${f.filename}`,
+      // ⭐ Correct servable path (matches express.static)
+      filepath: `/uploads/po-attachments/${file.filename}`,
 
       uploaded_at: db.fn.now(),
     }));
 
-    if (safeFiles.length)
-      await db("purchase_order_files").insert(safeFiles);
+    if (toInsert.length > 0) {
+      await db("purchase_order_files").insert(toInsert);
+    }
 
-    res.json({ success: 1, uploaded: safeFiles.length });
+    res.json({
+      success: 1,
+      uploaded: toInsert.length,
+      files: toInsert,
+    });
   } catch (err) {
-    res.status(500).json({ success: 0, errormsg: "Upload failed" });
+    console.error("❌ Upload error:", err);
+    res.status(500).json({
+      success: 0,
+      errormsg: "Upload failed",
+    });
   }
 });
 

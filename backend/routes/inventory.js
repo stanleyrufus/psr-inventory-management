@@ -5,28 +5,12 @@ import { db } from "../db.js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { makeUploader, resolveUploadPath } from "../middleware/uploads.js";
+
 
 const router = express.Router();
+const upload = makeUploader("parts"); // images for parts go into /uploads/parts
 
-/* --------------------------------------------------------
-   FILE UPLOAD SETUP FOR PART IMAGES
----------------------------------------------------------*/
-
-const PART_UPLOAD_PATH = path.join(process.cwd(), "uploads", "parts");
-
-if (!fs.existsSync(PART_UPLOAD_PATH)) {
-  fs.mkdirSync(PART_UPLOAD_PATH, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (_, file, cb) => cb(null, PART_UPLOAD_PATH),
-  filename: (_, file, cb) => {
-    const safe = file.originalname.replace(/[^\w.-]/g, "_");
-    cb(null, `${Date.now()}_${safe}`);
-  },
-});
-
-const upload = multer({ storage });
 
 /* ========================================================
    DASHBOARD-RELATED ROUTES  (MUST BE BEFORE "/:id")
