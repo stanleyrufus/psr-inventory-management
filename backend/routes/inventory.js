@@ -5,11 +5,42 @@ import { db } from "../db.js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { makeUploader, resolveUploadPath } from "../middleware/uploads.js";
+import { makeBasicUploader, resolveUploadPath } from "../middleware/uploads.js";
+const upload = makeBasicUploader("parts");
 
 
 const router = express.Router();
-const upload = makeUploader("parts"); // images for parts go into /uploads/parts
+
+// ⭐ Helpers for image path normalization on backend
+function normalizeImagePath(p) {
+  if (!p) return null;
+  let s = String(p).trim();
+
+  // strip any accidental full URL
+  const idxUploads = s.indexOf("/uploads");
+  if (idxUploads !== -1) {
+    s = s.substring(idxUploads);
+  }
+
+  if (!s.startsWith("/")) s = "/" + s;
+  return s;
+}
+
+function parseImageArray(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map(normalizeImagePath)
+        .filter(Boolean);
+    }
+  } catch {
+    // not JSON, fall through
+  }
+  const single = normalizeImagePath(raw);
+  return single ? [single] : [];
+}
 
 
 /* ========================================================
@@ -152,7 +183,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // CREATE PART  (multipart + image upload support)
-router.post("/", upload.single("image"), async (req, res) => {
+router.post("/", upload.array("images", 10), async (req, res) => {
   try {
     const body = req.body;
 
@@ -176,10 +207,14 @@ router.post("/", upload.single("image"), async (req, res) => {
       updated_on: db.fn.now(),
     };
 
-    // ⭐ If image uploaded
-    if (req.file) {
-      insertData.image_url = `/uploads/parts/${req.file.filename}`;
-    }
+    // ⭐ If image uploaded → save to permanent folder
+   // ⭐ Support MULTIPLE images
+if (req.files && req.files.length > 0) {
+  insertData.image_url = JSON.stringify(
+    req.files.map((f) => `/uploads/parts/${f.filename}`)
+  );
+}
+
 
     const inserted = await db("inventory")
       .insert(insertData)
@@ -200,7 +235,9 @@ router.post("/", upload.single("image"), async (req, res) => {
   }
 });
 
-router.put("/:id", upload.single("image"), async (req, res) => {
+
+// UPDATE PART (PUT)
+router.put("/:id", upload.array("images", 10), async (req, res) => {
   const id = Number(req.params.id);
   const body = req.body;
 
@@ -234,15 +271,62 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       updated_on: db.fn.now(),
     };
 
-    if (req.file) {
-      const newUrl = `/uploads/parts/${req.file.filename}`;
-      updateData.image_url = newUrl;
+    // ⭐ OLD images from DB (normalized array)
+    const oldImages = parseImageArray(exists.image_url);
 
-      if (exists.image_url) {
-        const oldFile = exists.image_url.replace(/^\//, "");
-        const oldPath = path.join(process.cwd(), oldFile);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    let keepImages = oldImages;
+    let imagesToDelete = [];
+    let finalImages = oldImages;
+
+    const hasExistingImagesPayload =
+      typeof body.existing_images === "string" && body.existing_images.length > 0;
+
+    // ⭐ If frontend sent existing_images, we trust that as "images to KEEP"
+    if (hasExistingImagesPayload) {
+      try {
+        const parsed = JSON.parse(body.existing_images);
+        if (Array.isArray(parsed)) {
+          keepImages = parsed.map(normalizeImagePath).filter(Boolean);
+        }
+      } catch (e) {
+        console.error("❌ Failed to parse existing_images:", e);
+        keepImages = oldImages; // fallback
       }
+
+      // Which images should be deleted from disk?
+      imagesToDelete = oldImages.filter(
+        (oldPath) => !keepImages.includes(oldPath)
+      );
+
+      // Delete removed images from disk
+      imagesToDelete.forEach((img) => {
+        const full = resolveUploadPath(img);
+        try {
+          if (full && fs.existsSync(full)) {
+            fs.unlinkSync(full);
+          }
+        } catch (e) {
+          console.error("❌ Error deleting old image:", e);
+        }
+      });
+    }
+
+    // ⭐ New uploaded files (if any)
+    const newUploaded = (req.files || []).map((f) =>
+      normalizeImagePath(`/uploads/parts/${f.filename}`)
+    );
+
+    // ⭐ Build final image list
+    if (hasExistingImagesPayload || (req.files && req.files.length > 0)) {
+      finalImages = [...keepImages, ...newUploaded];
+      if (finalImages.length > 0) {
+        updateData.image_url = JSON.stringify(finalImages);
+      } else {
+        updateData.image_url = null;
+      }
+    } else {
+      // No change requested to images → keep DB as-is
+      finalImages = oldImages;
     }
 
     await db("inventory").where({ part_id: id }).update(updateData);
@@ -250,12 +334,12 @@ router.put("/:id", upload.single("image"), async (req, res) => {
     res.json({
       success: 1,
       message: "Part updated successfully",
-      image_updated: !!req.file,
+      image_updated:
+        JSON.stringify(finalImages) !== JSON.stringify(oldImages),
     });
   } catch (err) {
     console.error("❌ PUT /api/parts/:id error:", err);
 
-    // 🔥 UNIQUE CONSTRAINT DUPLICATE FIX
     if (err.code === "23505") {
       return res.status(400).json({
         success: 0,
@@ -267,25 +351,32 @@ router.put("/:id", upload.single("image"), async (req, res) => {
   }
 });
 
+
 /* --------------------------------------------------------
    DELETE PART  ->  DELETE /api/parts/:id
 ---------------------------------------------------------*/
 router.delete("/:id", async (req, res) => {
   const id = Number(req.params.id);
+
   try {
     const exists = await db("inventory").where({ part_id: id }).first();
     if (!exists) {
       return res.status(404).json({ success: 0, message: "Part not found" });
     }
 
-    // optional: delete image file too
+    // ⭐ Delete all images (supports JSON array)
     if (exists.image_url) {
-      const oldPath = path.join(
-        process.cwd(),
-        exists.image_url.replace(/^\//, "")
-      );
-      if (fs.existsSync(oldPath)) {
-        fs.unlinkSync(oldPath);
+      try {
+        const images = JSON.parse(exists.image_url || "[]");
+
+        images.forEach((img) => {
+          const fullPath = resolveUploadPath(img);
+          if (fullPath && fs.existsSync(fullPath)) {
+            fs.unlinkSync(fullPath);
+          }
+        });
+      } catch (e) {
+        console.error("❌ Image delete error:", e);
       }
     }
 
@@ -297,5 +388,6 @@ router.delete("/:id", async (req, res) => {
     res.status(500).json({ success: 0, message: "Failed to delete part" });
   }
 });
+
 
 export default router;

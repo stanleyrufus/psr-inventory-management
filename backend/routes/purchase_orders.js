@@ -5,7 +5,9 @@ import fs from "fs";
 import multer from "multer";
 import { fileURLToPath } from "url";
 import nodemailer from "nodemailer";
-import { makeUploader, resolveUploadPath } from "../middleware/uploads.js";
+import { makeSafeUploader } from "../middleware/uploads.js";
+
+const uploadPo = makeSafeUploader("po-attachments");
 
 
 const router = express.Router();
@@ -14,7 +16,6 @@ const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const uploadPo = makeUploader("po-attachments");
 
 // -------- Helpers --------
 const normalizeDate = (d) => (d && String(d).trim() !== "" ? d : null);
@@ -411,10 +412,13 @@ router.put("/:id", async (req, res) => {
 // =============================================
 //  UPLOAD PO ATTACHMENTS (Permanent Storage)
 // =============================================
-router.post("/:id/upload", uploadPo.array("files", 10), async (req, res) => {
-  const id = Number(req.params.id);
-
+// =============================================
+//  UPLOAD PO ATTACHMENTS (final fix)
+// =============================================
+router.post("/:id/upload", uploadPo, async (req, res) => {
   try {
+    const id = Number(req.params.id);
+
     const po = await db("purchase_orders").where({ id }).first();
     if (!po) {
       return res.status(404).json({
@@ -423,35 +427,37 @@ router.post("/:id/upload", uploadPo.array("files", 10), async (req, res) => {
       });
     }
 
+    // Multer raw file objects (CANNOT return directly!)
     const uploadedFiles = req.files || [];
 
-    const toInsert = uploadedFiles.map((file) => ({
+    // Convert to SAFE POJO objects (NO circular refs)
+    const safeFiles = uploadedFiles.map((file) => ({
       po_id: id,
       original_filename: file.originalname,
       stored_filename: file.filename,
       mime_type: file.mimetype,
       size_bytes: file.size,
-
-      // ⭐ Correct servable path (matches express.static)
       filepath: `/uploads/po-attachments/${file.filename}`,
-
-      uploaded_at: db.fn.now(),
+      uploaded_at: new Date().toISOString(),
     }));
 
-    if (toInsert.length > 0) {
-      await db("purchase_order_files").insert(toInsert);
+    // Insert into DB
+    if (safeFiles.length > 0) {
+      await db("purchase_order_files").insert(safeFiles);
     }
 
-    res.json({
+    // ⭐ RETURN ONLY SAFE JSON (no req, no timeout, no callbacks)
+    return res.json({
       success: 1,
-      uploaded: toInsert.length,
-      files: toInsert,
+      uploaded: safeFiles.length,
+      files: safeFiles
     });
+
   } catch (err) {
-    console.error("❌ Upload error:", err);
-    res.status(500).json({
+    console.error("❌ Upload fatal:", err);
+    return res.status(500).json({
       success: 0,
-      errormsg: "Upload failed",
+      errormsg: err.message || "Upload failed",
     });
   }
 });

@@ -6,6 +6,30 @@ import PartForm from "../components/forms/PartForm";
 import BulkUploadModal from "../components/modals/BulkUploadModal";
 import PartDetail from "../components/PartDetail";
 
+// ⭐ Helper to handle both JSON-array and single-string images
+function getPartImageUrl(raw) {
+  if (!raw) return "/no-image.png";
+
+  let path = raw;
+
+  try {
+    // JSON array?
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr) && arr.length > 0) {
+      path = arr[0];   // use first image
+    }
+  } catch (e) {
+    // single string → do nothing
+  }
+
+  // Ensure starts with /uploads/...
+  if (!path.startsWith("/")) path = "/" + path;
+
+  const base = import.meta.env.VITE_API_URL.replace(/\/$/, "");
+  return `${base}${path}`;
+}
+
+
 export default function PartsPage() {
   // ⭐ NEW – moved inside component to follow React rules
   const [selectedPart, setSelectedPart] = useState(null);
@@ -144,26 +168,47 @@ export default function PartsPage() {
   }, []);
 
   /*************************************
-   ✅ CELL RENDERERS
-  *************************************/
-  const ImageRenderer = (props) => {
-    const url = normalizeImageUrl(props.value);
+   ✅ CELL RENDERERS (Updated for multi-image support)
+*************************************/
 
-    return url ? (
-      <img
-        src={url}
-        className="w-12 h-12 object-cover rounded border cursor-pointer"
-        onClick={() => setZoomImage(url)}
-        onError={(e) => {
-          // Safe fallback: if real image fails, show placeholder and stop further errors
-          e.target.src = "/no-image.png";
-          e.target.onerror = null;
-        }}
-      />
-    ) : (
-      <span className="text-gray-400 text-xs italic">No image</span>
-    );
-  };
+// Helper: supports JSON-array OR single string
+function getPartImageUrl(image_url) {
+  if (!image_url) return "/no-image.png";
+
+  let firstPath = image_url;
+
+  try {
+    const parsed = JSON.parse(image_url);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      firstPath = parsed[0];
+    }
+  } catch (e) {
+    // single string → do nothing
+  }
+
+  if (!firstPath.startsWith("/")) {
+    firstPath = "/" + firstPath;
+  }
+
+  const base = import.meta.env.VITE_API_URL.replace(/\/$/, "");
+  return `${base}${firstPath}`;
+}
+
+const ImageRenderer = (props) => {
+  const url = getPartImageUrl(props.value);
+
+  return (
+    <img
+      src={url}
+      className="w-12 h-12 object-cover rounded border cursor-pointer"
+      onClick={() => setZoomImage(url)}
+      onError={(e) => {
+        e.target.src = "/no-image.png";
+        e.target.onerror = null;
+      }}
+    />
+  );
+};
 
   const StatusRenderer = (props) => {
     const s = props.value || "Unknown";

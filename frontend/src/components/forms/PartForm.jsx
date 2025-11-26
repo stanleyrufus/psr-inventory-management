@@ -1,8 +1,50 @@
+console.log("🔥 PartForm updated version loaded!");
+
 // frontend/src/components/forms/PartForm.jsx
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
 
 import React, { useState, useEffect } from "react";
 import api, { apiRaw } from "../../utils/api";
+
+// ⭐ Helper: parse image_url from DB (string OR JSON array)
+// Returns array of normalized paths like "/uploads/parts/xxx.jpg"
+function parseImageUrls(raw) {
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((p) => {
+          if (!p) return null;
+          let s = String(p).trim();
+          const idx = s.indexOf("/uploads");
+          if (idx !== -1) s = s.substring(idx);
+          if (!s.startsWith("/")) s = "/" + s;
+          return s;
+        })
+        .filter(Boolean);
+    }
+  } catch {
+    // not JSON → fall through to single string
+  }
+
+  let s = String(raw).trim();
+  const idx = s.indexOf("/uploads");
+  if (idx !== -1) s = s.substring(idx);
+  if (!s.startsWith("/")) s = "/" + s;
+  return [s];
+}
+
+// ⭐ Helper: turn DB path into full URL
+function buildImageUrl(path) {
+  if (!path) return `${BASE}/no-image.png`;
+  let p = String(path).trim();
+  const idx = p.indexOf("/uploads");
+  if (idx !== -1) p = p.substring(idx);
+  if (!p.startsWith("/")) p = "/" + p;
+  return `${BASE}${p}`;
+}
 
 export default function PartForm({ initial = {}, onSaved, onCancel }) {
   const safeInitial = initial || {};
@@ -11,7 +53,7 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
 
   const [formData, setFormData] = useState({
     part_number: "",
-    part_name: safeInitial.part_name || "", // 👉 REMOVED from UI but kept for backend
+    part_name: safeInitial.part_name || "", // 👉 hidden but kept for backend
     category: "",
     description: "",
     quantity_on_hand: "",
@@ -26,8 +68,15 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
     remarks: "",
   });
 
-  const [imageFile, setImageFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(safeInitial.image_url || null);
+  // ⭐ EXISTING images from DB (paths like "/uploads/parts/xxx.jpg")
+  const [existingImages, setExistingImages] = useState([]);
+
+  // ⭐ NEW files selected in this edit session
+  const [imageFiles, setImageFiles] = useState([]);
+
+  // ⭐ Previews for NEW files only
+  const [previewUrls, setPreviewUrls] = useState([]);
+
   const [errors, setErrors] = useState({});
 
   // ----------------------------
@@ -46,7 +95,7 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
   }, []);
 
   // ----------------------------------------------------
-  // Load initial data into form
+  // Load initial data into form (including existing images)
   // ----------------------------------------------------
   useEffect(() => {
     if (safeInitial && Object.keys(safeInitial).length > 0) {
@@ -70,30 +119,40 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
         remarks: safeInitial.remarks ?? prev.remarks,
       }));
 
-      const img = safeInitial.image_url;
-      if (img) {
-        const base = BASE.replace(/\/$/, "");
-        const normalized = img.startsWith("/")
-          ? `${base}${img}`
-          : `${base}/${img}`;
-        setPreviewUrl(normalized);
-      } else {
-        setPreviewUrl(null);
-      }
+      // ⭐ Load existing image paths from DB
+      const imgs = parseImageUrls(safeInitial.image_url);
+      setExistingImages(imgs);
+    } else {
+      // new part
+      setExistingImages([]);
     }
   }, [safeInitial]);
 
   // ----------------------------------------------------
-  // Preview image
+  // Preview NEW images
   // ----------------------------------------------------
   useEffect(() => {
-    if (imageFile) setPreviewUrl(URL.createObjectURL(imageFile));
-  }, [imageFile]);
+    if (imageFiles.length > 0) {
+      const urls = imageFiles.map((file) => URL.createObjectURL(file));
+      setPreviewUrls(urls);
+    } else {
+      setPreviewUrls([]);
+    }
+  }, [imageFiles]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const handleRemoveExisting = (index) => {
+    setExistingImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    setImageFiles(files);
   };
 
   // ----------------------------------------------------
@@ -129,16 +188,37 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
         }
       });
 
+      const isEditing = !!safeInitial?.part_id;
+      const originalImages = isEditing
+        ? parseImageUrls(safeInitial.image_url)
+        : [];
+      const imagesChanged =
+        isEditing &&
+        JSON.stringify(originalImages) !== JSON.stringify(existingImages);
+
+      // ✅ We need multipart if:
+      //  - there are NEW files OR
+      //  - existing images changed (user deleted some)
+      const shouldUseMultipart = imageFiles.length > 0 || imagesChanged;
+
       let res;
 
-      if (imageFile) {
+      if (shouldUseMultipart) {
         const fd = new FormData();
+
         Object.entries(cleanData).forEach(([key, value]) =>
           fd.append(key, value ?? "")
         );
-        fd.append("image", imageFile);
 
-        if (safeInitial?.part_id) {
+        // ⭐ Tell backend which existing images to KEEP
+        if (isEditing) {
+          fd.append("existing_images", JSON.stringify(existingImages || []));
+        }
+
+        // ⭐ Append NEW images (if any)
+        imageFiles.forEach((file) => fd.append("images", file));
+
+        if (isEditing) {
           res = await apiRaw.put(`/parts/${safeInitial.part_id}`, fd, {
             headers: { "Content-Type": "multipart/form-data" },
           });
@@ -148,6 +228,7 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
           });
         }
       } else {
+        // ✅ No image changes – plain JSON
         const payload = { ...cleanData };
         delete payload.unit_price;
 
@@ -169,9 +250,6 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
         err.message ||
         "";
 
-      // -------------------------
-      // DUPLICATE HANDLING
-      // -------------------------
       if (
         rawMsg.toLowerCase().includes("duplicate") ||
         rawMsg.toLowerCase().includes("unique") ||
@@ -208,27 +286,68 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
       {/* Image Upload */}
       <div className="flex flex-col mb-2">
         <label className="text-sm font-medium text-gray-700 mb-1">
-          Part Image
+          Part Images
         </label>
+
+        {/* Existing Images with ❌ delete */}
+        {existingImages.length > 0 && (
+          <>
+            <p className="text-xs text-gray-500 mb-1">
+              Existing images:
+            </p>
+            <div className="flex gap-2 mt-1 flex-wrap">
+              {existingImages.map((imgPath, idx) => (
+                <div key={idx} className="relative inline-block">
+                  <img
+                    src={buildImageUrl(imgPath)}
+                    alt={`existing-${idx}`}
+                    className="w-20 h-20 object-cover rounded border"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveExisting(idx)}
+                    className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs shadow"
+                    title="Remove this image"
+                  >
+                    ✖
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* New uploader */}
         <input
           type="file"
           accept="image/*"
-          onChange={(e) => setImageFile(e.target.files[0])}
-          className="border p-2 rounded"
+          multiple
+          onChange={handleFileChange}
+          className="border p-2 rounded mt-3"
         />
 
-        {previewUrl && (
-          <img
-            src={previewUrl}
-            alt="preview"
-            className="mt-2 w-24 h-24 object-cover rounded border"
-          />
+        {/* Previews of NEW images */}
+        {previewUrls.length > 0 && (
+          <>
+            <p className="text-xs text-gray-500 mt-2">
+              New images to upload (will be added):
+            </p>
+            <div className="flex gap-2 mt-1 flex-wrap">
+              {previewUrls.map((url, idx) => (
+                <img
+                  key={idx}
+                  src={url}
+                  alt={`new-${idx}`}
+                  className="w-20 h-20 object-cover rounded border"
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
 
       {/* Form fields */}
       <div className="grid grid-cols-2 gap-3">
-
         {/* Part Number */}
         <label className="flex flex-col">
           <span className="text-sm font-medium text-gray-700 mb-1">
@@ -284,7 +403,9 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
 
         {/* Quantity */}
         <label className="flex flex-col">
-          <span className="text-sm font-medium text-gray-700 mb-1">Quantity on Hand</span>
+          <span className="text-sm font-medium text-gray-700 mb-1">
+            Quantity on Hand
+          </span>
           <input
             name="quantity_on_hand"
             type="number"
@@ -296,7 +417,9 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
 
         {/* Minimum Stock */}
         <label className="flex flex-col">
-          <span className="text-sm font-medium text-gray-700 mb-1">Minimum Stock Level</span>
+          <span className="text-sm font-medium text-gray-700 mb-1">
+            Minimum Stock Level
+          </span>
           <input
             name="minimum_stock_level"
             type="number"
@@ -308,7 +431,9 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
 
         {/* Price */}
         <label className="flex flex-col">
-          <span className="text-sm font-medium text-gray-700 mb-1">Unit Price</span>
+          <span className="text-sm font-medium text-gray-700 mb-1">
+            Unit Price
+          </span>
           <input
             name="current_unit_price"
             type="number"
@@ -321,7 +446,9 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
 
         {/* Location */}
         <label className="flex flex-col">
-          <span className="text-sm font-medium text-gray-700 mb-1">Location</span>
+          <span className="text-sm font-medium text-gray-700 mb-1">
+            Location
+          </span>
           <input
             name="location"
             value={formData.location}
@@ -332,7 +459,9 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
 
         {/* Lead Time */}
         <label className="flex flex-col">
-          <span className="text-sm font-medium text-gray-700 mb-1">Lead Time (days)</span>
+          <span className="text-sm font-medium text-gray-700 mb-1">
+            Lead Time (days)
+          </span>
           <input
             name="lead_time_days"
             type="number"
@@ -344,7 +473,9 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
 
         {/* Material */}
         <label className="flex flex-col">
-          <span className="text-sm font-medium text-gray-700 mb-1">Material</span>
+          <span className="text-sm font-medium text-gray-700 mb-1">
+            Material
+          </span>
           <input
             name="material"
             value={formData.material}
@@ -355,7 +486,9 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
 
         {/* Last PO */}
         <label className="flex flex-col">
-          <span className="text-sm font-medium text-gray-700 mb-1">Last PO Date</span>
+          <span className="text-sm font-medium text-gray-700 mb-1">
+            Last PO Date
+          </span>
           <input
             name="last_po_date"
             type="date"
@@ -367,7 +500,9 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
 
         {/* Status */}
         <label className="flex flex-col">
-          <span className="text-sm font-medium text-gray-700 mb-1">Status</span>
+          <span className="text-sm font-medium text-gray-700 mb-1">
+            Status
+          </span>
           <select
             name="status"
             value={formData.status}
@@ -382,7 +517,9 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
 
       {/* Description */}
       <label className="flex flex-col">
-        <span className="text-sm font-medium text-gray-700 mb-1">Description</span>
+        <span className="text-sm font-medium text-gray-700 mb-1">
+          Description
+        </span>
         <textarea
           name="description"
           value={formData.description}

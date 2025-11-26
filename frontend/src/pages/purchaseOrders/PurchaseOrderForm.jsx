@@ -2,6 +2,17 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
+function PaidStamp() {
+  return (
+    <div className="absolute top-2 right-2 rotate-[-15deg] pointer-events-none opacity-70">
+      <span className="inline-block px-4 py-1 text-red-700 border-4 border-red-700 font-extrabold text-2xl tracking-wider rounded-lg">
+        PAID
+      </span>
+    </div>
+  );
+}
+
+
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 // ✅ Use FILE_BASE for downloads (no /api suffix even if env has it)
 const FILE_BASE = BASE.replace(/\/api$/, "");
@@ -38,6 +49,12 @@ export default function PurchaseOrderForm({
   // local state for existing uploaded files (so we can delete & update UI)
   const [existingFiles, setExistingFiles] = useState(initialPo?.files || []);
   const [deletingFileIds, setDeletingFileIds] = useState([]);
+
+const removeItemRow = (index) => {
+  const updatedItems = po.items.filter((_, i) => i !== index);
+  setPo({ ...po, items: updatedItems });
+  recalcTotals(updatedItems);
+};
 
   // keep existingFiles in sync if initialPo changes
   useEffect(() => {
@@ -628,10 +645,13 @@ const handleSaveDraft = async () => {
       className={`bg-white p-6 rounded shadow ${formScrollClasses}`}
     >
       {/* Header with inline X only when used as a modal */}
-      <div className="flex items-start justify-between mb-4">
+<div className="relative flex items-start justify-between mb-4">
         <h2 className="text-xl font-bold text-blue-700">
           {initialPo ? "Edit Purchase Order" : "New Purchase Order"}
         </h2>
+{/* Paid Stamp */}
+  {po.status === "Received" && <PaidStamp />}
+
 
         {isModal && (
           <button
@@ -671,10 +691,11 @@ const handleSaveDraft = async () => {
             disabled={submitting || saved}
           >
             <option value="Draft">Draft</option>
-            <option value="Created">Created</option>
-            <option value="Sent">Sent</option>
-            <option value="Closed">Closed</option>
-            <option value="Cancelled">Cancelled</option>
+<option value="Sent RFQ">Sent RFQ</option>
+<option value="Ordered">Ordered</option>
+<option value="Received">Received</option>
+<option value="Cancelled">Cancelled</option>
+
           </select>
         </div>
 
@@ -925,6 +946,8 @@ const handleSaveDraft = async () => {
             <th className="p-2 border">Qty</th>
             <th className="p-2 border">Unit Price</th>
             <th className="p-2 border text-right">Total</th>
+	<th className="p-2 border text-center">Remove</th>
+
           </tr>
         </thead>
         <tbody>
@@ -1048,6 +1071,7 @@ const handleSaveDraft = async () => {
                 )}
               </td>
 
+
               <td className="border p-2">
                 <input
                   type="number"
@@ -1080,6 +1104,18 @@ const handleSaveDraft = async () => {
               <td className="border p-2 text-right">
                 ${money(item.totalPrice)}
               </td>
+		{/* ✅ ADD THIS BLOCK — REMOVE ROW BUTTON */}
+  <td className="border p-2 text-center">
+    <button
+      type="button"
+      onClick={() => removeItemRow(i)}
+      disabled={submitting || saved}
+      className="text-red-600 font-bold hover:text-red-800"
+      title="Remove row"
+    >
+      ✕
+    </button>
+  </td>
             </tr>
           ))}
         </tbody>
@@ -1102,7 +1138,7 @@ const handleSaveDraft = async () => {
         <div>Subtotal: ${money(po.subtotal)}</div>
         <div>Tax ({po.tax_percent}%): ${money(po.tax_amount)}</div>
         <div>
-          Shipping:{" "}
+          Shipping:{"$ "}
           <input
             type="number"
             value={po.shipping_charges || ""}
