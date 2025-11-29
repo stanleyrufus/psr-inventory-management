@@ -1,7 +1,136 @@
 // src/pages/purchaseOrders/PurchaseOrderForm.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+
+/* ===========================================================
+   🔵 SEARCHSELECT — DROP-IN COMPONENT (embedded in this file)
+   =========================================================== */
+function SearchSelect({
+  items = [],
+  value,
+  onChange,
+  display,
+  placeholder = "Search...",
+  disabled = false,
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [highlightIndex, setHighlightIndex] = useState(0);
+  const ref = useRef(null);
+
+  const lowerSearch = search.toLowerCase();
+
+  const filtered = items.filter((item) =>
+    display(item).toLowerCase().includes(lowerSearch)
+  );
+
+  useEffect(() => {
+    setHighlightIndex(0);
+  }, [search, items.length]);
+
+  // close on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selectedItem = items.find((item) => item.id === value);
+  const displayValue = selectedItem ? display(selectedItem) : "";
+
+  const handleKeyDown = (e) => {
+    if (!open) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightIndex((prev) =>
+        prev + 1 >= filtered.length ? prev : prev + 1
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIndex((prev) => (prev - 1 < 0 ? 0 : prev - 1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const item = filtered[highlightIndex];
+      if (item) {
+        onChange(item.id);
+        setOpen(false);
+        setSearch("");
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <input
+        disabled={disabled}
+        value={displayValue}
+        onClick={() => {
+          if (!disabled) setOpen((prev) => !prev);
+        }}
+        readOnly
+        placeholder={placeholder}
+        className="border p-2 rounded w-full bg-white cursor-pointer"
+      />
+
+      {open && (
+        <div className="absolute mt-1 w-full bg-white border rounded shadow z-20">
+          <input
+            autoFocus
+            className="border-b p-2 w-full"
+            placeholder={placeholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={disabled}
+          />
+
+          <div className="max-h-48 overflow-y-auto">
+            {filtered.length === 0 && (
+              <div className="p-2 text-sm text-gray-500">No results.</div>
+            )}
+
+            {filtered.map((item, idx) => {
+              const isSelected = item.id === value;
+              const isHighlighted = idx === highlightIndex;
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  disabled={disabled}
+                  onMouseEnter={() => setHighlightIndex(idx)}
+                  onClick={() => {
+                    onChange(item.id);
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                  className={`text-left w-full px-2 py-1 hover:bg-blue-50 ${
+                    isHighlighted ? "bg-blue-50" : ""
+                  } ${isSelected ? "bg-blue-100 font-semibold" : ""}`}
+                >
+                  {display(item)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =============================
+   EXISTING FILE CONTENT
+   ============================= */
 
 function PaidStamp() {
   return (
@@ -38,9 +167,7 @@ export default function PurchaseOrderForm({
   const [attachments, setAttachments] = useState([]);
   const [staffList] = useState([
     "Shiney Ramnarain",
-    "Brian Ramnarain",
-    "Dave Ramnarain",
-  ]);
+    ]);
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -129,8 +256,6 @@ export default function PurchaseOrderForm({
           status: "Draft",
         }
   );
-
-
 
   // load vendors + parts
   useEffect(() => {
@@ -430,13 +555,31 @@ export default function PurchaseOrderForm({
   };
 
   const handleSaveDraft = async () => {
-    if (!po.psr_po_number.trim()) {
-      alert("PO Number is required to save a draft.");
+  if (!po.psr_po_number.trim()) {
+    alert("PO Number is required to save a draft.");
+    return;
+  }
+
+  // 🔍 UNIQUE PO NUMBER CHECK FOR NEW DRAFTS
+  try {
+    const exists = await axios
+      .get(`${BASE}/api/purchase_orders/check-number/${po.psr_po_number}`)
+      .then((res) => res.data.exists)
+      .catch(() => false);
+
+    if (exists) {
+      alert("This PO Number already exists. Please use a unique PO Number.");
       return;
     }
+  } catch (err) {
+    console.error("❌ Error checking PO number uniqueness:", err);
+    alert("Failed to validate PO number.");
+    return;
+  }
 
-    try {
-      setSubmitting(true);
+  try {
+    setSubmitting(true);
+
 
       const res = await axios.post(`${BASE}/api/purchase_orders`, {
         ...po,
@@ -550,14 +693,13 @@ export default function PurchaseOrderForm({
     let sendRevised = false;
 
     if (
-  initialPo?.id && 
-  (initialPo.status === "Sent RFQ" || initialPo.status === "Sent Revised RFQ")
-) {
-
+      initialPo?.id &&
+      (initialPo.status === "Sent RFQ" ||
+        initialPo.status === "Sent Revised RFQ")
+    ) {
       const originalNorm = normalizePo(initialPo);
       const userEditedSomething =
-        originalNorm &&
-        JSON.stringify(originalNorm) !== JSON.stringify(po);
+        originalNorm && JSON.stringify(originalNorm) !== JSON.stringify(po);
 
       if (userEditedSomething) {
         const ask = window.confirm(
@@ -578,9 +720,8 @@ export default function PurchaseOrderForm({
     }
 
     if (sendRevised) {
-  finalStatus = "Sent Revised RFQ";   // ⭐ NEW
-}
-
+      finalStatus = "Sent Revised RFQ"; // ⭐ NEW
+    }
 
     // ----------------------
     // BUILD PAYLOAD
@@ -628,18 +769,16 @@ export default function PurchaseOrderForm({
           );
         }
 
-      if (sendRevised) {
+        if (sendRevised) {
+          // ⭐ VALIDATE FULL PO BEFORE ALLOWING REVISED RFQ
+          if (!validateBeforeRFQ()) {
+            setSubmitting(false);
+            return;
+          }
 
-  // ⭐ VALIDATE FULL PO BEFORE ALLOWING REVISED RFQ
-  if (!validateBeforeRFQ()) {
-    setSubmitting(false);
-    return;
-  }
-
-  navigate(`/purchase-orders/${initialPo.id}/send-rfq?revised=1`);
-  return;
-}
-
+          navigate(`/purchase-orders/${initialPo.id}/send-rfq?revised=1`);
+          return;
+        }
 
         alert("✅ PO updated successfully.");
       } else {
@@ -679,60 +818,58 @@ export default function PurchaseOrderForm({
   // ---------------------
   const status = po.status;
 
-// =======================================================
-// 🔵 VALIDATE FULL PO BEFORE ALLOWING RFQ OR REVISED RFQ
-// =======================================================
-const validateBeforeRFQ = () => {
-  // Vendor required
-  if (!po.vendor_id) {
-    alert("Please select a Vendor before sending RFQ.");
-    return false;
-  }
-
-  // Created by required
-  if (!po.created_by) {
-    alert("Please select who created this PO.");
-    return false;
-  }
-
-  // At least one item
-  if (!po.items || po.items.length === 0) {
-    alert("Please add at least one line item before sending RFQ.");
-    return false;
-  }
-
-  // Validate each item
-  for (const i of po.items) {
-    if (!i.partId) {
-      alert("Each item must have a Part selected.");
+  // =======================================================
+  // 🔵 VALIDATE FULL PO BEFORE ALLOWING RFQ OR REVISED RFQ
+  // =======================================================
+  const validateBeforeRFQ = () => {
+    // Vendor required
+    if (!po.vendor_id) {
+      alert("Please select a Vendor before sending RFQ.");
       return false;
     }
-    if (!i.quantity || Number(i.quantity) <= 0) {
-      alert("Item quantity must be greater than 0.");
+
+    // Created by required
+    if (!po.created_by) {
+      alert("Please select who created this PO.");
       return false;
     }
-    if (!i.unitPrice || Number(i.unitPrice) <= 0) {
-      alert("Unit Price must be greater than 0 for all items.");
+
+    // At least one item
+    if (!po.items || po.items.length === 0) {
+      alert("Please add at least one line item before sending RFQ.");
       return false;
     }
-  }
 
-  return true;
-};
+    // Validate each item
+    for (const i of po.items) {
+      if (!i.partId) {
+        alert("Each item must have a Part selected.");
+        return false;
+      }
+      if (!i.quantity || Number(i.quantity) <= 0) {
+        alert("Item quantity must be greater than 0.");
+        return false;
+      }
+      if (!i.unitPrice || Number(i.unitPrice) <= 0) {
+        alert("Unit Price must be greater than 0 for all items.");
+        return false;
+      }
+    }
 
+    return true;
+  };
 
   const goToSendRFQ = () => {
-  if (!initialPo?.id) {
-    alert("Please save the draft first.");
-    return;
-  }
+    if (!initialPo?.id) {
+      alert("Please save the draft first.");
+      return;
+    }
 
-  // ⭐ VALIDATE FULL PO BEFORE ALLOWING RFQ PAGE
-  if (!validateBeforeRFQ()) return;
+    // ⭐ VALIDATE FULL PO BEFORE ALLOWING RFQ PAGE
+    if (!validateBeforeRFQ()) return;
 
-  navigate(`/purchase-orders/${initialPo.id}/send-rfq`);
-};
-
+    navigate(`/purchase-orders/${initialPo.id}/send-rfq`);
+  };
 
   const markOrdered = async () => {
     if (!initialPo?.id) return;
@@ -829,8 +966,7 @@ const validateBeforeRFQ = () => {
           >
             <option value="Draft">Draft</option>
             <option value="Sent RFQ">Sent RFQ</option>
-	<option value="Sent Revised RFQ">Sent Revised RFQ</option>
-
+            <option value="Sent Revised RFQ">Sent Revised RFQ</option>
             <option value="Ordered">Ordered</option>
             <option value="Received">Received</option>
             <option value="Cancelled">Cancelled</option>
@@ -884,22 +1020,36 @@ const validateBeforeRFQ = () => {
         </div>
 
         {!addingNewVendor ? (
-          <select
-            className="border p-2 rounded w-full"
-            value={po.vendor_id || ""}
-            onChange={(e) =>
-              setPo({ ...po, vendor_id: e.target.value })
-            }
-            required={po.status !== "Draft"} // Draft should NOT require vendor
-            disabled={submitting || saved}
-          >
-            <option value="">Select Vendor</option>
-            {vendors.map((v) => (
-              <option key={v.vendor_id || v.id} value={v.vendor_id || v.id}>
-                {v.vendor_name || v.name}
-              </option>
-            ))}
-          </select>
+          <div className="space-y-2">
+            <SearchSelect
+              items={vendors.map((v) => {
+                const id = v.vendor_id || v.id;
+                const name = v.vendor_name || v.name || "Unnamed Vendor";
+                const city = v.city || "";
+                const region = v.state || v.country || "";
+                const location = [city, region].filter(Boolean).join(", ");
+                return { id, name, location };
+              })}
+              value={po.vendor_id}
+              onChange={(id) =>
+                setPo((prev) => ({
+                  ...prev,
+                  vendor_id: id,
+                }))
+              }
+              display={(v) =>
+                v.location ? `${v.name} — ${v.location}` : v.name
+              }
+              placeholder="Search vendor by name, city, country..."
+              disabled={submitting || saved}
+            />
+
+            {po.vendor_id && (
+              <div className="text-xs text-gray-600 mt-1">
+                Selected vendor ID: {po.vendor_id}
+              </div>
+            )}
+          </div>
         ) : (
           <div className="border p-3 bg-gray-50 rounded space-y-2">
             <input
@@ -1088,175 +1238,178 @@ const validateBeforeRFQ = () => {
           </tr>
         </thead>
         <tbody>
-          {po.items.map((item, i) => (
-            <tr key={i}>
-              <td className="border p-2">{i + 1}</td>
-              <td className="border p-2">
-                {!addingNewPartRow[i] ? (
-                  <>
-                    <select
-                      className="border p-1 rounded w-full"
-                      value={item.partId || item.part_id || ""}
-                      onChange={(e) =>
-                        handlePartSelect(i, e.target.value)
-                      }
-                      disabled={submitting || saved}
-                    >
-                      <option value="">Select</option>
-                      {parts.map((p) => (
-                        <option
-                          key={p.part_id || p.id}
-                          value={p.part_id || p.id}
-                        >
-                          {p.part_number}
-                        </option>
-                      ))}
-                      <option value="new">+ Add New Part</option>
-                    </select>
+          {po.items.map((item, i) => {
+            const selectedPart =
+              parts.find(
+                (p) =>
+                  String(p.part_id || p.id) ===
+                  String(item.partId || item.part_id)
+              ) || null;
 
-                    {item.partId && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        {
-                          parts.find(
-                            (p) =>
-                              String(p.part_id) ===
-                              String(item.partId || item.part_id)
-                          )?.description
+            return (
+              <tr key={i}>
+                <td className="border p-2">{i + 1}</td>
+                <td className="border p-2 align-top">
+                  {!addingNewPartRow[i] ? (
+                    <div className="space-y-1">
+                      <SearchSelect
+                        items={parts.map((p) => ({
+                          id: p.part_id || p.id,
+                          part_number: p.part_number,
+                          description: p.description || "",
+                        }))}
+                        value={item.partId || item.part_id || ""}
+                        onChange={(id) => handlePartSelect(i, id)}
+                        display={(p) =>
+                          `${p.part_number || "No Part #"} — ${
+                            p.description || "No description"
+                          }`
                         }
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="bg-gray-50 border rounded p-2 space-y-1">
-                    <input
-                      placeholder="Part Number *"
-                      className="border p-1 rounded w-full"
-                      value={newPartDraft[i]?.part_number || ""}
-                      onChange={(e) =>
-                        setNewPartDraft({
-                          ...newPartDraft,
-                          [i]: {
-                            ...newPartDraft[i],
-                            part_number: e.target.value,
-                          },
-                        })
-                      }
-                      disabled={submitting || saved}
-                    />
-                    <input
-                      placeholder="Part Name"
-                      className="border p-1 rounded w-full"
-                      value={newPartDraft[i]?.part_name || ""}
-                      onChange={(e) =>
-                        setNewPartDraft({
-                          ...newPartDraft,
-                          [i]: {
-                            ...newPartDraft[i],
-                            part_name: e.target.value,
-                          },
-                        })
-                      }
-                      disabled={submitting || saved}
-                    />
-                    <input
-                      placeholder="Description"
-                      className="border p-1 rounded w-full"
-                      value={newPartDraft[i]?.description || ""}
-                      onChange={(e) =>
-                        setNewPartDraft({
-                          ...newPartDraft,
-                          [i]: {
-                            ...newPartDraft[i],
-                            description: e.target.value,
-                          },
-                        })
-                      }
-                      disabled={submitting || saved}
-                    />
-                    <input
-                      type="number"
-                      placeholder="Unit Price"
-                      className="border p-1 rounded w-full"
-                      value={newPartDraft[i]?.current_unit_price || ""}
-                      onChange={(e) =>
-                        setNewPartDraft({
-                          ...newPartDraft,
-                          [i]: {
-                            ...newPartDraft[i],
-                            current_unit_price: e.target.value,
-                          },
-                        })
-                      }
-                      disabled={submitting || saved}
-                    />
-                    <div className="flex justify-end gap-2 mt-2">
-                      <button
-                        type="button"
-                        className="px-2 py-1 bg-gray-200 rounded"
-                        onClick={() => cancelNewPartForRow(i)}
+                        placeholder="Search part # or description..."
                         disabled={submitting || saved}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        className="px-2 py-1 bg-blue-600 text-white rounded"
-                        onClick={() => saveNewPartForRow(i)}
-                        disabled={submitting || saved}
-                      >
-                        Save Part
-                      </button>
+                      />
+
+                      {/* Selected part description / last price helper */}
+                      {selectedPart && (
+                        <div className="text-[11px] text-gray-500 mt-1">
+                          {selectedPart.description}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
-              </td>
+                  ) : (
+                    <div className="bg-gray-50 border rounded p-2 space-y-1">
+                      <input
+                        placeholder="Part Number *"
+                        className="border p-1 rounded w-full"
+                        value={newPartDraft[i]?.part_number || ""}
+                        onChange={(e) =>
+                          setNewPartDraft({
+                            ...newPartDraft,
+                            [i]: {
+                              ...newPartDraft[i],
+                              part_number: e.target.value,
+                            },
+                          })
+                        }
+                        disabled={submitting || saved}
+                      />
+                      <input
+                        placeholder="Part Name"
+                        className="border p-1 rounded w-full"
+                        value={newPartDraft[i]?.part_name || ""}
+                        onChange={(e) =>
+                          setNewPartDraft({
+                            ...newPartDraft,
+                            [i]: {
+                              ...newPartDraft[i],
+                              part_name: e.target.value,
+                            },
+                          })
+                        }
+                        disabled={submitting || saved}
+                      />
+                      <input
+                        placeholder="Description"
+                        className="border p-1 rounded w-full"
+                        value={newPartDraft[i]?.description || ""}
+                        onChange={(e) =>
+                          setNewPartDraft({
+                            ...newPartDraft,
+                            [i]: {
+                              ...newPartDraft[i],
+                              description: e.target.value,
+                            },
+                          })
+                        }
+                        disabled={submitting || saved}
+                      />
+                      <input
+                        type="number"
+                        placeholder="Unit Price"
+                        className="border p-1 rounded w-full"
+                        value={
+                          newPartDraft[i]?.current_unit_price || ""
+                        }
+                        onChange={(e) =>
+                          setNewPartDraft({
+                            ...newPartDraft,
+                            [i]: {
+                              ...newPartDraft[i],
+                              current_unit_price: e.target.value,
+                            },
+                          })
+                        }
+                        disabled={submitting || saved}
+                      />
+                      <div className="flex justify-end gap-2 mt-2">
+                        <button
+                          type="button"
+                          className="px-2 py-1 bg-gray-200 rounded"
+                          onClick={() => cancelNewPartForRow(i)}
+                          disabled={submitting || saved}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="px-2 py-1 bg-blue-600 text-white rounded"
+                          onClick={() => saveNewPartForRow(i)}
+                          disabled={submitting || saved}
+                        >
+                          Save Part
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </td>
 
-              <td className="border p-2">
-                <input
-                  type="number"
-                  value={item.quantity}
-                  className="border p-1 rounded w-full"
-                  onChange={(e) =>
-                    updateItem(i, "quantity", e.target.value)
-                  }
-                  disabled={submitting || saved}
-                />
-              </td>
+                <td className="border p-2">
+                  <input
+                    type="number"
+                    value={item.quantity}
+                    className="border p-1 rounded w-full"
+                    onChange={(e) =>
+                      updateItem(i, "quantity", e.target.value)
+                    }
+                    disabled={submitting || saved}
+                  />
+                </td>
 
-              <td className="border p-2">
-                <input
-                  type="number"
-                  value={item.unitPrice}
-                  className="border p-1 rounded w-full"
-                  onChange={(e) =>
-                    updateItem(i, "unitPrice", e.target.value)
-                  }
-                  disabled={submitting || saved}
-                />
-                {item.lastUnitPrice && (
-                  <div className="text-xs text-gray-500">
-                    Last: ${money(item.lastUnitPrice)}
-                  </div>
-                )}
-              </td>
+                <td className="border p-2">
+                  <input
+                    type="number"
+                    value={item.unitPrice}
+                    className="border p-1 rounded w-full"
+                    onChange={(e) =>
+                      updateItem(i, "unitPrice", e.target.value)
+                    }
+                    disabled={submitting || saved}
+                  />
+                  {item.lastUnitPrice && (
+                    <div className="text-xs text-gray-500">
+                      Last: ${money(item.lastUnitPrice)}
+                    </div>
+                  )}
+                </td>
 
-              <td className="border p-2 text-right">
-                ${money(item.totalPrice)}
-              </td>
-              {/* ✅ REMOVE ROW BUTTON */}
-              <td className="border p-2 text-center">
-                <button
-                  type="button"
-                  onClick={() => removeItemRow(i)}
-                  disabled={submitting || saved}
-                  className="text-red-600 font-bold hover:text-red-800"
-                  title="Remove row"
-                >
-                  ✕
-                </button>
-              </td>
-            </tr>
-          ))}
+                <td className="border p-2 text-right">
+                  ${money(item.totalPrice)}
+                </td>
+                {/* ✅ REMOVE ROW BUTTON */}
+                <td className="border p-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => removeItemRow(i)}
+                    disabled={submitting || saved}
+                    className="text-red-600 font-bold hover:text-red-800"
+                    title="Remove row"
+                  >
+                    ✕
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
 
@@ -1277,7 +1430,7 @@ const validateBeforeRFQ = () => {
         <div>Subtotal: ${money(po.subtotal)}</div>
         <div>Tax ({po.tax_percent}%): ${money(po.tax_amount)}</div>
         <div>
-          Shipping:{" "}
+          Shipping:${" "}
           <input
             type="number"
             value={po.shipping_charges || ""}
@@ -1411,26 +1564,27 @@ const validateBeforeRFQ = () => {
         )}
 
         {/* 3️⃣ SENT RFQ → Ordered + Save (NO Send RFQ button) */}
-{initialPo?.id && 
- (status === "Sent RFQ" || status === "Sent Revised RFQ") && (
-          <>
-            <button
-              type="button"
-              onClick={markOrdered}
-              className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded shadow"
-              disabled={submitting}
-            >
-              Mark As Ordered
-            </button>
-            <button
-              type="submit"
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
-              disabled={submitting}
-            >
-              Save Changes
-            </button>
-          </>
-        )}
+        {initialPo?.id &&
+          (status === "Sent RFQ" ||
+            status === "Sent Revised RFQ") && (
+            <>
+              <button
+                type="button"
+                onClick={markOrdered}
+                className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded shadow"
+                disabled={submitting}
+              >
+                Mark As Ordered
+              </button>
+              <button
+                type="submit"
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
+                disabled={submitting}
+              >
+                Save Changes
+              </button>
+            </>
+          )}
 
         {/* 4️⃣ ORDERED → Mark Received + Save */}
         {initialPo?.id && status === "Ordered" && (

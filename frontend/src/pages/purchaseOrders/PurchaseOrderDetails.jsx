@@ -102,16 +102,18 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
   // -------------------------------
   return (
     <Wrapper>
-      <style>
-        {`
-          @media print {
-            body * { visibility: hidden !important; }
-            #print-po, #print-po * { visibility: visible !important; }
-            #print-po { position: absolute; top: 0; left: 0; width: 100%; }
-            .shadow, .shadow-md, .shadow-lg, .shadow-xl { box-shadow: none !important; }
-          }
-        `}
-      </style>
+     <style>
+  {`
+    @media print {
+      body * { visibility: hidden !important; }
+      #print-po, #print-po * { visibility: visible !important; }
+      #print-po { position: absolute; top: 0; left: 0; width: 100%; }
+      .shadow, .shadow-md, .shadow-lg, .shadow-xl { box-shadow: none !important; }
+      .print-hide { display: none !important; visibility: hidden !important; }
+    }
+  `}
+</style>
+
 
       <div
         id="print-po"
@@ -125,59 +127,56 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
             Purchase Order — {po.psr_po_number}
           </h2>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => window.print()}
-              className="px-3 py-1 bg-gray-700 hover:bg-black text-white text-sm rounded shadow"
-            >
-              🖨 Print
-            </button>
+<div className="flex items-center gap-3 print-hide">
+  <button
+    onClick={() => window.print()}
+    className="px-3 py-1 bg-gray-700 hover:bg-black text-white text-sm rounded shadow"
+  >
+    🖨 Print
+  </button>
 
-            <button
-              className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded shadow"
-              onClick={() => alert("PDF Download route coming soon")}
-            >
-              ⬇️ Download
-            </button>
+  <button
+    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded shadow"
+    onClick={() => {
+  window.open(`${BASE}/api/purchase_orders/${po.id}/download`, "_blank");
+}}
 
-            <button
-              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded shadow"
-              onClick={() =>
-                (window.location.href = `/purchase-orders/edit/${po.id}`)
-              }
-            >
-              ✏️ Edit
-            </button>
+  >
+    ⬇️ Download
+  </button>
 
-            <button
-              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded shadow"
-              onClick={async () => {
-                if (
-                  !window.confirm(
-                    `Delete PO "${po.psr_po_number}" permanently?`
-                  )
-                )
-                  return;
-                try {
-                  await axios.delete(`${BASE}/api/purchase_orders/${po.id}`);
-                  alert("✅ Purchase Order deleted");
-                  handleClose();
-                } catch (err) {
-                  console.error(err);
-                  alert("❌ Failed to delete purchase order");
-                }
-              }}
-            >
-              🗑 Delete
-            </button>
+  <button
+    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded shadow"
+    onClick={() => (window.location.href = `/purchase-orders/edit/${po.id}`)}
+  >
+    ✏️ Edit
+  </button>
 
-            <button
-              onClick={handleClose}
-              className="text-gray-500 hover:text-gray-700 text-xl font-bold"
-            >
-              ✕
-            </button>
-          </div>
+  <button
+    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded shadow"
+    onClick={async () => {
+      if (!window.confirm(`Delete PO "${po.psr_po_number}" permanently?`)) return;
+      try {
+        await axios.delete(`${BASE}/api/purchase_orders/${po.id}`);
+        alert("✅ Purchase Order deleted");
+        handleClose();
+      } catch (err) {
+        console.error(err);
+        alert("❌ Failed to delete purchase order");
+      }
+    }}
+  >
+    🗑 Delete
+  </button>
+
+  <button
+    onClick={handleClose}
+    className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+  >
+    ✕
+  </button>
+</div>
+
         </div>
 
         {/* TO / FROM */}

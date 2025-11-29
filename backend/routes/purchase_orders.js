@@ -527,4 +527,92 @@ router.delete("/:po_id/file/:file_id", async (req, res) => {
   }
 });
 
+// =============================================
+//  DOWNLOAD PO AS PDF
+// =============================================
+import PDFDocument from "pdfkit";
+
+router.get("/:id/download", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    // 1. Load PO
+    const po = await db("purchase_orders as po")
+      .leftJoin("vendors as v", "po.vendor_id", "v.vendor_id")
+      .select("po.*", "v.vendor_name", "v.email as vendor_email")
+      .where("po.id", id)
+      .first();
+
+    if (!po) {
+      return res.status(404).json({ success: 0, errormsg: "PO not found" });
+    }
+
+    // 2. Load Items
+    const items = await db("purchase_order_items as i")
+      .leftJoin("inventory as inv", "i.part_id", "inv.part_id")
+      .select("i.*", "inv.part_number", "inv.description")
+      .where("i.po_id", id)
+      .orderBy("i.line_no");
+
+    // 3. Initialize PDF
+    const doc = new PDFDocument({ margin: 40 });
+
+    // Tell browser to download PDF
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=PO-${po.psr_po_number}.pdf`
+    );
+
+    doc.pipe(res);
+
+    // ------------------------------------
+    // HEADER
+    // ------------------------------------
+    doc.fontSize(20).text(`Purchase Order: ${po.psr_po_number}`);
+    doc.moveDown(1);
+
+    // ------------------------------------
+    // Vendor Info
+    // ------------------------------------
+    doc.fontSize(12).text(`Vendor: ${po.vendor_name}`);
+    doc.text(`Vendor Email: ${po.vendor_email || "-"}`);
+    doc.text(`Created By: ${po.created_by}`);
+    doc.text(`Status: ${po.status}`);
+    doc.moveDown(1);
+
+    // ------------------------------------
+    // ITEMS TABLE
+    // ------------------------------------
+    doc.fontSize(14).text("Items", { underline: true }).moveDown(0.5);
+
+    items.forEach((item) => {
+      doc.fontSize(12).text(
+        `Line ${item.line_no} - ${item.part_number || item.part_id}\n` +
+          `Qty: ${item.quantity}  Unit Price: $${item.unit_price}  Total: $${item.total_price}\n` +
+          `Description: ${item.description || "-"}`
+      );
+      doc.moveDown(0.5);
+    });
+
+    // ------------------------------------
+    // TOTALS
+    // ------------------------------------
+    doc.moveDown(1);
+    doc.fontSize(12).text(`Subtotal: $${po.subtotal}`);
+    doc.text(`Tax: $${po.tax_amount}`);
+    doc.text(`Shipping: $${po.shipping_charges}`);
+    doc.text(`Grand Total: $${po.grand_total}`);
+
+    // ------------------------------------
+    // END PDF
+    // ------------------------------------
+    doc.end();
+  } catch (err) {
+    console.error("❌ PDF Download error:", err);
+    res.status(500).json({ success: 0, errormsg: "Failed to generate PDF" });
+  }
+});
+
+
 export default router;
