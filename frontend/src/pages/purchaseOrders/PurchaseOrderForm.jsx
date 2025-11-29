@@ -1,3 +1,4 @@
+// src/pages/purchaseOrders/PurchaseOrderForm.jsx
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -11,7 +12,6 @@ function PaidStamp() {
     </div>
   );
 }
-
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 // ✅ Use FILE_BASE for downloads (no /api suffix even if env has it)
@@ -42,19 +42,11 @@ export default function PurchaseOrderForm({
     "Dave Ramnarain",
   ]);
   const [submitting, setSubmitting] = useState(false);
-
-  // lock submit after successful save
   const [saved, setSaved] = useState(false);
 
   // local state for existing uploaded files (so we can delete & update UI)
   const [existingFiles, setExistingFiles] = useState(initialPo?.files || []);
   const [deletingFileIds, setDeletingFileIds] = useState([]);
-
-const removeItemRow = (index) => {
-  const updatedItems = po.items.filter((_, i) => i !== index);
-  setPo({ ...po, items: updatedItems });
-  recalcTotals(updatedItems);
-};
 
   // keep existingFiles in sync if initialPo changes
   useEffect(() => {
@@ -91,15 +83,21 @@ const removeItemRow = (index) => {
   // Normalize the initialPo items shape if editing
   const normalizePo = (poData) => {
     if (!poData) return null;
-    const items = (poData.items || []).map((i) => ({
-      partId: i.part_id || i.id || "",
-      description: i.description || i.part_name || "",
-      quantity: i.quantity || 1,
-      unitPrice: i.unit_price || i.current_unit_price || 0,
-      totalPrice:
-        (i.quantity || 1) * (i.unit_price || i.current_unit_price || 0),
+
+    // backend may return items[] or po_items[]
+    const rawItems = poData.items || poData.po_items || [];
+
+    const items = rawItems.map((i) => ({
+      poItemId: i.id,
+      partId: i.part_id || i.partId,
+      description: i.description || "",
+      quantity: Number(i.quantity),
+      unitPrice: Number(i.unit_price),
+      totalPrice: Number(i.total_price),
+      lineNo: i.line_no || null,
       lastUnitPrice: i.last_unit_price || null,
     }));
+
     return {
       ...poData,
       order_date: toDateOnly(poData.order_date),
@@ -132,6 +130,8 @@ const removeItemRow = (index) => {
         }
   );
 
+
+
   // load vendors + parts
   useEffect(() => {
     axios
@@ -163,6 +163,12 @@ const removeItemRow = (index) => {
     const tax_amount = (subtotal * nNum(po.tax_percent)) / 100;
     const grand_total = subtotal + tax_amount + nNum(shipping);
     setPo((prev) => ({ ...prev, subtotal, tax_amount, grand_total }));
+  };
+
+  const removeItemRow = (index) => {
+    const updatedItems = po.items.filter((_, i) => i !== index);
+    setPo({ ...po, items: updatedItems });
+    recalcTotals(updatedItems);
   };
 
   // add a blank line item row
@@ -289,14 +295,9 @@ const removeItemRow = (index) => {
         ? nNum(selected.current_unit_price)
         : "",
       lastUnitPrice: selected.last_unit_price || null,
-      totalPrice:
-        nNum(updatedItems[index].quantity) *
-        (selected.last_unit_price
-          ? nNum(selected.last_unit_price)
-          : selected.current_unit_price
-          ? nNum(selected.current_unit_price)
-          : nNum(updatedItems[index].unitPrice || 0)),
     };
+    updatedItems[index].totalPrice =
+      nNum(updatedItems[index].quantity) * nNum(updatedItems[index].unitPrice);
 
     setPo({ ...po, items: updatedItems });
     recalcTotals(updatedItems);
@@ -419,7 +420,6 @@ const removeItemRow = (index) => {
       await axios.delete(
         `${BASE}/api/purchase_orders/${initialPo.id}/file/${fileId}`
       );
-      // remove from local list so UI updates
       setExistingFiles((prev) => prev.filter((f) => f.id !== fileId));
     } catch (err) {
       console.error("❌ File delete error:", err);
@@ -429,76 +429,78 @@ const removeItemRow = (index) => {
     }
   };
 
-const handleSaveDraft = async () => {
-  if (!po.psr_po_number.trim()) {
-    alert("PO Number is required to save a draft.");
-    return;
-  }
+  const handleSaveDraft = async () => {
+    if (!po.psr_po_number.trim()) {
+      alert("PO Number is required to save a draft.");
+      return;
+    }
 
-  // ⭐ DO NOT WIPE DATA — keep everything that exists
-  const draftPayload = {
-    psr_po_number: po.psr_po_number,
-    order_date: po.order_date || "",
-    expected_delivery_date: po.expected_delivery_date || "",
-    created_by: po.created_by || "",
-    vendor_id: po.vendor_id || null,
-    remarks: po.remarks || "",
-    currency: po.currency || "USD",
-    payment_terms: po.payment_terms || "",
-    tax_percent: nNum(po.tax_percent),
-    shipping_charges: nNum(po.shipping_charges),
-    items: po.items || [],
-    subtotal: nNum(po.subtotal),
-    tax_amount: nNum(po.tax_amount),
-    grand_total: nNum(po.grand_total),
-    status: "Draft",
+    try {
+      setSubmitting(true);
+
+      const res = await axios.post(`${BASE}/api/purchase_orders`, {
+        ...po,
+        status: "Draft",
+        items: po.items.map((i, index) => ({
+          id: null,
+          part_id: Number(i.partId),
+          line_no: index + 1,
+          quantity: String(i.quantity),
+          unit_price: String(i.unitPrice),
+          total_price: String(i.totalPrice),
+          description: i.description || "",
+        })),
+      });
+
+      const newId = res.data?.po_id;
+      if (!newId) {
+        alert("Failed to save draft.");
+        return;
+      }
+
+      // Upload attachments AFTER PO exists
+      if (attachments.length > 0) {
+        const formData = new FormData();
+        attachments.forEach((file) => {
+          formData.append("files", file);
+        });
+
+        const uploadRes = await axios.post(
+          `${BASE}/api/purchase_orders/${newId}/upload`,
+          formData,
+          { headers: { "Content-Type": "multipart/form-data" } }
+        );
+
+        const uploaded = uploadRes.data?.files || [];
+        setExistingFiles((prev) => [...prev, ...uploaded]);
+        setAttachments([]);
+      }
+
+      alert("Draft saved successfully.");
+      navigate("/purchase-orders");
+    } catch (err) {
+      console.error("❌ Draft save failed:", err);
+      alert("Failed to save draft.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  try {
-    // ---------------------------------------------------
-    // 🟢 CASE 1: Update existing draft
-    // ---------------------------------------------------
-    if (initialPo?.id) {
-      await axios.put(`${BASE}/api/purchase_orders/${initialPo.id}`, draftPayload);
-
-      alert("Draft updated successfully.");
-      navigate("/purchase-orders");
-      return;
-    }
-
-    // ---------------------------------------------------
-    // 🟢 CASE 2: First-time draft creation
-    // ---------------------------------------------------
-    const res = await axios.post(`${BASE}/api/purchase_orders`, draftPayload);
-    const newId = res.data?.po_id;
-
-    if (!newId) {
-      alert("Failed to save draft.");
-      return;
-    }
-
-    alert("Draft created successfully.");
-    navigate(`/purchase-orders/edit/${newId}`);
-  } catch (err) {
-    console.error("❌ Draft save error:", err);
-    alert("Failed to save draft. See console.");
-  }
-};
-
-
+  // ============================================
+  // 🔵 FINAL HANDLE SUBMIT WITH REVISED RFQ PROMPT
+  // ============================================
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (submitting || saved) return;
     setSubmitting(true);
 
-    // Validation: Must have at least 1 line item
+    // Validation
     if (!po.items || po.items.length === 0) {
       alert("At least one Part must be added to the Purchase Order.");
       setSubmitting(false);
       return;
     }
 
-    // Each item must have Part + Quantity
     for (let i of po.items) {
       if (!i.partId) {
         alert("Each line item must have a selected Part.");
@@ -510,62 +512,79 @@ const handleSaveDraft = async () => {
         setSubmitting(false);
         return;
       }
-    }
-
-    // Unit Price must not be blank or zero
-    for (let i of po.items) {
-      if (
-        i.unitPrice === "" ||
-        i.unitPrice === null ||
-        Number(i.unitPrice) <= 0
-      ) {
-        alert(
-          "Unit Price is required and must be greater than 0 for all items."
-        );
+      if (!i.unitPrice || Number(i.unitPrice) <= 0) {
+        alert("Unit Price must be greater than 0.");
         setSubmitting(false);
         return;
       }
     }
 
+    // Ensure totals are in sync
     recalcTotals(po.items);
 
-    // Only run duplicate check for NEW PO
+    // Duplicate check for NEW PO only
     if (!initialPo?.id) {
       try {
         const exists = await axios
-          .get(`${BASE}/api/purchase_orders/check-number/${po.psr_po_number}`)
+          .get(
+            `${BASE}/api/purchase_orders/check-number/${po.psr_po_number}`
+          )
           .then((res) => res.data.exists)
           .catch(() => false);
 
         if (exists) {
-          alert("This PO Number already exists. Please use a unique PO Number.");
+          alert(
+            "This PO Number already exists. Please use a unique PO Number."
+          );
           setSubmitting(false);
           return;
         }
       } catch {
-        // backend will still enforce unique number
+        // ignore check failure, continue
       }
     }
 
-    // If this was a draft and user is now submitting → force Created
-    // Once a PO is Created, it should NEVER return to Draft.
+    // --------------------------
+    // 🔵 AUTO REVISED RFQ PROMPT
+    // --------------------------
+    let sendRevised = false;
+
+    if (
+  initialPo?.id && 
+  (initialPo.status === "Sent RFQ" || initialPo.status === "Sent Revised RFQ")
+) {
+
+      const originalNorm = normalizePo(initialPo);
+      const userEditedSomething =
+        originalNorm &&
+        JSON.stringify(originalNorm) !== JSON.stringify(po);
+
+      if (userEditedSomething) {
+        const ask = window.confirm(
+          "You modified a PO that was already sent to the vendor.\n\nSend Revised RFQ now?"
+        );
+        sendRevised = ask;
+      }
+    }
+
+    // ----------------------
+    // FINAL STATUS DECISION
+    // ----------------------
     let finalStatus = po.status;
 
-    // NEW RULE:
-    // - New PO: Draft → Created
-    // - Editing Draft: Draft → Created
-    // - Editing Created: stay Created
-    if (!initialPo?.id && po.status === "Draft") {
-      finalStatus = "Created";
-    }
-    if (initialPo?.id && initialPo.status === "Draft" && po.status === "Draft") {
-      finalStatus = "Created";
-    }
-    if (initialPo?.id && initialPo.status === "Created") {
-      finalStatus = "Created"; // force lock
+    // new POs always start as Draft
+    if (!initialPo?.id) {
+      finalStatus = "Draft";
     }
 
-    // Build payload (same for create/update)
+    if (sendRevised) {
+  finalStatus = "Sent Revised RFQ";   // ⭐ NEW
+}
+
+
+    // ----------------------
+    // BUILD PAYLOAD
+    // ----------------------
     const payload = {
       psr_po_number: po.psr_po_number,
       order_date: po.order_date,
@@ -575,26 +594,31 @@ const handleSaveDraft = async () => {
       payment_terms: po.payment_terms,
       currency: po.currency,
       remarks: po.remarks,
-      tax_percent: nNum(po.tax_percent),
-      shipping_charges: nNum(po.shipping_charges),
-      subtotal: nNum(po.subtotal),
-      tax_amount: nNum(po.tax_amount),
-      grand_total: nNum(po.grand_total),
-      items: po.items.map((i) => ({
-        part_id: Number(i.partId),
-        quantity: nNum(i.quantity),
-        unit_price: nNum(i.unitPrice),
-        total_price: nNum(i.totalPrice),
-      })),
+      tax_percent: Number(po.tax_percent),
+      shipping_charges: Number(po.shipping_charges),
+      subtotal: Number(po.subtotal),
+      tax_amount: Number(po.tax_amount),
+      grand_total: Number(po.grand_total),
       status: finalStatus,
+      items: po.items.map((i, index) => ({
+        id: i.poItemId ?? null,
+        part_id: Number(i.partId),
+        line_no: index + 1,
+        quantity: String(i.quantity),
+        unit_price: String(i.unitPrice),
+        total_price: String(i.totalPrice),
+        description: i.description || "",
+      })),
     };
 
     try {
       if (initialPo?.id) {
-        // EDIT MODE
-        await axios.put(`${BASE}/api/purchase_orders/${initialPo.id}`, payload);
+        // UPDATE MODE
+        await axios.put(
+          `${BASE}/api/purchase_orders/${initialPo.id}`,
+          payload
+        );
 
-        // upload new files during EDIT
         if (attachments.length > 0) {
           const fd = new FormData();
           attachments.forEach((f) => fd.append("files", f));
@@ -604,30 +628,44 @@ const handleSaveDraft = async () => {
           );
         }
 
+      if (sendRevised) {
+
+  // ⭐ VALIDATE FULL PO BEFORE ALLOWING REVISED RFQ
+  if (!validateBeforeRFQ()) {
+    setSubmitting(false);
+    return;
+  }
+
+  navigate(`/purchase-orders/${initialPo.id}/send-rfq?revised=1`);
+  return;
+}
+
+
         alert("✅ PO updated successfully.");
       } else {
         // CREATE MODE
-        const res = await axios.post(`${BASE}/api/purchase_orders`, payload);
+        const res = await axios.post(
+          `${BASE}/api/purchase_orders`,
+          payload
+        );
         const poId = res.data?.po_id;
 
         if (poId && attachments.length) {
           const fd = new FormData();
           attachments.forEach((f) => fd.append("files", f));
-          await axios.post(`${BASE}/api/purchase_orders/${poId}/upload`, fd);
+          await axios.post(
+            `${BASE}/api/purchase_orders/${poId}/upload`,
+            fd
+          );
         }
 
         alert("✅ PO created successfully.");
       }
 
-      // After successful save, lock the form
       setSaved(true);
 
-      // If opened inside a modal (Dashboard) → close via onSaved
-      if (isModal && onSaved) {
-        onSaved();
-      } else {
-        navigate("/purchase-orders");
-      }
+      if (isModal && onSaved) onSaved();
+      else navigate("/purchase-orders");
     } catch (err) {
       console.error("❌ PO save error:", err);
       alert("Save failed. See console.");
@@ -636,22 +674,121 @@ const handleSaveDraft = async () => {
     }
   };
 
+  // ---------------------
+  // STATE MACHINE ACTIONS
+  // ---------------------
+  const status = po.status;
+
+// =======================================================
+// 🔵 VALIDATE FULL PO BEFORE ALLOWING RFQ OR REVISED RFQ
+// =======================================================
+const validateBeforeRFQ = () => {
+  // Vendor required
+  if (!po.vendor_id) {
+    alert("Please select a Vendor before sending RFQ.");
+    return false;
+  }
+
+  // Created by required
+  if (!po.created_by) {
+    alert("Please select who created this PO.");
+    return false;
+  }
+
+  // At least one item
+  if (!po.items || po.items.length === 0) {
+    alert("Please add at least one line item before sending RFQ.");
+    return false;
+  }
+
+  // Validate each item
+  for (const i of po.items) {
+    if (!i.partId) {
+      alert("Each item must have a Part selected.");
+      return false;
+    }
+    if (!i.quantity || Number(i.quantity) <= 0) {
+      alert("Item quantity must be greater than 0.");
+      return false;
+    }
+    if (!i.unitPrice || Number(i.unitPrice) <= 0) {
+      alert("Unit Price must be greater than 0 for all items.");
+      return false;
+    }
+  }
+
+  return true;
+};
+
+
+  const goToSendRFQ = () => {
+  if (!initialPo?.id) {
+    alert("Please save the draft first.");
+    return;
+  }
+
+  // ⭐ VALIDATE FULL PO BEFORE ALLOWING RFQ PAGE
+  if (!validateBeforeRFQ()) return;
+
+  navigate(`/purchase-orders/${initialPo.id}/send-rfq`);
+};
+
+
+  const markOrdered = async () => {
+    if (!initialPo?.id) return;
+
+    await axios.put(`${BASE}/api/purchase_orders/${initialPo.id}`, {
+      ...po,
+      status: "Ordered",
+    });
+
+    setPo((p) => ({ ...p, status: "Ordered" }));
+    alert("PO Marked As Ordered");
+  };
+
+  const markReceived = async () => {
+    if (!initialPo?.id) return;
+
+    await axios.put(`${BASE}/api/purchase_orders/${initialPo.id}`, {
+      ...po,
+      status: "Received",
+    });
+
+    setPo((p) => ({ ...p, status: "Received" }));
+    alert("PO Marked As Received");
+  };
+
+  const cancelPO = async () => {
+    if (!initialPo?.id) return;
+    if (!window.confirm("Cancel this PO?")) return;
+
+    await axios.put(`${BASE}/api/purchase_orders/${initialPo.id}`, {
+      ...po,
+      status: "Cancelled",
+    });
+
+    setPo((p) => ({ ...p, status: "Cancelled" }));
+    alert("PO Cancelled");
+  };
+
   // Only apply internal scroll when NOT in a modal
   const formScrollClasses = isModal ? "" : "max-h-[90vh] overflow-y-auto";
 
+  // ------------------------------------------------
+  //              FORM + FULL BUTTON BLOCK
+  // ------------------------------------------------
   return (
     <form
       onSubmit={handleSubmit}
       className={`bg-white p-6 rounded shadow ${formScrollClasses}`}
     >
-      {/* Header with inline X only when used as a modal */}
-<div className="relative flex items-start justify-between mb-4">
+      {/* HEADER */}
+      <div className="relative flex items-start justify-between mb-4">
         <h2 className="text-xl font-bold text-blue-700">
           {initialPo ? "Edit Purchase Order" : "New Purchase Order"}
         </h2>
-{/* Paid Stamp */}
-  {po.status === "Received" && <PaidStamp />}
 
+        {po.status === "Received" && <PaidStamp />}
 
         {isModal && (
           <button
@@ -691,11 +828,12 @@ const handleSaveDraft = async () => {
             disabled={submitting || saved}
           >
             <option value="Draft">Draft</option>
-<option value="Sent RFQ">Sent RFQ</option>
-<option value="Ordered">Ordered</option>
-<option value="Received">Received</option>
-<option value="Cancelled">Cancelled</option>
+            <option value="Sent RFQ">Sent RFQ</option>
+	<option value="Sent Revised RFQ">Sent Revised RFQ</option>
 
+            <option value="Ordered">Ordered</option>
+            <option value="Received">Received</option>
+            <option value="Cancelled">Cancelled</option>
           </select>
         </div>
 
@@ -946,8 +1084,7 @@ const handleSaveDraft = async () => {
             <th className="p-2 border">Qty</th>
             <th className="p-2 border">Unit Price</th>
             <th className="p-2 border text-right">Total</th>
-	<th className="p-2 border text-center">Remove</th>
-
+            <th className="p-2 border text-center">Remove</th>
           </tr>
         </thead>
         <tbody>
@@ -959,7 +1096,7 @@ const handleSaveDraft = async () => {
                   <>
                     <select
                       className="border p-1 rounded w-full"
-                      value={item.partId}
+                      value={item.partId || item.part_id || ""}
                       onChange={(e) =>
                         handlePartSelect(i, e.target.value)
                       }
@@ -979,10 +1116,13 @@ const handleSaveDraft = async () => {
 
                     {item.partId && (
                       <div className="text-xs text-gray-500 mt-1">
-                        {parts.find(
-                          (p) =>
-                            String(p.part_id) === String(item.partId)
-                        )?.description || "No description available"}
+                        {
+                          parts.find(
+                            (p) =>
+                              String(p.part_id) ===
+                              String(item.partId || item.part_id)
+                          )?.description
+                        }
                       </div>
                     )}
                   </>
@@ -1071,7 +1211,6 @@ const handleSaveDraft = async () => {
                 )}
               </td>
 
-
               <td className="border p-2">
                 <input
                   type="number"
@@ -1104,18 +1243,18 @@ const handleSaveDraft = async () => {
               <td className="border p-2 text-right">
                 ${money(item.totalPrice)}
               </td>
-		{/* ✅ ADD THIS BLOCK — REMOVE ROW BUTTON */}
-  <td className="border p-2 text-center">
-    <button
-      type="button"
-      onClick={() => removeItemRow(i)}
-      disabled={submitting || saved}
-      className="text-red-600 font-bold hover:text-red-800"
-      title="Remove row"
-    >
-      ✕
-    </button>
-  </td>
+              {/* ✅ REMOVE ROW BUTTON */}
+              <td className="border p-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => removeItemRow(i)}
+                  disabled={submitting || saved}
+                  className="text-red-600 font-bold hover:text-red-800"
+                  title="Remove row"
+                >
+                  ✕
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -1138,7 +1277,7 @@ const handleSaveDraft = async () => {
         <div>Subtotal: ${money(po.subtotal)}</div>
         <div>Tax ({po.tax_percent}%): ${money(po.tax_amount)}</div>
         <div>
-          Shipping:{"$ "}
+          Shipping:{" "}
           <input
             type="number"
             value={po.shipping_charges || ""}
@@ -1172,9 +1311,8 @@ const handleSaveDraft = async () => {
           </p>
           <ul className="list-disc pl-6 text-sm space-y-1">
             {existingFiles.map((f) => {
-              const safePath = f.filepath?.startsWith("/")
-                ? f.filepath
-                : `/${f.filepath || ""}`;
+              const safePath = "/" + (f.filepath || "").replace(/^\/+/, "");
+
               return (
                 <li
                   key={f.id || f.filepath}
@@ -1227,45 +1365,115 @@ const handleSaveDraft = async () => {
 
       {/* --- Buttons --- */}
       <div className="mt-6 flex justify-end space-x-4">
+        {/* CANCEL — always visible */}
         <button
           type="button"
           onClick={handleCancel}
           className="bg-gray-300 hover:bg-gray-400 text-black px-4 py-2 rounded shadow"
           disabled={submitting}
         >
-          {saved ? "Close" : "Cancel"}
+          Cancel
         </button>
 
-        {/* Save Draft ONLY when creating a new PO or editing a Draft */}
-        {(!initialPo || initialPo.status === "Draft") && (
+        {/* 1️⃣ NEW PO — Only Draft (ID not created yet) */}
+        {!initialPo?.id && status === "Draft" && (
+          <>
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded shadow"
+              disabled={submitting}
+            >
+              Save as Draft
+            </button>
+          </>
+        )}
+
+        {/* 2️⃣ EXISTING: DRAFT → Save + Send RFQ */}
+        {initialPo?.id && status === "Draft" && (
+          <>
+            <button
+              type="submit"
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
+              disabled={submitting}
+            >
+              Save Changes
+            </button>
+            <button
+              type="button"
+              onClick={goToSendRFQ}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow"
+              disabled={submitting}
+            >
+              Send RFQ
+            </button>
+          </>
+        )}
+
+        {/* 3️⃣ SENT RFQ → Ordered + Save (NO Send RFQ button) */}
+{initialPo?.id && 
+ (status === "Sent RFQ" || status === "Sent Revised RFQ") && (
+          <>
+            <button
+              type="button"
+              onClick={markOrdered}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded shadow"
+              disabled={submitting}
+            >
+              Mark As Ordered
+            </button>
+            <button
+              type="submit"
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
+              disabled={submitting}
+            >
+              Save Changes
+            </button>
+          </>
+        )}
+
+        {/* 4️⃣ ORDERED → Mark Received + Save */}
+        {initialPo?.id && status === "Ordered" && (
+          <>
+            <button
+              type="button"
+              onClick={markReceived}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
+              disabled={submitting}
+            >
+              Mark As Received
+            </button>
+            <button
+              type="submit"
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
+              disabled={submitting}
+            >
+              Save Changes
+            </button>
+          </>
+        )}
+
+        {/* 5️⃣ RECEIVED → Only Save Changes */}
+        {initialPo?.id && status === "Received" && (
           <button
-            type="button"
-            onClick={handleSaveDraft}
-            className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded shadow"
-            disabled={submitting || saved}
+            type="submit"
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
+            disabled={submitting}
           >
-            Save as Draft
+            Save Changes
           </button>
         )}
 
-        {/* Create/Update button */}
-        <button
-          type="submit"
-          disabled={submitting || saved}
-          className={`px-4 py-2 rounded shadow text-white ${
-            submitting || saved
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-green-600 hover:bg-green-700"
-          }`}
-        >
-          {submitting
-            ? "Saving..."
-            : saved
-            ? "Saved"
-            : !initialPo || initialPo.status === "Draft"
-            ? "Create PO"
-            : "Update Purchase Order"}
-        </button>
+        {/* 6️⃣ CANCELLED → Only Save Changes */}
+        {initialPo?.id && status === "Cancelled" && (
+          <button
+            type="submit"
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
+            disabled={submitting}
+          >
+            Save Changes
+          </button>
+        )}
       </div>
     </form>
   );

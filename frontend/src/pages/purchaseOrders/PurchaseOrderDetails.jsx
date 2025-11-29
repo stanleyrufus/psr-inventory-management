@@ -4,6 +4,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const FILE_BASE = BASE.replace(/\/api$/, ""); // ✅ needed for images
+
 const money = (v) => (v == null ? "-" : `$${Number(v).toFixed(2)}`);
 
 export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
@@ -11,7 +13,8 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
   const navigate = useNavigate();
 
   const [fetchedOrder, setFetchedOrder] = useState(null);
-  const [vendorInfo, setVendorInfo] = useState(null); // ✅ FIXED hook inside component
+  const [vendorInfo, setVendorInfo] = useState(null);
+  const [parts, setParts] = useState([]);          // ✅ ADDED
   const [loading, setLoading] = useState(false);
 
   // -------------------------------
@@ -38,7 +41,7 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
   }, [propOrder, fetchedOrder]);
 
   // -------------------------------
-  //  Load Vendor details based on vendor_id from PO
+  //  Load Vendor
   // -------------------------------
   useEffect(() => {
     if (!po?.vendor_id) return;
@@ -48,6 +51,27 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
       .then((res) => setVendorInfo(res.data?.data || res.data || null))
       .catch((err) => console.error("❌ Failed to load vendor info:", err));
   }, [po?.vendor_id]);
+
+  // -------------------------------
+  //  Load ALL PARTS (needed to show part_number & images)
+  // -------------------------------
+  useEffect(() => {
+    axios
+      .get(`${BASE}/api/parts`)
+      .then((res) => {
+        const raw = res.data?.data || res.data || [];
+        const normalized = raw.map((p) => ({
+          part_id: p.part_id || p.id,
+          part_number: p.part_number,
+          part_name: p.part_name,
+          description: p.description,
+          image_url: p.image_url,
+          current_unit_price: p.current_unit_price,
+        }));
+        setParts(normalized);
+      })
+      .catch(() => setParts([]));
+  }, []);
 
   if (loading) return <div className="p-6">Loading...</div>;
   if (!po) return <div className="p-6">Purchase Order not found.</div>;
@@ -78,42 +102,23 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
   // -------------------------------
   return (
     <Wrapper>
-<style>
-{`
-  @media print {
-    /* Hide everything */
-    body * {
-      visibility: hidden !important;
-    }
+      <style>
+        {`
+          @media print {
+            body * { visibility: hidden !important; }
+            #print-po, #print-po * { visibility: visible !important; }
+            #print-po { position: absolute; top: 0; left: 0; width: 100%; }
+            .shadow, .shadow-md, .shadow-lg, .shadow-xl { box-shadow: none !important; }
+          }
+        `}
+      </style>
 
-    /* Show only the PO container */
-    #print-po, #print-po * {
-      visibility: visible !important;
-    }
-
-    /* Position the PO print block at the top-left */
-    #print-po {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-    }
-
-    /* Remove shadows for clean printing */
-    .shadow, .shadow-md, .shadow-lg, .shadow-xl {
-      box-shadow: none !important;
-    }
-  }
-`}
-</style>
-
-    <div
-  id="print-po"
-  className={`bg-white rounded-lg shadow-xl w-full ${
-    isModal ? "max-w-5xl p-6 overflow-y-auto max-h-[95vh]" : "p-6"
-  }`}
->
-
+      <div
+        id="print-po"
+        className={`bg-white rounded-lg shadow-xl w-full ${
+          isModal ? "max-w-5xl p-6 overflow-y-auto max-h-[95vh]" : "p-6"
+        }`}
+      >
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-semibold text-gray-800">
@@ -147,7 +152,12 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
             <button
               className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded shadow"
               onClick={async () => {
-                if (!window.confirm(`Delete PO "${po.psr_po_number}" permanently?`)) return;
+                if (
+                  !window.confirm(
+                    `Delete PO "${po.psr_po_number}" permanently?`
+                  )
+                )
+                  return;
                 try {
                   await axios.delete(`${BASE}/api/purchase_orders/${po.id}`);
                   alert("✅ Purchase Order deleted");
@@ -170,73 +180,65 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
           </div>
         </div>
 
-        {/* TO / FROM SECTION */}
+        {/* TO / FROM */}
         <div className="grid grid-cols-2 gap-4 mt-6 mb-6">
-          {/* TO — Vendor */}
-<div className="border rounded-lg p-3 bg-gray-50 leading-tight text-sm">
+          {/* TO */}
+          <div className="border rounded-lg p-3 bg-gray-50 text-sm leading-tight">
+            <h2 className="font-semibold text-gray-800 text-sm mb-1">
+              TO — {vendorInfo?.vendor_name || po.vendor_name || "—"}
+              {vendorInfo?.contact_name && (
+                <span> (Attn: {vendorInfo.contact_name})</span>
+              )}
+            </h2>
 
-  {/* Header: Vendor + Attn */}
-  <h2 className="font-semibold text-gray-800 text-sm mb-1">
-    TO — {vendorInfo?.vendor_name || po.vendor_name || "—"}
-    {vendorInfo?.contact_name ? (
-      <span className="text-gray-700"> (Attn: {vendorInfo.contact_name})</span>
-    ) : null}
-  </h2>
+            {/* Address logic kept same */}
+            {(vendorInfo?.address1 || vendorInfo?.address2) && (
+              <p className="text-gray-700">
+                {(vendorInfo.address1 || "") +
+                  (vendorInfo.address2 ? `, ${vendorInfo.address2}` : "")}
+              </p>
+            )}
 
-  {/* Compact Address Line (Address1, Address2) */}
-  {(vendorInfo?.address1 || vendorInfo?.address2) && (
-    <p className="text-gray-700">
-      {(vendorInfo.address1 || "") +
-        (vendorInfo.address2 ? `, ${vendorInfo.address2}` : "")}
-    </p>
-  )}
+            {(vendorInfo?.city ||
+              vendorInfo?.state ||
+              vendorInfo?.postal_code ||
+              vendorInfo?.country) && (
+              <p className="text-gray-700">
+                {vendorInfo.city || ""}
+                {vendorInfo.city && vendorInfo.state ? ", " : ""}
+                {vendorInfo.state || ""}
+                {(vendorInfo.city || vendorInfo.state) &&
+                vendorInfo.postal_code
+                  ? " "
+                  : ""}
+                {vendorInfo.postal_code || ""}
+                {(vendorInfo.city ||
+                  vendorInfo.state ||
+                  vendorInfo.postal_code) &&
+                vendorInfo.country
+                  ? ", "
+                  : ""}
+                {vendorInfo.country || ""}
+              </p>
+            )}
 
- {/* City, State, Zip, Country — all in one line */}
-{(vendorInfo?.city ||
-  vendorInfo?.state ||
-  vendorInfo?.postal_code ||
-  vendorInfo?.country) && (
-  <p className="text-gray-700">
-    {vendorInfo.city || ""}
-    {vendorInfo.city && vendorInfo.state ? ", " : ""}
-    {vendorInfo.state || ""}
-    {(vendorInfo.city || vendorInfo.state) && vendorInfo.postal_code
-      ? " "
-      : ""}
-    {vendorInfo.postal_code || ""}
-    {(vendorInfo.city ||
-      vendorInfo.state ||
-      vendorInfo.postal_code) &&
-    vendorInfo.country
-      ? ", "
-      : ""}
-    {vendorInfo.country || ""}
-  </p>
-)}
+            {vendorInfo?.phone && (
+              <p className="text-gray-700 mt-1">📞 {vendorInfo.phone}</p>
+            )}
+            {vendorInfo?.email && (
+              <p className="text-gray-700">✉️ {vendorInfo.email}</p>
+            )}
+          </div>
 
-  {/* Phone */}
-  {vendorInfo?.phone && (
-    <p className="text-gray-700 mt-1">📞 {vendorInfo.phone}</p>
-  )}
-
-  {/* Email */}
-  {vendorInfo?.email && (
-    <p className="text-gray-700">✉️ {vendorInfo.email}</p>
-  )}
-</div>
-
-
-          {/* FROM — PSR */}
-          <div className="border rounded-lg p-3 bg-gray-50 leading-tight text-sm">
+          {/* FROM */}
+          <div className="border rounded-lg p-3 bg-gray-50 text-sm leading-tight">
             <h2 className="font-semibold text-gray-800 text-sm mb-1">
               FROM — PSR Automation Inc.
             </h2>
-
-            <p className="text-gray-700">13318 Skyline Cir</p>
-            <p className="text-gray-700">Shakopee, MN 55379, USA</p>
-
-            <p className="text-gray-700 mt-1">📞 952-233-1441</p>
-            <p className="text-gray-700">✉️ info@psrautomation.com</p>
+            <p>13318 Skyline Cir</p>
+            <p>Shakopee, MN 55379, USA</p>
+            <p className="mt-1">📞 952-233-1441</p>
+            <p>✉️ info@psrautomation.com</p>
           </div>
         </div>
 
@@ -244,19 +246,17 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <p>
-              <span className="font-medium text-gray-700">Created By:</span>{" "}
+              <span className="font-medium">Created By:</span>{" "}
               {po.created_by || "—"}
             </p>
             <p>
-              <span className="font-medium text-gray-700">Order Date:</span>{" "}
+              <span className="font-medium">Order Date:</span>{" "}
               {po.order_date
                 ? new Date(po.order_date).toLocaleDateString()
                 : "—"}
             </p>
             <p>
-              <span className="font-medium text-gray-700">
-                Expected Delivery:
-              </span>{" "}
+              <span className="font-medium">Expected Delivery:</span>{" "}
               {po.expected_delivery_date
                 ? new Date(po.expected_delivery_date).toLocaleDateString()
                 : "—"}
@@ -265,16 +265,14 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
 
           <div>
             <p>
-              <span className="font-medium text-gray-700">Status:</span>{" "}
-              {po.status || "—"}
+              <span className="font-medium">Status:</span> {po.status}
             </p>
             <p>
-              <span className="font-medium text-gray-700">Payment Terms:</span>{" "}
+              <span className="font-medium">Payment Terms:</span>{" "}
               {po.payment_terms || "—"}
             </p>
             <p>
-              <span className="font-medium text-gray-700">Currency:</span>{" "}
-              {po.currency || "—"}
+              <span className="font-medium">Currency:</span> {po.currency}
             </p>
           </div>
         </div>
@@ -301,44 +299,77 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
           </div>
         </div>
 
-        {/* Items */}
+        {/* ITEMS TABLE */}
         <h3 className="mt-6 font-semibold text-gray-800">Items</h3>
+
         {items.length > 0 ? (
           <div className="overflow-x-auto mt-2">
             <table className="min-w-full text-sm border">
               <thead className="bg-gray-100">
                 <tr>
                   <th className="border px-2 py-1">Line</th>
-                  <th className="border px-2 py-1">Part Number</th>
+                  <th className="border px-2 py-1">Part</th>
                   <th className="border px-2 py-1">Description</th>
+                  <th className="border px-2 py-1">Image</th>
                   <th className="border px-2 py-1 text-right">Qty</th>
                   <th className="border px-2 py-1 text-right">Unit Price</th>
                   <th className="border px-2 py-1 text-right">Total</th>
                 </tr>
               </thead>
+
               <tbody>
-                {items.map((it, idx) => (
-                  <tr key={idx}>
-                    <td className="border px-2 py-1 text-center">
-                      {it.line_no ?? idx + 1}
-                    </td>
-                    <td className="border px-2 py-1">
-                      {it.part_number || it.part_id}
-                    </td>
-                    <td className="border px-2 py-1">
-                      {it.description || "—"}
-                    </td>
-                    <td className="border px-2 py-1 text-right">
-                      {it.quantity}
-                    </td>
-                    <td className="border px-2 py-1 text-right">
-                      {money(it.unit_price)}
-                    </td>
-                    <td className="border px-2 py-1 text-right">
-                      {money(it.total_price)}
-                    </td>
-                  </tr>
-                ))}
+                {items.map((it, idx) => {
+                  const part = parts.find((p) =>
+  String(p.part_id) === String(it.part_id || it.partId)
+);
+
+
+                  return (
+                    <tr key={idx}>
+                      <td className="border px-2 py-1 text-center">
+                        {it.line_no ?? idx + 1}
+                      </td>
+
+                      {/* PART NUMBER */}
+                      <td className="border px-2 py-1">
+{part?.part_number || `Part #${it.part_id || it.partId}`}
+                      </td>
+
+                      {/* DESCRIPTION */}
+                      <td className="border px-2 py-1">
+                        {part?.description || it.description || "—"}
+                      </td>
+
+                      {/* IMAGE */}
+                      <td className="border px-2 py-1 text-center">
+                        {part?.image_url ? (
+                          <img
+src={
+  part?.image_url
+    ? `${FILE_BASE}${part.image_url.startsWith("/") ? "" : "/"}${part.image_url}`
+    : ""
+}
+                            className="w-12 h-12 object-cover border rounded"
+                          />
+                        ) : (
+                          <span className="text-gray-400 text-xs">
+                            No Image
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="border px-2 py-1 text-right">
+                        {it.quantity}
+                      </td>
+                      <td className="border px-2 py-1 text-right">
+                        {money(it.unit_price)}
+                      </td>
+                      <td className="border px-2 py-1 text-right">
+                        {money(it.total_price)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -346,16 +377,15 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
           <p className="text-sm text-gray-500 mt-2">No items found.</p>
         )}
 
-        {/* Attachments */}
+        {/* ATTACHMENTS */}
         <h3 className="mt-6 font-semibold text-gray-800">Attachments</h3>
+
         {files.length > 0 ? (
           <ul className="list-disc pl-6 mt-1 text-sm">
             {files.map((f) => (
               <li key={f.id || f.filepath}>
                 <a
-                  href={`${BASE}${
-                    f.filepath?.startsWith("/") ? "" : "/"
-                  }${f.filepath}`}
+                 href={`${FILE_BASE}${f.filepath.startsWith("/") ? "" : "/"}${f.filepath}`}
                   target="_blank"
                   rel="noreferrer"
                   className="text-blue-700 hover:underline"
@@ -372,7 +402,6 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
           </p>
         )}
       </div>
-
     </Wrapper>
   );
 }

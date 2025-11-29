@@ -143,48 +143,69 @@ router.post("/", async (req, res) => {
   } = body;
 
   // ======================================================
-  // ⭐ 1. DRAFT MODE (NO VALIDATION, NO ITEMS REQUIRED)
-  // ======================================================
-  if (status === "Draft") {
-    if (!psr_po_number) {
-      return res.status(400).json({
-        success: 0,
-        errormsg: "PO Number is required to save draft.",
-      });
-    }
-
-    try {
-      const inserted = await db("purchase_orders")
-        .insert({
-          psr_po_number,
-          status: "Draft",
-          remarks: remarks || null,
-          created_by: created_by || null,
-          vendor_id: vendor_id || null,
-          order_date: normalizeDate(order_date),
-          expected_delivery_date: normalizeDate(expected_delivery_date),
-          subtotal: 0,
-          tax_amount: 0,
-          grand_total: 0,
-          created_at: db.fn.now(),
-          updated_at: db.fn.now(),
-        })
-        .returning(["id"]);
-
-      return res.json({
-        success: 1,
-        po_id: inserted[0].id,
-        draft: true,
-        message: "Draft saved successfully.",
-      });
-    } catch (err) {
-      console.error("❌ Draft save error:", err);
-      return res.status(500).json({
-        success: 0,
-        errormsg: "Failed to save draft.",
-      });
-    }
+// ⭐ 1. DRAFT MODE — Save everything INCLUDING ITEMS
+// ======================================================
+if (status === "Draft") {
+  if (!psr_po_number) {
+    return res.status(400).json({
+      success: 0,
+      errormsg: "PO Number is required to save draft.",
+    });
   }
+
+  const trx = await db.transaction();
+  try {
+    const inserted = await trx("purchase_orders")
+      .insert({
+        psr_po_number,
+        status: "Draft",
+        remarks: remarks || null,
+        created_by: created_by || null,
+        vendor_id: vendor_id || null,
+        order_date: normalizeDate(order_date),
+        expected_delivery_date: normalizeDate(expected_delivery_date),
+        subtotal: subtotal || 0,
+        tax_amount: tax_amount || 0,
+        grand_total: grand_total || 0,
+        created_at: db.fn.now(),
+        updated_at: db.fn.now(),
+      })
+      .returning(["id"]);
+
+    const po_id = inserted[0].id;
+
+    if (items && items.length > 0) {
+      const itemsToInsert = items.map((item, index) => ({
+        po_id,
+        line_no: index + 1,
+        part_id: item.part_id || item.partId,
+        quantity: item.quantity,
+        unit_price: item.unit_price || item.unitPrice,
+        total_price: item.total_price || item.totalPrice,
+      }));
+
+      await trx("purchase_order_items").insert(itemsToInsert);
+    }
+
+    await trx.commit();
+
+    return res.json({
+      success: 1,
+      po_id,
+      draft: true,
+      message: "Draft saved successfully",
+    });
+
+  } catch (err) {
+    await trx.rollback();
+    console.error("❌ Draft save error:", err);
+    return res.status(500).json({
+      success: 0,
+      errormsg: "Failed to save draft with items.",
+    });
+  }
+}
+
 
   // ======================================================
   // ⭐ 2. NORMAL CREATE PO MODE (FULL VALIDATION)
@@ -336,7 +357,7 @@ router.get("/:id", async (req, res) => {
     // 🔥 CRITICAL FIX: always return a PUBLIC path
     const normalizedFiles = files.map((f) => ({
       ...f,
-      filepath: `/uploads/purchase_orders/${path.basename(f.filepath)}`,
+  filepath: `/uploads/po-attachments/${path.basename(f.filepath)}`,
     }));
 
     res.json({ success: 1, data: { ...po, items, files: normalizedFiles } });
@@ -437,7 +458,8 @@ router.post("/:id/upload", uploadPo, async (req, res) => {
       stored_filename: file.filename,
       mime_type: file.mimetype,
       size_bytes: file.size,
-      filepath: `/uploads/po-attachments/${file.filename}`,
+filepath: `/uploads/po-attachments/${file.filename}`,
+
       uploaded_at: new Date().toISOString(),
     }));
 

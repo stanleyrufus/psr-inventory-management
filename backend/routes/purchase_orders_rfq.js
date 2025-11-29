@@ -144,13 +144,12 @@ router.post("/:id/rfq/send", async (req, res) => {
   const { id } = req.params;
   const { to = [], cc = [] } = req.body || {};
 
-  // ✅ Add default CC from .env
+  // Default CC
   const defaultCC = String(process.env.RFQ_CC_DEFAULT || "")
     .split(",")
     .map((e) => e.trim())
     .filter(Boolean);
 
-  // ✅ Merge & dedupe
   const ccAll = Array.from(new Set([...defaultCC, ...cc]));
 
   if (!to.length)
@@ -164,29 +163,39 @@ router.post("/:id/rfq/send", async (req, res) => {
   const html = buildRFQHtml(data);
 
   try {
+    // 1️⃣ SEND EMAIL
     const info = await transporter.sendMail({
       from: process.env.RFQ_FROM_EMAIL,
       to,
-      cc: ccAll, // ✅ fixed
+      cc: ccAll,
       subject,
       html,
     });
 
+    // 2️⃣ STORE EMAIL LOG
     await db("po_rfq_emails").insert({
       po_id: id,
       to_emails: to,
-      cc_emails: ccAll, // ✅ store cc
+      cc_emails: ccAll,
       subject,
       body_html: html,
       sent_at: db.fn.now(),
       status: "sent",
     });
 
+    // ⭐⭐⭐ CRITICAL FIX ⭐⭐⭐
+    // UPDATE MAIN PO STATUS SO FRONTEND LOGIC WORKS
+    await db("purchase_orders")
+      .where({ id })
+      .update({ status: "Sent RFQ" });
+
+    // 3️⃣ SUCCESS RESPONSE
     res.json({
       success: 1,
       messageId: info.messageId,
-      cc_used: ccAll, // ✅ return CC used
+      cc_used: ccAll,
     });
+
   } catch (err) {
     console.error("RFQ send error:", err);
     res.status(500).json({ success: 0, error: err.message });
