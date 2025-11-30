@@ -114,8 +114,8 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
       </style>
 
       <div
-        id="print-po"
-        className={`bg-white rounded-lg shadow-xl w-full border border-gray-300 ${
+  id="print-po"
+  className={`relative bg-white rounded-lg shadow-xl w-full ${
           isModal ? "max-w-6xl p-6 overflow-y-auto max-h-[95vh]" : "p-6"
         }`}
       >
@@ -128,19 +128,57 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
             🖨 Print
           </button>
 
-          <button
-            className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded shadow"
-            onClick={() =>
-              window.open(
-                `${BASE}/api/purchase_orders/${po.id}/download`,
-                "_blank"
-              )
-            }
-          >
-            ⬇️ Download
-          </button>
+{po.status !== "Paid" && (
+  <button
+    className="px-3 py-1 bg-green-700 hover:bg-green-800 text-white text-sm rounded shadow"
+    onClick={async () => {
+      if (!window.confirm("Mark this PO as PAID?")) return;
 
-          <button
+      try {
+        await axios.put(`${BASE}/api/purchase_orders/${po.id}`, {
+          ...po,
+          status: "Paid",
+        });
+
+        alert("PO marked as PAID.");
+        window.location.reload();
+      } catch (err) {
+        console.error(err);
+        alert("Failed to update status.");
+      }
+    }}
+  >
+    💲 Mark as Paid
+  </button>
+)}
+
+{po.status === "Paid" && (
+  <button
+    className="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded shadow"
+    onClick={async () => {
+      if (!window.confirm("Revert this PO to UNPAID status?")) return;
+
+      try {
+        await axios.put(`${BASE}/api/purchase_orders/${po.id}`, {
+          ...po,
+          status: "Received", // OR revert to last known state
+        });
+
+        alert("PO status reverted to UNPAID.");
+        window.location.reload();
+      } catch (err) {
+        console.error(err);
+        alert("Failed to update status.");
+      }
+    }}
+  >
+    ↩️ Mark as Unpaid
+  </button>
+)}
+
+  
+
+	  <button
             className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded shadow"
             onClick={() =>
               (window.location.href = `/purchase-orders/edit/${po.id}`)
@@ -262,7 +300,8 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
         <span className="font-medium text-gray-700">Status: </span>
         {po.status || "—"}
       </div>
-    </div>
+   </div>
+
 
     {/* -----------------------------------
        COLUMN 3 — CREATED BY / TERMS / CURRENCY
@@ -282,6 +321,7 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
         <span className="font-medium text-gray-700">Currency: </span>
         {po.currency || "USD"}
       </div>
+
     </div>
   </div>
 </div>
@@ -465,38 +505,47 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
           <p className="text-sm text-gray-500 mt-2">No items found.</p>
         )}
 
-        {/* =======================================================
-            TOTALS BLOCK (bottom-right, PSR styled)
-           ======================================================= */}
-        <div className="mt-4 flex justify-end">
-          <div className="border border-gray-300 rounded-md bg-gray-50 px-4 py-3 text-sm w-64">
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-700">Subtotal</span>
-              <span className="font-semibold">{money(po.subtotal)}</span>
-            </div>
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-700">
-                Tax ({po.tax_percent ?? 0}%)
-              </span>
-              <span className="font-semibold">{money(po.tax_amount)}</span>
-            </div>
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-700">Shipping</span>
-              <span className="font-semibold">
-                {money(po.shipping_charges)}
-              </span>
-            </div>
-            <div className="border-t border-gray-300 mt-2 pt-2 flex justify-between">
-              <span className="font-semibold text-gray-800">
-                GRAND TOTAL
-              </span>
-              <span className="font-bold text-gray-900">
-                {money(po.grand_total)}
-              </span>
-            </div>
-          </div>
-        </div>
 
+{/* =======================================================
+    TOTALS BLOCK (bottom-right, PSR styled)
+   ======================================================= */}
+<div className="mt-4 flex justify-end relative">
+  {/* ⭐ PAID STAMP — centered in left side space of totals block */}
+  {po.status === "Paid" && (
+    <div className="absolute top-1/2 -translate-y-1/2 right-[18rem] rotate-[-12deg] opacity-70 pointer-events-none">
+      <span className="inline-block px-5 py-2 text-red-700 border-4 border-red-700 font-extrabold text-3xl tracking-wider rounded-lg">
+        PAID
+      </span>
+    </div>
+  )}
+
+  <div className="border border-gray-300 rounded-md bg-gray-50 px-4 py-3 text-sm w-64">
+    <div className="flex justify-between mb-1">
+      <span className="text-gray-700">Subtotal</span>
+      <span className="font-semibold">{money(po.subtotal)}</span>
+    </div>
+    <div className="flex justify-between mb-1">
+      <span className="text-gray-700">
+        Tax ({po.tax_percent ?? 0}%)
+      </span>
+      <span className="font-semibold">{money(po.tax_amount)}</span>
+    </div>
+    <div className="flex justify-between mb-1">
+      <span className="text-gray-700">Shipping</span>
+      <span className="font-semibold">
+        {money(po.shipping_charges)}
+      </span>
+    </div>
+    <div className="border-t border-gray-300 mt-2 pt-2 flex justify-between">
+      <span className="font-semibold text-gray-800">
+        GRAND TOTAL
+      </span>
+      <span className="font-bold text-gray-900">
+        {money(po.grand_total)}
+      </span>
+    </div>
+  </div>
+</div>
 {/* ATTACHMENTS */}
 <h3 className="mt-6 font-semibold text-gray-800">Attachments</h3>
 

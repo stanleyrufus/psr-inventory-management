@@ -979,6 +979,7 @@ if (wantRevised) {
             <option value="Sent Revised RFQ">Sent Revised RFQ</option>
             <option value="Ordered">Ordered</option>
             <option value="Received">Received</option>
+	    <option value="Paid">Paid</option>
             <option value="Cancelled">Cancelled</option>
           </select>
         </div>
