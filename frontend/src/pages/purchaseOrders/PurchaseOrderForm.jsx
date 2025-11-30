@@ -935,8 +935,6 @@ if (wantRevised) {
           {initialPo ? "Edit Purchase Order" : "New Purchase Order"}
         </h2>
 
-        {po.status === "Received" && <PaidStamp />}
-
         {isModal && (
           <button
             type="button"

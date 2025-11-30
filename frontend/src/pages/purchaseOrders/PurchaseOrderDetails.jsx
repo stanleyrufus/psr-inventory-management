@@ -119,103 +119,101 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
           isModal ? "max-w-6xl p-6 overflow-y-auto max-h-[95vh]" : "p-6"
         }`}
       >
-        {/* TOP ACTION BAR (non-print) */}
-        <div className="flex justify-end mb-3 gap-2 print-hide">
-          <button
-            onClick={() => window.print()}
-            className="px-3 py-1 bg-gray-700 hover:bg-black text-white text-sm rounded shadow"
-          >
-            🖨 Print
-          </button>
+{/* TOP ACTION BAR (non-print) */}
+<div className="flex justify-end mb-3 gap-2 print-hide">
 
-{po.status !== "Paid" && (
   <button
-    className="px-3 py-1 bg-green-700 hover:bg-green-800 text-white text-sm rounded shadow"
+    onClick={() => window.print()}
+    className="px-3 h-10 bg-gray-700 hover:bg-black text-white text-sm rounded shadow flex items-center"
+  >
+    🖨 Print
+  </button>
+
+  {po.status !== "Paid" && (
+    <button
+      className="px-3 h-10 bg-green-700 hover:bg-green-800 text-white text-sm rounded shadow flex items-center"
+      onClick={async () => {
+        if (!window.confirm("Mark this PO as PAID?")) return;
+
+        try {
+          await axios.put(`${BASE}/api/purchase_orders/${po.id}`, {
+            ...po,
+            status: "Paid",
+          });
+
+          alert("PO marked as PAID.");
+          window.location.reload();
+        } catch (err) {
+          console.error(err);
+          alert("Failed to update status.");
+        }
+      }}
+    >
+      💲 Mark as Paid
+    </button>
+  )}
+
+  {po.status === "Paid" && (
+    <button
+      className="px-3 h-10 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded shadow flex items-center"
+      onClick={async () => {
+        if (!window.confirm("Revert this PO to UNPAID status?")) return;
+
+        try {
+          await axios.put(`${BASE}/api/purchase_orders/${po.id}`, {
+            ...po,
+            status: "Received", // revert to previous state
+          });
+
+          alert("PO status reverted to UNPAID.");
+          window.location.reload();
+        } catch (err) {
+          console.error(err);
+          alert("Failed to update status.");
+        }
+      }}
+    >
+      ↩️ Mark as Unpaid
+    </button>
+  )}
+
+  <button
+    className="px-3 h-10 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded shadow flex items-center"
+    onClick={() =>
+      (window.location.href = `/purchase-orders/edit/${po.id}`)
+    }
+  >
+    ✏️ Edit
+  </button>
+
+  <button
+    className="px-3 h-10 bg-red-600 hover:bg-red-700 text-white text-sm rounded shadow flex items-center"
     onClick={async () => {
-      if (!window.confirm("Mark this PO as PAID?")) return;
+      if (!window.confirm(
+        `Delete PO "${po.psr_po_number}" permanently?`
+      )) return;
 
       try {
-        await axios.put(`${BASE}/api/purchase_orders/${po.id}`, {
-          ...po,
-          status: "Paid",
-        });
-
-        alert("PO marked as PAID.");
-        window.location.reload();
+        await axios.delete(`${BASE}/api/purchase_orders/${po.id}`);
+        alert("✅ Purchase Order deleted");
+        handleClose();
       } catch (err) {
         console.error(err);
-        alert("Failed to update status.");
+        alert("❌ Failed to delete purchase order");
       }
     }}
   >
-    💲 Mark as Paid
+    🗑 Delete
   </button>
-)}
 
-{po.status === "Paid" && (
   <button
-    className="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded shadow"
-    onClick={async () => {
-      if (!window.confirm("Revert this PO to UNPAID status?")) return;
-
-      try {
-        await axios.put(`${BASE}/api/purchase_orders/${po.id}`, {
-          ...po,
-          status: "Received", // OR revert to last known state
-        });
-
-        alert("PO status reverted to UNPAID.");
-        window.location.reload();
-      } catch (err) {
-        console.error(err);
-        alert("Failed to update status.");
-      }
-    }}
+    onClick={handleClose}
+    className="h-10 px-3 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xl font-bold rounded flex items-center justify-center"
   >
-    ↩️ Mark as Unpaid
+    ✕
   </button>
-)}
 
-  
-
-	  <button
-            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded shadow"
-            onClick={() =>
-              (window.location.href = `/purchase-orders/edit/${po.id}`)
-            }
-          >
-            ✏️ Edit
-          </button>
-
-          <button
-            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded shadow"
-            onClick={async () => {
-              if (
-                !window.confirm(
-                  `Delete PO "${po.psr_po_number}" permanently?`
-                )
-              )
-                return;
-              try {
-                await axios.delete(`${BASE}/api/purchase_orders/${po.id}`);
-                alert("✅ Purchase Order deleted");
-                handleClose();
-              } catch (err) {
-                console.error(err);
-                alert("❌ Failed to delete purchase order");
-              }
-            }}
-          >
-            🗑 Delete
-          </button>
-
-          <button
-            onClick={handleClose}
-            className="text-gray-500 hover:text-gray-700 text-xl font-bold"
-          >
-            ✕
-          </button>
-        </div>
+</div>
 
 {/* =======================================================
     HEADER STRIP (PSR + PO INFO)
