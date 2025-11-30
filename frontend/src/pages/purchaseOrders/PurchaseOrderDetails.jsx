@@ -4,9 +4,10 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
-const FILE_BASE = BASE.replace(/\/api$/, ""); // ✅ needed for images
+const FILE_BASE = BASE.replace(/\/api$/, "");
 
-const money = (v) => (v == null ? "-" : `$${Number(v).toFixed(2)}`);
+const money = (v) =>
+  v == null || v === "" || isNaN(Number(v)) ? "-" : `$${Number(v).toFixed(2)}`;
 
 export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
   const { id } = useParams();
@@ -14,7 +15,7 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
 
   const [fetchedOrder, setFetchedOrder] = useState(null);
   const [vendorInfo, setVendorInfo] = useState(null);
-  const [parts, setParts] = useState([]);          // ✅ ADDED
+  const [parts, setParts] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // -------------------------------
@@ -53,7 +54,7 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
   }, [po?.vendor_id]);
 
   // -------------------------------
-  //  Load ALL PARTS (needed to show part_number & images)
+  //  Load ALL PARTS (for part number + images)
   // -------------------------------
   useEffect(() => {
     axios
@@ -92,278 +93,366 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
         {children}
       </div>
     ) : (
-      <div className="p-6 bg-white rounded shadow max-w-5xl mx-auto my-8">
+      <div className="p-6 bg-white rounded shadow max-w-6xl mx-auto my-8">
         {children}
       </div>
     );
 
-  // -------------------------------
-  // Render
-  // -------------------------------
   return (
     <Wrapper>
-     <style>
-  {`
-    @media print {
-      body * { visibility: hidden !important; }
-      #print-po, #print-po * { visibility: visible !important; }
-      #print-po { position: absolute; top: 0; left: 0; width: 100%; }
-      .shadow, .shadow-md, .shadow-lg, .shadow-xl { box-shadow: none !important; }
-      .print-hide { display: none !important; visibility: hidden !important; }
-    }
-  `}
-</style>
-
+      {/* PRINT STYLES */}
+      <style>
+        {`
+          @media print {
+            body * { visibility: hidden !important; }
+            #print-po, #print-po * { visibility: visible !important; }
+            #print-po { position: absolute; top: 0; left: 0; width: 100%; }
+            .shadow, .shadow-md, .shadow-lg, .shadow-xl { box-shadow: none !important; }
+            .print-hide { display: none !important; visibility: hidden !important; }
+          }
+        `}
+      </style>
 
       <div
         id="print-po"
-        className={`bg-white rounded-lg shadow-xl w-full ${
-          isModal ? "max-w-5xl p-6 overflow-y-auto max-h-[95vh]" : "p-6"
+        className={`bg-white rounded-lg shadow-xl w-full border border-gray-300 ${
+          isModal ? "max-w-6xl p-6 overflow-y-auto max-h-[95vh]" : "p-6"
         }`}
       >
-        {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold text-gray-800">
-            Purchase Order — {po.psr_po_number}
-          </h2>
+        {/* TOP ACTION BAR (non-print) */}
+        <div className="flex justify-end mb-3 gap-2 print-hide">
+          <button
+            onClick={() => window.print()}
+            className="px-3 py-1 bg-gray-700 hover:bg-black text-white text-sm rounded shadow"
+          >
+            🖨 Print
+          </button>
 
-<div className="flex items-center gap-3 print-hide">
-  <button
-    onClick={() => window.print()}
-    className="px-3 py-1 bg-gray-700 hover:bg-black text-white text-sm rounded shadow"
-  >
-    🖨 Print
-  </button>
+          <button
+            className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded shadow"
+            onClick={() =>
+              window.open(
+                `${BASE}/api/purchase_orders/${po.id}/download`,
+                "_blank"
+              )
+            }
+          >
+            ⬇️ Download
+          </button>
 
-  <button
-    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded shadow"
-    onClick={() => {
-  window.open(`${BASE}/api/purchase_orders/${po.id}/download`, "_blank");
-}}
+          <button
+            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded shadow"
+            onClick={() =>
+              (window.location.href = `/purchase-orders/edit/${po.id}`)
+            }
+          >
+            ✏️ Edit
+          </button>
 
-  >
-    ⬇️ Download
-  </button>
+          <button
+            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded shadow"
+            onClick={async () => {
+              if (
+                !window.confirm(
+                  `Delete PO "${po.psr_po_number}" permanently?`
+                )
+              )
+                return;
+              try {
+                await axios.delete(`${BASE}/api/purchase_orders/${po.id}`);
+                alert("✅ Purchase Order deleted");
+                handleClose();
+              } catch (err) {
+                console.error(err);
+                alert("❌ Failed to delete purchase order");
+              }
+            }}
+          >
+            🗑 Delete
+          </button>
 
-  <button
-    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded shadow"
-    onClick={() => (window.location.href = `/purchase-orders/edit/${po.id}`)}
-  >
-    ✏️ Edit
-  </button>
+          <button
+            onClick={handleClose}
+            className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+          >
+            ✕
+          </button>
+        </div>
 
-  <button
-    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded shadow"
-    onClick={async () => {
-      if (!window.confirm(`Delete PO "${po.psr_po_number}" permanently?`)) return;
-      try {
-        await axios.delete(`${BASE}/api/purchase_orders/${po.id}`);
-        alert("✅ Purchase Order deleted");
-        handleClose();
-      } catch (err) {
-        console.error(err);
-        alert("❌ Failed to delete purchase order");
-      }
-    }}
-  >
-    🗑 Delete
-  </button>
+{/* =======================================================
+    HEADER STRIP (PSR + PO INFO)
+   ======================================================= */}
+<div className="border border-gray-300 rounded-md mb-4">
+  <div className="flex justify-between items-center bg-blue-900 text-white px-4 py-2 rounded-t-md">
+    <div className="font-semibold text-lg tracking-wide">
+      PSR AUTOMATION INC.
+    </div>
+    <div className="text-right text-sm leading-tight">
+      <div className="font-semibold text-base">PURCHASE ORDER</div>
+      <div>PO #: {po.psr_po_number || "-"}</div>
+    </div>
+  </div>
 
-  <button
-    onClick={handleClose}
-    className="text-gray-500 hover:text-gray-700 text-xl font-bold"
-  >
-    ✕
-  </button>
+  <div className="px-4 py-2 text-sm grid grid-cols-3 gap-2">
+
+    {/* -----------------------------------
+       COLUMN 1 — VENDOR INFORMATION
+       ----------------------------------- */}
+    <div>
+      <div className="font-semibold text-gray-800">
+        {vendorInfo?.vendor_name || po.vendor_name || "Vendor"}
+      </div>
+
+      {vendorInfo?.contact_name && (
+        <div>Attn: {vendorInfo.contact_name}</div>
+      )}
+
+      {/* Address Line 1 */}
+      {vendorInfo?.address1 && <div>{vendorInfo.address1}</div>}
+
+      {/* Address Line 2 */}
+      {vendorInfo?.address2 && <div>{vendorInfo.address2}</div>}
+
+      {/* City, State, Postal */}
+      {(vendorInfo?.city ||
+        vendorInfo?.state ||
+        vendorInfo?.postal_code) && (
+        <div>
+          {vendorInfo.city || ""}
+          {vendorInfo.city && vendorInfo.state ? ", " : ""}
+          {vendorInfo.state || ""}
+          {(vendorInfo.city || vendorInfo.state) && vendorInfo.postal_code
+            ? " "
+            : ""}
+          {vendorInfo.postal_code || ""}
+        </div>
+      )}
+
+      {/* Country */}
+      {vendorInfo?.country && <div>{vendorInfo.country}</div>}
+
+      {/* Contact Info */}
+      {vendorInfo?.phone && (
+        <div>📞 {vendorInfo.phone}</div>
+      )}
+      {vendorInfo?.email && (
+        <div>✉️ {vendorInfo.email}</div>
+      )}
+    </div>
+
+    {/* -----------------------------------
+       COLUMN 2 — PO META
+       ----------------------------------- */}
+    <div className="text-sm">
+      <div>
+        <span className="font-medium text-gray-700">PO Date: </span>
+        {po.order_date
+          ? new Date(po.order_date).toLocaleDateString()
+          : "—"}
+      </div>
+
+      <div>
+        <span className="font-medium text-gray-700">Expected Delivery: </span>
+        {po.expected_delivery_date
+          ? new Date(po.expected_delivery_date).toLocaleDateString()
+          : "—"}
+      </div>
+
+      <div>
+        <span className="font-medium text-gray-700">Status: </span>
+        {po.status || "—"}
+      </div>
+    </div>
+
+    {/* -----------------------------------
+       COLUMN 3 — CREATED BY / TERMS / CURRENCY
+       ----------------------------------- */}
+    <div className="text-sm text-right">
+      <div>
+        <span className="font-medium text-gray-700">Created By: </span>
+        {po.created_by || "—"}
+      </div>
+
+      <div>
+        <span className="font-medium text-gray-700">Terms: </span>
+        {po.payment_terms || "—"}
+      </div>
+
+      <div>
+        <span className="font-medium text-gray-700">Currency: </span>
+        {po.currency || "USD"}
+      </div>
+    </div>
+  </div>
 </div>
 
-        </div>
+       {/* =======================================================
+    SOLD TO / SHIP TO (STATIC)
+   ======================================================= */}
+<div className="grid grid-cols-2 gap-4 mb-4">
+  
+  {/* SOLD TO (STATIC LIKE SOA) */}
+  <div className="border border-gray-300 rounded-md bg-gray-50 text-sm leading-tight">
+    <div className="bg-gray-200 px-3 py-1 border-b border-gray-300">
+      <span className="font-semibold text-gray-800 tracking-wide text-xs">
+        SOLD TO
+      </span>
+    </div>
+    <div className="px-3 py-2 leading-tight">
+      <p className="font-semibold text-gray-800">SHINEY RAMNARAIN</p>
+      <p className="text-gray-800">PSR AUTOMATION</p>
+      <p className="text-gray-800">13318 SKYLINE CIRCLE</p>
+      <p className="text-gray-800">SHAKOPEE MN 55379</p>
+      <p className="text-gray-800">Phone: 952-233-1441</p>
+      <p className="text-gray-800">Fax: 952-233-3731</p>
+      <p className="text-gray-800">Email: SHINEY@PSRAUTOMATION.COM</p>
+    </div>
+  </div>
 
-        {/* TO / FROM */}
-        <div className="grid grid-cols-2 gap-4 mt-6 mb-6">
-          {/* TO */}
-          <div className="border rounded-lg p-3 bg-gray-50 text-sm leading-tight">
-            <h2 className="font-semibold text-gray-800 text-sm mb-1">
-              TO — {vendorInfo?.vendor_name || po.vendor_name || "—"}
-              {vendorInfo?.contact_name && (
-                <span> (Attn: {vendorInfo.contact_name})</span>
-              )}
-            </h2>
+  {/* SHIP TO (STATIC LIKE SOA) */}
+  <div className="border border-gray-300 rounded-md bg-gray-50 text-sm leading-tight">
+    <div className="bg-gray-200 px-3 py-1 border-b border-gray-300">
+      <span className="font-semibold text-gray-800 tracking-wide text-xs">
+        SHIP TO
+      </span>
+    </div>
+    <div className="px-3 py-2 leading-tight">
+      <p className="font-semibold text-gray-800">PSR AUTOMATION</p>
+      <p className="text-gray-800">13318 SKYLINE CIRCLE</p>
+      <p className="text-gray-800">SHAKOPEE MN 55379</p>
+    </div>
+  </div>
 
-            {/* Address logic kept same */}
-            {(vendorInfo?.address1 || vendorInfo?.address2) && (
-              <p className="text-gray-700">
-                {(vendorInfo.address1 || "") +
-                  (vendorInfo.address2 ? `, ${vendorInfo.address2}` : "")}
-              </p>
-            )}
+</div>
 
-            {(vendorInfo?.city ||
-              vendorInfo?.state ||
-              vendorInfo?.postal_code ||
-              vendorInfo?.country) && (
-              <p className="text-gray-700">
-                {vendorInfo.city || ""}
-                {vendorInfo.city && vendorInfo.state ? ", " : ""}
-                {vendorInfo.state || ""}
-                {(vendorInfo.city || vendorInfo.state) &&
-                vendorInfo.postal_code
-                  ? " "
-                  : ""}
-                {vendorInfo.postal_code || ""}
-                {(vendorInfo.city ||
-                  vendorInfo.state ||
-                  vendorInfo.postal_code) &&
-                vendorInfo.country
-                  ? ", "
-                  : ""}
-                {vendorInfo.country || ""}
-              </p>
-            )}
 
-            {vendorInfo?.phone && (
-              <p className="text-gray-700 mt-1">📞 {vendorInfo.phone}</p>
-            )}
-            {vendorInfo?.email && (
-              <p className="text-gray-700">✉️ {vendorInfo.email}</p>
-            )}
-          </div>
-
-          {/* FROM */}
-          <div className="border rounded-lg p-3 bg-gray-50 text-sm leading-tight">
-            <h2 className="font-semibold text-gray-800 text-sm mb-1">
-              FROM — PSR Automation Inc.
-            </h2>
-            <p>13318 Skyline Cir</p>
-            <p>Shakopee, MN 55379, USA</p>
-            <p className="mt-1">📞 952-233-1441</p>
-            <p>✉️ info@psrautomation.com</p>
-          </div>
-        </div>
-
-        {/* Meta */}
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <p>
-              <span className="font-medium">Created By:</span>{" "}
-              {po.created_by || "—"}
-            </p>
-            <p>
-              <span className="font-medium">Order Date:</span>{" "}
+        {/* =======================================================
+            ORDER META STRIP (SOA-style)
+           ======================================================= */}
+        <div className="border border-gray-300 rounded-md mb-4 bg-gray-50 text-sm">
+          <div className="grid grid-cols-2 gap-y-1 px-3 py-2">
+            <div>
+              <span className="font-medium text-gray-700">PO Number: </span>
+              {po.psr_po_number || "—"}
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">Order Date: </span>
               {po.order_date
                 ? new Date(po.order_date).toLocaleDateString()
                 : "—"}
-            </p>
-            <p>
-              <span className="font-medium">Expected Delivery:</span>{" "}
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">
+                Expected Delivery:{" "}
+              </span>
               {po.expected_delivery_date
                 ? new Date(po.expected_delivery_date).toLocaleDateString()
                 : "—"}
-            </p>
-          </div>
-
-          <div>
-            <p>
-              <span className="font-medium">Status:</span> {po.status}
-            </p>
-            <p>
-              <span className="font-medium">Payment Terms:</span>{" "}
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">Status: </span>
+              {po.status || "—"}
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">Created By: </span>
+              {po.created_by || "—"}
+            </div>
+            <div>
+              <span className="font-medium text-gray-700">Payment Terms: </span>
               {po.payment_terms || "—"}
-            </p>
-            <p>
-              <span className="font-medium">Currency:</span> {po.currency}
-            </p>
-          </div>
-        </div>
-
-        {/* Totals */}
-        <div className="mt-4 border rounded p-3 bg-gray-50">
-          <div className="grid grid-cols-4 gap-4 text-sm">
-            <div>
-              <span className="text-gray-600">Subtotal</span>
-              <div className="font-semibold">{money(po.subtotal)}</div>
-            </div>
-            <div>
-              <span className="text-gray-600">Tax</span>
-              <div className="font-semibold">{money(po.tax_amount)}</div>
-            </div>
-            <div>
-              <span className="text-gray-600">Shipping</span>
-              <div className="font-semibold">{money(po.shipping_charges)}</div>
-            </div>
-            <div>
-              <span className="text-gray-600">Grand Total</span>
-              <div className="font-semibold">{money(po.grand_total)}</div>
             </div>
           </div>
         </div>
 
-        {/* ITEMS TABLE */}
-        <h3 className="mt-6 font-semibold text-gray-800">Items</h3>
+        {/* =======================================================
+            ITEMS TABLE (SOA boxed style + images)
+           ======================================================= */}
+        <h3 className="mt-2 font-semibold text-gray-800 text-sm">
+          ORDER LINES
+        </h3>
 
         {items.length > 0 ? (
-          <div className="overflow-x-auto mt-2">
-            <table className="min-w-full text-sm border">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="border px-2 py-1">Line</th>
-                  <th className="border px-2 py-1">Part</th>
-                  <th className="border px-2 py-1">Description</th>
-                  <th className="border px-2 py-1">Image</th>
-                  <th className="border px-2 py-1 text-right">Qty</th>
-                  <th className="border px-2 py-1 text-right">Unit Price</th>
-                  <th className="border px-2 py-1 text-right">Total</th>
+          <div className="overflow-x-auto mt-2 border border-gray-300 rounded-md">
+            <table className="min-w-full text-[13px] border-collapse">
+              <thead>
+                <tr className="bg-blue-900 text-white">
+                  <th className="border border-gray-300 px-2 py-1 text-center w-12">
+                    LINE
+                  </th>
+                  <th className="border border-gray-300 px-2 py-1 text-left w-40">
+                    PART NUMBER
+                  </th>
+                  <th className="border border-gray-300 px-2 py-1 text-left">
+                    DESCRIPTION
+                  </th>
+                  <th className="border border-gray-300 px-2 py-1 text-center w-24">
+                    IMAGE
+                  </th>
+                  <th className="border border-gray-300 px-2 py-1 text-right w-20">
+                    QTY
+                  </th>
+                  <th className="border border-gray-300 px-2 py-1 text-right w-24">
+                    UNIT PRICE
+                  </th>
+                  <th className="border border-gray-300 px-2 py-1 text-right w-28">
+                    LINE TOTAL
+                  </th>
                 </tr>
               </thead>
 
               <tbody>
                 {items.map((it, idx) => {
-                  const part = parts.find((p) =>
-  String(p.part_id) === String(it.part_id || it.partId)
-);
+                  const part = parts.find(
+                    (p) =>
+                      String(p.part_id) ===
+                      String(it.part_id || it.partId)
+                  );
 
+                  const imgUrl =
+                    part?.image_url &&
+                    `${FILE_BASE}${
+                      part.image_url.startsWith("/") ? "" : "/"
+                    }${part.image_url}`;
 
                   return (
-                    <tr key={idx}>
-                      <td className="border px-2 py-1 text-center">
+                    <tr
+                      key={idx}
+                      className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                    >
+                      <td className="border border-gray-300 px-2 py-1 text-center">
                         {it.line_no ?? idx + 1}
                       </td>
 
-                      {/* PART NUMBER */}
-                      <td className="border px-2 py-1">
-{part?.part_number || `Part #${it.part_id || it.partId}`}
+                      <td className="border border-gray-300 px-2 py-1">
+                        {part?.part_number ||
+                          `Part #${it.part_id || it.partId || "-"}`}
                       </td>
 
-                      {/* DESCRIPTION */}
-                      <td className="border px-2 py-1">
+                      <td className="border border-gray-300 px-2 py-1">
                         {part?.description || it.description || "—"}
                       </td>
 
-                      {/* IMAGE */}
-                      <td className="border px-2 py-1 text-center">
-                        {part?.image_url ? (
+                      <td className="border border-gray-300 px-2 py-1 text-center">
+                        {imgUrl ? (
                           <img
-src={
-  part?.image_url
-    ? `${FILE_BASE}${part.image_url.startsWith("/") ? "" : "/"}${part.image_url}`
-    : ""
-}
-                            className="w-12 h-12 object-cover border rounded"
+                            src={imgUrl}
+                            alt={part?.part_number || "Part image"}
+                            className="w-12 h-12 object-cover border border-gray-300 rounded"
                           />
                         ) : (
-                          <span className="text-gray-400 text-xs">
+                          <span className="text-gray-400 text-[11px]">
                             No Image
                           </span>
                         )}
                       </td>
 
-                      <td className="border px-2 py-1 text-right">
+                      <td className="border border-gray-300 px-2 py-1 text-right">
                         {it.quantity}
                       </td>
-                      <td className="border px-2 py-1 text-right">
+                      <td className="border border-gray-300 px-2 py-1 text-right">
                         {money(it.unit_price)}
                       </td>
-                      <td className="border px-2 py-1 text-right">
+                      <td className="border border-gray-300 px-2 py-1 text-right">
                         {money(it.total_price)}
                       </td>
                     </tr>
@@ -376,30 +465,86 @@ src={
           <p className="text-sm text-gray-500 mt-2">No items found.</p>
         )}
 
-        {/* ATTACHMENTS */}
-        <h3 className="mt-6 font-semibold text-gray-800">Attachments</h3>
+        {/* =======================================================
+            TOTALS BLOCK (bottom-right, PSR styled)
+           ======================================================= */}
+        <div className="mt-4 flex justify-end">
+          <div className="border border-gray-300 rounded-md bg-gray-50 px-4 py-3 text-sm w-64">
+            <div className="flex justify-between mb-1">
+              <span className="text-gray-700">Subtotal</span>
+              <span className="font-semibold">{money(po.subtotal)}</span>
+            </div>
+            <div className="flex justify-between mb-1">
+              <span className="text-gray-700">
+                Tax ({po.tax_percent ?? 0}%)
+              </span>
+              <span className="font-semibold">{money(po.tax_amount)}</span>
+            </div>
+            <div className="flex justify-between mb-1">
+              <span className="text-gray-700">Shipping</span>
+              <span className="font-semibold">
+                {money(po.shipping_charges)}
+              </span>
+            </div>
+            <div className="border-t border-gray-300 mt-2 pt-2 flex justify-between">
+              <span className="font-semibold text-gray-800">
+                GRAND TOTAL
+              </span>
+              <span className="font-bold text-gray-900">
+                {money(po.grand_total)}
+              </span>
+            </div>
+          </div>
+        </div>
 
-        {files.length > 0 ? (
-          <ul className="list-disc pl-6 mt-1 text-sm">
-            {files.map((f) => (
-              <li key={f.id || f.filepath}>
-                <a
-                 href={`${FILE_BASE}${f.filepath.startsWith("/") ? "" : "/"}${f.filepath}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-blue-700 hover:underline"
-                >
-                  {f.original_filename} ({f.mime_type},{" "}
-                  {f.size_bytes?.toLocaleString() || 0} bytes)
-                </a>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-gray-500 mt-2">
-            No attachments uploaded.
-          </p>
-        )}
+{/* ATTACHMENTS */}
+<h3 className="mt-6 font-semibold text-gray-800">Attachments</h3>
+
+{files.length > 0 ? (
+  <div className="grid grid-cols-4 gap-4 mt-2">
+    {files.map((f) => {
+      const fileUrl = `${FILE_BASE}${f.filepath.startsWith("/") ? "" : "/"}${f.filepath}`;
+      const isImage = /\.(jpg|jpeg|png|gif|webp|bmp)$/i.test(f.original_filename);
+
+      return (
+        <div key={f.id} className="border rounded p-2 text-center bg-white shadow-sm">
+          {isImage ? (
+            <a href={fileUrl} target="_blank" rel="noreferrer">
+              <img
+                src={fileUrl}
+                alt={f.original_filename}
+                className="w-20 h-20 object-cover mx-auto rounded border"
+              />
+            </a>
+          ) : (
+            <a
+              href={fileUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-blue-700 underline text-sm break-all"
+            >
+              {f.original_filename}
+            </a>
+          )}
+
+          <div className="text-xs text-gray-600 mt-1">
+            {f.original_filename}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+) : (
+  <p className="text-sm text-gray-500 mt-2">No attachments uploaded.</p>
+)}
+
+        {/* =======================================================
+            FOOTER
+           ======================================================= */}
+        <div className="mt-6 text-xs text-gray-500 border-t border-gray-200 pt-2">
+          Thank you for your business. Please contact PSR Automation Inc. if you
+          have any questions regarding this purchase order.
+        </div>
       </div>
     </Wrapper>
   );

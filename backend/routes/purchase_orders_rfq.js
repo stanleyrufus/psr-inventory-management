@@ -140,11 +140,14 @@ router.get("/:id/rfq/preview", async (req, res) => {
 /* ======================================================
    ✅ RFQ SEND (Correct CC handling)
    ====================================================== */
+/* ======================================================
+   ✅ RFQ SEND (Supports TO, CC, BCC)
+   ====================================================== */
 router.post("/:id/rfq/send", async (req, res) => {
   const { id } = req.params;
-  const { to = [], cc = [] } = req.body || {};
+  const { to = [], cc = [], bcc = [] } = req.body || {};
 
-  // Default CC
+  // Default CC from .env
   const defaultCC = String(process.env.RFQ_CC_DEFAULT || "")
     .split(",")
     .map((e) => e.trim())
@@ -152,85 +155,68 @@ router.post("/:id/rfq/send", async (req, res) => {
 
   const ccAll = Array.from(new Set([...defaultCC, ...cc]));
 
-  if (!to.length)
-    return res.status(400).json({ success: 0, message: "No recipient emails" });
+  // ⭐ BCC must be unique list, cleaned
+  const bccAll = Array.from(
+    new Set(
+      (Array.isArray(bcc) ? bcc : [bcc])
+        .map((e) => String(e || "").trim())
+        .filter(Boolean)
+    )
+  );
+
+  if (!to.length) {
+    return res
+      .status(400)
+      .json({ success: 0, message: "No recipient emails." });
+  }
 
   const data = await loadPOWithItems(id);
-  if (!data)
-    return res.status(404).json({ success: 0, message: "PO not found" });
+  if (!data) {
+    return res
+      .status(404)
+      .json({ success: 0, message: "PO not found." });
+  }
 
   const subject = `RFQ: ${data.po.psr_po_number}`;
   const html = buildRFQHtml(data);
 
   try {
-    // 1️⃣ SEND EMAIL
+    // ⭐ normalize arrays into comma-separated strings
     const info = await transporter.sendMail({
       from: process.env.RFQ_FROM_EMAIL,
-      to,
-      cc: ccAll,
+      to: Array.isArray(to) ? to.join(", ") : to,
+      cc: ccAll.join(", "),
+      bcc: bccAll.join(", "),
       subject,
       html,
     });
 
-    // 2️⃣ STORE EMAIL LOG
+    // Save email log
     await db("po_rfq_emails").insert({
-      po_id: id,
-      to_emails: to,
-      cc_emails: ccAll,
-      subject,
-      body_html: html,
-      sent_at: db.fn.now(),
-      status: "sent",
+  po_id: id,
+  to_emails: to,        // ⭐ array
+  cc_emails: ccAll,     // ⭐ array
+  bcc_emails: bccAll,   // ⭐ array
+  subject,
+  body_html: html,
+  sent_at: db.fn.now(),
+  status: "sent",
+});
+
+    // Update PO status
+    await db("purchase_orders").where({ id }).update({
+      status: "Sent RFQ",
     });
 
-    // ⭐⭐⭐ CRITICAL FIX ⭐⭐⭐
-    // UPDATE MAIN PO STATUS SO FRONTEND LOGIC WORKS
-    await db("purchase_orders")
-      .where({ id })
-      .update({ status: "Sent RFQ" });
-
-    // 3️⃣ SUCCESS RESPONSE
-    res.json({
+    return res.json({
       success: 1,
       messageId: info.messageId,
       cc_used: ccAll,
+      bcc_used: bccAll,
     });
-
   } catch (err) {
-    console.error("RFQ send error:", err);
-    res.status(500).json({ success: 0, error: err.message });
-  }
-});
-
-// 🔹 RFQ Status API (for dashboard)
-router.get("/rfq/status", async (req, res) => {
-  try {
-    const ids = req.query.po_ids?.split(",").filter(Boolean);
-    if (!ids || ids.length === 0)
-      return res.json({ success: 1, data: {} });
-
-    // Fetch latest RFQ email info for all given POs
-    const rows = await db("po_rfq_emails")
-      .select("po_id")
-      .count("* as sentCount")
-      .max("sent_at as lastSentAt")
-      .whereIn("po_id", ids)
-      .andWhere("status", "sent")
-      .groupBy("po_id");
-
-    // Convert rows into lookup object
-    const map = {};
-    for (const r of rows) {
-      map[r.po_id] = {
-        sentCount: Number(r.sentCount || 0),
-        lastSentAt: r.lastSentAt,
-      };
-    }
-
-    res.json({ success: 1, data: map });
-  } catch (err) {
-    console.error("❌ RFQ status route error:", err);
-    res.status(500).json({ success: 0, message: "Failed to fetch RFQ status" });
+    console.error("❌ RFQ send error:", err);
+    return res.status(500).json({ success: 0, error: err.message });
   }
 });
 

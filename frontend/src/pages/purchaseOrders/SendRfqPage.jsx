@@ -1,10 +1,159 @@
 // src/pages/purchaseOrders/SendRfqPage.jsx
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+/******************************************************************
+ * MULTI-SELECT SEARCH (POForm-style for vendors)
+ ******************************************************************/
+function SearchSelectMultiVendors({
+  options = [],        // [{ id, label, name, email, location }]
+  selectedIds = [],    // [id, id, ...]
+  onChange,
+  placeholder = "Select vendors to BCC…",
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [highlightIndex, setHighlightIndex] = useState(0);
+  const ref = useRef(null);
+
+  const lowerSearch = search.toLowerCase();
+
+  const filtered = options.filter((opt) =>
+    (opt.label || "").toLowerCase().includes(lowerSearch)
+  );
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  useEffect(() => {
+    setHighlightIndex(0);
+  }, [search, options.length]);
+
+  const handleToggleId = (id) => {
+    if (!id) return;
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter((x) => x !== id));
+    } else {
+      onChange([...selectedIds, id]);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (!open) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightIndex((prev) =>
+        prev + 1 >= filtered.length ? prev : prev + 1
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIndex((prev) => (prev - 1 < 0 ? 0 : prev - 1));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const item = filtered[highlightIndex];
+      if (item) {
+        handleToggleId(item.id);
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+    }
+  };
+
+  const selectedOptions = selectedIds
+    .map((id) => options.find((o) => o.id === id))
+    .filter(Boolean);
+
+  return (
+    <div className="relative" ref={ref}>
+      {/* Display area (chips) */}
+      <div
+        className="border p-2 rounded w-full bg-white cursor-pointer"
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        <div className="flex flex-wrap gap-2">
+          {selectedOptions.length === 0 && (
+            <span className="text-gray-400 text-sm">{placeholder}</span>
+          )}
+
+          {selectedOptions.map((opt) => (
+            <span
+              key={opt.id}
+              className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs flex items-center gap-1"
+            >
+              {opt.label}
+              <button
+                type="button"
+                className="text-red-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange(selectedIds.filter((x) => x !== opt.id));
+                }}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute mt-1 w-full bg-white border rounded shadow z-20">
+          <input
+            autoFocus
+            className="border-b p-2 w-full"
+            placeholder="Search vendors..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+
+          <div className="max-h-48 overflow-y-auto">
+            {filtered.length === 0 && (
+              <div className="p-2 text-sm text-gray-500">No vendors found.</div>
+            )}
+
+            {filtered.map((opt, idx) => {
+              const isSelected = selectedIds.includes(opt.id);
+              const isHighlighted = idx === highlightIndex;
+
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onMouseEnter={() => setHighlightIndex(idx)}
+                  onClick={() => handleToggleId(opt.id)}
+                  className={`text-left w-full px-2 py-1 hover:bg-blue-50 ${
+                    isHighlighted ? "bg-blue-50" : ""
+                  } ${isSelected ? "bg-blue-100 font-semibold" : ""}`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/******************************************************************
+ * SEND RFQ PAGE
+ ******************************************************************/
 export default function SendRfqPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -16,12 +165,17 @@ export default function SendRfqPage() {
   const [htmlPreview, setHtmlPreview] = useState("");
   const [subject, setSubject] = useState("");
 
-  // ⭐ THESE WILL NOW BE DIRECTLY SET BY PREVIEW API
-  const [to, setTo] = useState("");  
-  const [cc, setCc] = useState("purchasing@psr.com"); 
+  const [to, setTo] = useState(""); // TO vendor email
+  const [cc, setCc] = useState("purchasing@psr.com");
+
+  const [vendorsRaw, setVendorsRaw] = useState([]);
+  const [bccVendorIds, setBccVendorIds] = useState([]); // selected vendor IDs
 
   const [error, setError] = useState("");
 
+  /**********************************************************
+   * Load vendors + RFQ preview + PO data
+   **********************************************************/
   useEffect(() => {
     let cancelled = false;
 
@@ -29,55 +183,99 @@ export default function SendRfqPage() {
       try {
         setLoading(true);
 
-        // 1️⃣ Load PO (for header info)
+        // 1) Load vendors (same as POForm source)
+        const vRes = await axios.get(`${BASE}/api/vendors`);
+        if (!cancelled) {
+          const arr = vRes.data?.data || vRes.data || [];
+          setVendorsRaw(Array.isArray(arr) ? arr : []);
+        }
+
+        // 2) Load PO header info
         const poRes = await axios.get(`${BASE}/api/purchase_orders/${id}`);
         const poData = poRes.data?.data || poRes.data;
         if (!poData) throw new Error("PO not found");
-        if (cancelled) return;
-        setPo(poData);
+        if (!cancelled) setPo(poData);
 
-        // 2️⃣ Load RFQ preview (THIS contains correct vendor_email)
-        const prevRes = await axios.get(`${BASE}/api/purchase_orders/${id}/rfq/preview`);
-        if (cancelled) return;
-
+        // 3) Load RFQ preview (includes main vendor email & subject)
+        const prevRes = await axios.get(
+          `${BASE}/api/purchase_orders/${id}/rfq/preview`
+        );
         const data = prevRes.data;
 
-        setHtmlPreview(data.html || "");
-        setSubject(data.subject || `RFQ: ${poData.psr_po_number}`);
-
-        // ⭐⭐⭐ FIXED: DEFAULT TO = vendor_email from backend preview
-        setTo(data.vendor_email || "");
-
-        // ⭐⭐⭐ FIXED: ALWAYS DEFAULT CC = purchasing@psr.com
-        setCc("purchasing@psr.com");
-
+        if (!cancelled) {
+          setHtmlPreview(data.html || "");
+          setSubject(data.subject || `RFQ: ${poData.psr_po_number}`);
+          setTo(data.vendor_email || "");
+        }
       } catch (e) {
         console.error("RFQ load error:", e);
-        setError("Failed to load RFQ preview.");
+        if (!cancelled) setError("Failed to load RFQ preview.");
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
     run();
-    return () => (cancelled = true);
-
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
-  const parsedTo = useMemo(
-    () => to.split(",").map(s => s.trim()).filter(Boolean),
-    [to]
-  );
-  const parsedCc = useMemo(
-    () => cc.split(",").map(s => s.trim()).filter(Boolean),
-    [cc]
-  );
+  /**********************************************************
+   * Normalized vendor options (POForm-style)
+   **********************************************************/
+  const vendorOptions = useMemo(() => {
+    return (vendorsRaw || []).map((v) => {
+      const id = v.vendor_id || v.id;
+      const name = v.vendor_name || v.name || "Unnamed Vendor";
+      const city = v.city || "";
+      const region = v.state || v.country || "";
+      const location = [city, region].filter(Boolean).join(", ");
+      const email = v.email || "";
 
+      // Option C — 1-line compact:
+      // VendorName — City, State — email@example.com
+      const parts = [name];
+      if (location) parts.push(location);
+      if (email) parts.push(email);
+      const label = parts.join(" — ");
+
+      return { id, name, location, email, label };
+    });
+  }, [vendorsRaw]);
+
+  /**********************************************************
+   * Derived BCC email list (from selected vendor IDs)
+   **********************************************************/
+  const bccEmails = useMemo(() => {
+    return vendorOptions
+      .filter((opt) => bccVendorIds.includes(opt.id) && opt.email)
+      .map((opt) => opt.email)
+      .join(", ");
+  }, [vendorOptions, bccVendorIds]);
+
+  /**********************************************************
+   * Send RFQ
+   **********************************************************/
   const handleSend = async () => {
     setError("");
 
+    const parsedTo = to
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const parsedCc = cc
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const parsedBcc = vendorOptions
+      .filter((opt) => bccVendorIds.includes(opt.id) && opt.email)
+      .map((opt) => opt.email);
+
     if (!parsedTo.length) {
-      setError("Please provide at least one recipient email in the To field.");
+      setError("Please provide a TO email.");
       return;
     }
 
@@ -87,27 +285,28 @@ export default function SendRfqPage() {
       await axios.post(`${BASE}/api/purchase_orders/${id}/rfq/send`, {
         to: parsedTo,
         cc: parsedCc,
+        bcc: parsedBcc,
       });
 
       alert("✅ RFQ sent successfully!");
-
       localStorage.setItem("refreshPOList", "1");
       navigate("/purchase-orders");
-
     } catch (e) {
-      console.error("❌ RFQ send error:", e);
+      console.error("RFQ send error:", e);
       setError(e?.response?.data?.error || "Failed to send RFQ.");
     } finally {
       setSending(false);
     }
   };
 
+  /**********************************************************
+   * Render
+   **********************************************************/
   if (loading) return <div className="p-6">Loading RFQ…</div>;
   if (!po) return <div className="p-6">Purchase Order not found.</div>;
 
   return (
     <div className="max-w-5xl mx-auto p-6 bg-white rounded shadow">
-
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">
           Send RFQ — PO {po.psr_po_number}
@@ -143,12 +342,12 @@ export default function SendRfqPage() {
           <input
             className="border rounded p-2 w-full"
             value={subject}
-            onChange={(e) => setSubject(e.target.value)}
+            readOnly // backend uses preview subject
           />
         </div>
       </div>
 
-      {/* Email Fields */}
+      {/* TO */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700">To *</label>
         <input
@@ -158,6 +357,7 @@ export default function SendRfqPage() {
         />
       </div>
 
+      {/* CC */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700">Cc</label>
         <input
@@ -165,6 +365,26 @@ export default function SendRfqPage() {
           value={cc}
           onChange={(e) => setCc(e.target.value)}
         />
+      </div>
+
+      {/* BCC Multi-select vendors */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700">
+          Bcc (select multiple vendors)
+        </label>
+
+        <SearchSelectMultiVendors
+          options={vendorOptions}
+          selectedIds={bccVendorIds}
+          onChange={setBccVendorIds}
+          placeholder="Search & select vendors to BCC…"
+        />
+
+        <div className="text-xs text-gray-500 mt-1">
+          {bccEmails
+            ? `Emails: ${bccEmails}`
+            : "No BCC emails selected yet."}
+        </div>
       </div>
 
       {/* Preview */}
@@ -178,6 +398,7 @@ export default function SendRfqPage() {
 
       {error && <div className="mb-4 text-red-600 text-sm">{error}</div>}
 
+      {/* Actions */}
       <div className="flex justify-end gap-3">
         <button
           className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
@@ -196,7 +417,6 @@ export default function SendRfqPage() {
           {sending ? "Sending..." : "Send RFQ"}
         </button>
       </div>
-
     </div>
   );
 }

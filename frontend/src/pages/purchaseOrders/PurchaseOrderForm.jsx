@@ -702,10 +702,20 @@ export default function PurchaseOrderForm({
         originalNorm && JSON.stringify(originalNorm) !== JSON.stringify(po);
 
       if (userEditedSomething) {
-        const ask = window.confirm(
-          "You modified a PO that was already sent to the vendor.\n\nSend Revised RFQ now?"
-        );
-        sendRevised = ask;
+        // Ask user if they want to send a Revised RFQ now
+const wantRevised = window.confirm(
+  "This PO was already sent to the vendor.\n\n" +
+    "Do you want to send a *Revised RFQ* now?\n\n" +
+    "OK = Yes, send revised RFQ\n" +
+    "Cancel = No, only save changes"
+);
+
+if (wantRevised) {
+  sendRevised = true;        // only set flag
+} else {
+  sendRevised = false;       // clean: NO status change
+}
+
       }
     }
 
@@ -719,9 +729,9 @@ export default function PurchaseOrderForm({
       finalStatus = "Draft";
     }
 
-    if (sendRevised) {
-      finalStatus = "Sent Revised RFQ"; // ⭐ NEW
-    }
+// ❗ Do NOT change status here.
+// Status changes ONLY after the Revised RFQ email is actually sent.
+
 
     // ----------------------
     // BUILD PAYLOAD
