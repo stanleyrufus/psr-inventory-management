@@ -87,16 +87,17 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
 
   const isModal = !!onClose;
 
-  const Wrapper = ({ children }) =>
-    isModal ? (
-      <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-        {children}
-      </div>
-    ) : (
-      <div className="p-6 bg-white rounded shadow max-w-6xl mx-auto my-8">
-        {children}
-      </div>
-    );
+const Wrapper = ({ children }) =>
+  isModal ? (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+      {children}
+    </div>
+  ) : (
+<div className="p-6 bg-white rounded shadow max-w-5xl mx-auto mt-0 mb-8">
+      {children}
+    </div>
+  );
+
 
   return (
     <Wrapper>
@@ -120,7 +121,7 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
         }`}
       >
 {/* TOP ACTION BAR (non-print) */}
-<div className="flex justify-end mb-3 gap-2 print-hide">
+<div className="flex justify-end gap-2 mb-3 -mt-6 print-hide">
 
   <button
     onClick={() => window.print()}
@@ -223,10 +224,10 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
     <div className="font-semibold text-lg tracking-wide">
       PSR AUTOMATION INC.
     </div>
-    <div className="text-right text-sm leading-tight">
-      <div className="font-semibold text-base">PURCHASE ORDER</div>
-      <div>PO #: {po.psr_po_number || "-"}</div>
-    </div>
+    <div className="text-right text-lg font-bold leading-tight">
+  <div>PO #: {po.psr_po_number || "-"}</div>
+</div>
+
   </div>
 
   <div className="px-4 py-2 text-sm grid grid-cols-3 gap-2">
@@ -276,51 +277,53 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
       )}
     </div>
 
-    {/* -----------------------------------
-       COLUMN 2 — PO META
-       ----------------------------------- */}
-    <div className="text-sm">
-      <div>
-        <span className="font-medium text-gray-700">PO Date: </span>
-        {po.order_date
-          ? new Date(po.order_date).toLocaleDateString()
-          : "—"}
-      </div>
+{/* -----------------------------------
+    COLUMN 2 — PO META (TIGHT ALIGN)
+   ----------------------------------- */}
+<div className="text-sm space-y-1">
+  <div className="flex">
+    <span className="w-32 font-medium text-gray-700">PO Date:</span>
+    <span>
+      {po.order_date
+        ? new Date(po.order_date).toLocaleDateString()
+        : "—"}
+    </span>
+  </div>
 
-      <div>
-        <span className="font-medium text-gray-700">Expected Delivery: </span>
-        {po.expected_delivery_date
-          ? new Date(po.expected_delivery_date).toLocaleDateString()
-          : "—"}
-      </div>
+  <div className="flex">
+    <span className="w-32 font-medium text-gray-700">Expected Delivery:</span>
+    <span>
+      {po.expected_delivery_date
+        ? new Date(po.expected_delivery_date).toLocaleDateString()
+        : "—"}
+    </span>
+  </div>
 
-      <div>
-        <span className="font-medium text-gray-700">Status: </span>
-        {po.status || "—"}
-      </div>
-   </div>
+  <div className="flex">
+    <span className="w-32 font-medium text-gray-700">Status:</span>
+    <span>{po.status || "—"}</span>
+  </div>
+</div>
 
+{/* -----------------------------------
+    COLUMN 3 — CREATED BY / TERMS / CURRENCY (TIGHT ALIGN)
+   ----------------------------------- */}
+<div className="text-sm space-y-1">
+  <div className="flex">
+    <span className="w-32 font-medium text-gray-700">Created By:</span>
+    <span>{po.created_by || "—"}</span>
+  </div>
 
-    {/* -----------------------------------
-       COLUMN 3 — CREATED BY / TERMS / CURRENCY
-       ----------------------------------- */}
-    <div className="text-sm text-right">
-      <div>
-        <span className="font-medium text-gray-700">Created By: </span>
-        {po.created_by || "—"}
-      </div>
+  <div className="flex">
+    <span className="w-32 font-medium text-gray-700">Payment Terms:</span>
+    <span>{po.payment_terms || "—"}</span>
+  </div>
 
-      <div>
-        <span className="font-medium text-gray-700">Terms: </span>
-        {po.payment_terms || "—"}
-      </div>
-
-      <div>
-        <span className="font-medium text-gray-700">Currency: </span>
-        {po.currency || "USD"}
-      </div>
-
-    </div>
+  <div className="flex">
+    <span className="w-32 font-medium text-gray-700">Currency:</span>
+    <span>{po.currency || "USD"}</span>
+  </div>
+</div>
   </div>
 </div>
 
@@ -362,45 +365,7 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
   </div>
 
 </div>
-
-
-        {/* =======================================================
-            ORDER META STRIP (SOA-style)
-           ======================================================= */}
-        <div className="border border-gray-300 rounded-md mb-4 bg-gray-50 text-sm">
-          <div className="grid grid-cols-2 gap-y-1 px-3 py-2">
-            <div>
-              <span className="font-medium text-gray-700">PO Number: </span>
-              {po.psr_po_number || "—"}
-            </div>
-            <div>
-              <span className="font-medium text-gray-700">Order Date: </span>
-              {po.order_date
-                ? new Date(po.order_date).toLocaleDateString()
-                : "—"}
-            </div>
-            <div>
-              <span className="font-medium text-gray-700">
-                Expected Delivery:{" "}
-              </span>
-              {po.expected_delivery_date
-                ? new Date(po.expected_delivery_date).toLocaleDateString()
-                : "—"}
-            </div>
-            <div>
-              <span className="font-medium text-gray-700">Status: </span>
-              {po.status || "—"}
-            </div>
-            <div>
-              <span className="font-medium text-gray-700">Created By: </span>
-              {po.created_by || "—"}
-            </div>
-            <div>
-              <span className="font-medium text-gray-700">Payment Terms: </span>
-              {po.payment_terms || "—"}
-            </div>
-          </div>
-        </div>
+       
 
         {/* =======================================================
             ITEMS TABLE (SOA boxed style + images)
@@ -585,13 +550,7 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
   <p className="text-sm text-gray-500 mt-2">No attachments uploaded.</p>
 )}
 
-        {/* =======================================================
-            FOOTER
-           ======================================================= */}
-        <div className="mt-6 text-xs text-gray-500 border-t border-gray-200 pt-2">
-          Thank you for your business. Please contact PSR Automation Inc. if you
-          have any questions regarding this purchase order.
-        </div>
+  
       </div>
     </Wrapper>
   );

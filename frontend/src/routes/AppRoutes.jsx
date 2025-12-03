@@ -102,9 +102,10 @@ const PrivateLayout = ({ children }) => {
 
 
         {/* PAGE CONTENT */}
-        <div className="flex-1 p-6 overflow-y-auto">
-          {children}
-        </div>
+      {/* PAGE CONTENT */}
+<div className="flex-1 pt-2 px-6 pb-6 overflow-y-auto">
+  {children}
+</div>
 
       </main>
     </div>
