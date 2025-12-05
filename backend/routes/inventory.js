@@ -115,6 +115,36 @@ router.get("/trend/monthly", async (req, res) => {
   }
 });
 
+// ============================================================
+// GET ALL POs THAT INCLUDE THIS PART
+// ============================================================
+router.get("/:id/purchase-orders", async (req, res) => {
+  const partId = Number(req.params.id);
+
+  try {
+    const pos = await db("purchase_orders as po")
+      .join("purchase_order_items as i", "po.id", "i.po_id")
+      .leftJoin("vendors as v", "po.vendor_id", "v.vendor_id")       // ⭐ ADDED
+      .where("i.part_id", partId)
+      .select(
+        "po.id",
+        "po.psr_po_number",
+        "po.status",
+        "po.order_date",
+        "i.quantity",
+        "i.unit_price",
+        "i.total_price",
+        "v.vendor_name"                                             // ⭐ ADDED
+      )
+      .orderBy("po.id", "desc");
+
+    res.json({ success: true, data: pos });
+  } catch (err) {
+    console.error("❌ PO lookup error:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch PO links" });
+  }
+});
+
 /* --------------------------------------------------------
    GET ALL PARTS  ->  GET /api/parts
 ---------------------------------------------------------*/

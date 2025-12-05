@@ -274,6 +274,33 @@ if (status === "Draft") {
 
     await trx("purchase_order_items").insert(itemsToInsert);
 
+// ⭐ Lookup Vendor Name (you forgot this — caused vendor_name = undefined)
+const vendorNameRow = await trx("vendors")
+  .where("vendor_id", vendor_id)
+  .select("vendor_name")
+  .first();
+const vendor_name = vendorNameRow?.vendor_name || null;
+
+// ⭐ UPDATE INVENTORY last-PO FIELDS FOR EACH PART
+for (const item of itemsToInsert) {
+  await trx("inventory")
+    .where({ part_id: item.part_id })
+    .update({
+      last_po_id: po_id,
+      last_po_number: psr_po_number,
+      last_po_date: order_date || null,
+      last_vendor_id: vendor_id || null,
+      last_vendor_name: vendor_name,   // NOW SAFE
+      last_quantity: item.quantity,
+      last_unit_price: item.unit_price,
+      last_currency_code: currency || "USD",
+      last_payment_terms: payment_terms || null,
+      last_payment_method: payment_method || null,
+      updated_on: db.fn.now(),
+    });
+}
+
+
     await trx.commit();
 
     res.json({ success: 1, po_id });
@@ -317,54 +344,74 @@ router.get("/", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   const id = Number(req.params.id);
+
   try {
+    // Load main PO record
     const po = await db("purchase_orders as po")
       .leftJoin("vendors as v", "po.vendor_id", "v.vendor_id")
-      .select("po.*", "v.vendor_name", "v.email as vendor_email")
+      .select(
+        "po.*",
+        "v.vendor_name",
+        "v.contact_name",
+        "v.email as vendor_email",
+        "v.phone as vendor_phone"
+      )
       .where("po.id", id)
       .first();
 
-    if (!po) return res.status(404).json({ success: 0, errormsg: "PO not found" });
+    if (!po) {
+      return res.status(404).json({ success: 0, message: "PO not found" });
+    }
 
+    // Load items for this PO
     const items = await db("purchase_order_items as i")
-      .leftJoin("inventory as inv", "i.part_id", "inv.part_id")
+      .leftJoin("inventory as p", "i.part_id", "p.part_id")
       .select(
-        "i.id",
-        "i.part_id",
-        "i.line_no",
-        "i.quantity",
-        "i.unit_price",
-        "i.total_price",
-        "inv.part_number",
-        "inv.part_name",
-        "inv.description"
+        "i.*",
+        "p.part_number",
+        "p.part_name",
+        "p.description",
+        "p.current_unit_price"
       )
       .where("i.po_id", id)
       .orderBy("i.line_no");
+// Load attachments
+const files = await db("purchase_order_files")
+  .select(
+    "id",
+    "original_filename",
+    "stored_filename",
+    "filepath",
+    "size_bytes",
+    "mime_type",
+    "uploaded_at"
+  )
+  .where({ po_id: id })
+  .orderBy("uploaded_at", "desc");
 
-    const files = await db("purchase_order_files")
-      .select(
-        "id",
-        "original_filename",
-        "filepath",
-        "size_bytes",
-        "mime_type",
-        "uploaded_at"
-      )
-      .where({ po_id: id })
-      .orderBy("uploaded_at", "desc");
+// Convert to public URL format
+const normalizedFiles = files.map((f) => ({
+  ...f,
+  filepath: `/uploads/po-attachments/${f.stored_filename}`,
+}));
 
-    // 🔥 CRITICAL FIX: always return a PUBLIC path
-    const normalizedFiles = files.map((f) => ({
-      ...f,
-  filepath: `/uploads/po-attachments/${path.basename(f.filepath)}`,
-    }));
-
-    res.json({ success: 1, data: { ...po, items, files: normalizedFiles } });
-  } catch (err) {
-    res.status(500).json({ success: 0, errormsg: "Failed to fetch PO details" });
+res.json({
+  success: 1,
+  data: {
+    ...po,
+    items,
+    files: normalizedFiles   // ⭐ FIX: RETURN ATTACHMENTS
   }
 });
+
+
+  } catch (err) {
+    console.error("❌ GET PO ERROR:", err);
+    res.status(500).json({ success: 0, message: "Failed to fetch PO" });
+  }
+});
+
+
 
 //
 // =============================================
@@ -420,6 +467,32 @@ router.put("/:id", async (req, res) => {
     if (itemsToInsert.length > 0) {
       await trx("purchase_order_items").insert(itemsToInsert);
     }
+
+// ⭐ Lookup Vendor Name
+const vendorNameRow = await trx("vendors")
+  .where("vendor_id", vendor_id)
+  .select("vendor_name")
+  .first();
+const vendor_name = vendorNameRow?.vendor_name || null;
+
+// ⭐ UPDATE INVENTORY last-PO FIELDS FOR EACH PART
+for (const item of itemsToInsert) {
+  await trx("inventory")
+    .where({ part_id: item.part_id })
+    .update({
+      last_po_id: id,
+      last_po_number: psr_po_number,
+      last_po_date: order_date || null,
+      last_vendor_id: vendor_id || null,
+      last_vendor_name: vendor_name,   // FIXED
+      last_quantity: item.quantity,
+      last_unit_price: item.unit_price,
+      last_currency_code: currency || "USD",
+      last_payment_terms: payment_terms || null,
+      last_payment_method: payment_method || null,
+      updated_on: db.fn.now(),
+    });
+}
 
     await trx.commit();
     res.json({ success: 1, message: "PO updated successfully" });

@@ -29,7 +29,6 @@ function SearchSelect({
     setHighlightIndex(0);
   }, [search, items.length]);
 
-  // close on outside click
   useEffect(() => {
     const handler = (e) => {
       if (ref.current && !ref.current.contains(e.target)) {
@@ -143,7 +142,6 @@ function PaidStamp() {
 }
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
-// ✅ Use FILE_BASE for downloads (no /api suffix even if env has it)
 const FILE_BASE = BASE.replace(/\/api$/, "");
 
 const n = (v) => Number(v ?? 0);
@@ -153,7 +151,7 @@ export default function PurchaseOrderForm({
   initialPo,
   onSaved,
   onCancel,
-  isModal = false, // tells the form it lives inside a modal
+  isModal = false,
 }) {
   const navigate = useNavigate();
 
@@ -165,22 +163,17 @@ export default function PurchaseOrderForm({
   const [vendors, setVendors] = useState([]);
   const [parts, setParts] = useState([]);
   const [attachments, setAttachments] = useState([]);
-  const [staffList] = useState([
-    "Shiney Ramnarain",
-    ]);
+  const [staffList] = useState(["Shiney Ramnarain"]);
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // local state for existing uploaded files (so we can delete & update UI)
   const [existingFiles, setExistingFiles] = useState(initialPo?.files || []);
   const [deletingFileIds, setDeletingFileIds] = useState([]);
 
-  // keep existingFiles in sync if initialPo changes
   useEffect(() => {
     setExistingFiles(initialPo?.files || []);
   }, [initialPo]);
 
-  // inline vendor "add new vendor" state
   const [addingNewVendor, setAddingNewVendor] = useState(false);
   const [newVendor, setNewVendor] = useState({
     vendor_name: "",
@@ -191,11 +184,9 @@ export default function PurchaseOrderForm({
     country: "",
   });
 
-  // per-row "add new part for this row"
   const [addingNewPartRow, setAddingNewPartRow] = useState({});
   const [newPartDraft, setNewPartDraft] = useState({});
 
-  // global "+ Add New Part" panel (not tied to a row)
   const [addingGlobalPart, setAddingGlobalPart] = useState(false);
   const [globalPart, setGlobalPart] = useState({
     part_number: "",
@@ -204,14 +195,11 @@ export default function PurchaseOrderForm({
     current_unit_price: "",
   });
 
-  // helper: normalize date values coming from backend (e.g. "2025-11-28T00:00:00.000Z")
   const toDateOnly = (val) => (val ? String(val).slice(0, 10) : "");
 
-  // Normalize the initialPo items shape if editing
   const normalizePo = (poData) => {
     if (!poData) return null;
 
-    // backend may return items[] or po_items[]
     const rawItems = poData.items || poData.po_items || [];
 
     const items = rawItems.map((i) => ({
@@ -247,7 +235,7 @@ export default function PurchaseOrderForm({
           payment_terms: "",
           currency: "USD",
           remarks: "",
-          tax_percent: 8,
+          tax_percent: 0,
           shipping_charges: 0,
           items: [],
           subtotal: 0,
@@ -257,7 +245,7 @@ export default function PurchaseOrderForm({
         }
   );
 
-  // load vendors + parts
+  // Load vendors + parts
   useEffect(() => {
     axios
       .get(`${BASE}/api/vendors`)
@@ -279,7 +267,6 @@ export default function PurchaseOrderForm({
       })
       .catch(() => setParts([]));
   }, []);
-
   const nNum = (v) =>
     v === "" || v === null || v === undefined ? 0 : Number(v);
 
@@ -296,7 +283,6 @@ export default function PurchaseOrderForm({
     recalcTotals(updatedItems);
   };
 
-  // add a blank line item row
   const addItemRow = () => {
     setPo((prev) => ({
       ...prev,
@@ -360,7 +346,6 @@ export default function PurchaseOrderForm({
         return;
       }
 
-      // update dropdown list
       setParts((prev) => [
         ...prev,
         {
@@ -373,7 +358,6 @@ export default function PurchaseOrderForm({
         },
       ]);
 
-      // inject that new part into this row
       const updatedItems = [...po.items];
       updatedItems[rowIndex] = {
         ...updatedItems[rowIndex],
@@ -392,7 +376,7 @@ export default function PurchaseOrderForm({
       cancelNewPartForRow(rowIndex);
     } catch (err) {
       console.error("❌ Error creating new part:", err);
-      alert("Failed to add new part. See console.");
+      alert("Failed to add new part.");
     }
   };
 
@@ -428,7 +412,6 @@ export default function PurchaseOrderForm({
     recalcTotals(updatedItems);
   };
 
-  // update row qty/unit price
   const updateItem = (index, field, value) => {
     const updatedItems = [...po.items];
     updatedItems[index][field] = value;
@@ -441,7 +424,7 @@ export default function PurchaseOrderForm({
     recalcTotals(updatedItems);
   };
 
-  // ---- GLOBAL NEW PART PANEL ----
+  // GLOBAL NEW PART PANEL
   const saveGlobalPart = async () => {
     if (!globalPart.part_number.trim()) {
       alert("Part Number is required.");
@@ -462,7 +445,6 @@ export default function PurchaseOrderForm({
         return;
       }
 
-      // add to dropdown list
       setParts((prev) => [
         ...prev,
         {
@@ -483,14 +465,14 @@ export default function PurchaseOrderForm({
         current_unit_price: "",
       });
 
-      alert("✅ Part added successfully.");
+      alert("Part added successfully.");
     } catch (err) {
       console.error("❌ Global part add error:", err);
       alert("Error adding part.");
     }
   };
 
-  // ---- Vendor inline add/save ----
+  // VENDOR INLINE ADD
   const saveNewVendor = async () => {
     if (!newVendor.vendor_name.trim()) {
       alert("Vendor name required.");
@@ -534,11 +516,9 @@ export default function PurchaseOrderForm({
 
   const handleFileChange = (e) => setAttachments([...e.target.files]);
 
-  // delete a single existing file
   const handleDeleteFile = async (fileId) => {
     if (!initialPo?.id) return;
-    const confirmDelete = window.confirm("Delete this attachment?");
-    if (!confirmDelete) return;
+    if (!window.confirm("Delete this attachment?")) return;
 
     try {
       setDeletingFileIds((prev) => [...prev, fileId]);
@@ -548,38 +528,35 @@ export default function PurchaseOrderForm({
       setExistingFiles((prev) => prev.filter((f) => f.id !== fileId));
     } catch (err) {
       console.error("❌ File delete error:", err);
-      alert("Failed to delete file. See console.");
+      alert("Failed to delete file.");
     } finally {
       setDeletingFileIds((prev) => prev.filter((id) => id !== fileId));
     }
   };
-
   const handleSaveDraft = async () => {
-  if (!po.psr_po_number.trim()) {
-    alert("PO Number is required to save a draft.");
-    return;
-  }
-
-  // 🔍 UNIQUE PO NUMBER CHECK FOR NEW DRAFTS
-  try {
-    const exists = await axios
-      .get(`${BASE}/api/purchase_orders/check-number/${po.psr_po_number}`)
-      .then((res) => res.data.exists)
-      .catch(() => false);
-
-    if (exists) {
-      alert("This PO Number already exists. Please use a unique PO Number.");
+    if (!po.psr_po_number.trim()) {
+      alert("PO Number is required to save a draft.");
       return;
     }
-  } catch (err) {
-    console.error("❌ Error checking PO number uniqueness:", err);
-    alert("Failed to validate PO number.");
-    return;
-  }
 
-  try {
-    setSubmitting(true);
+    try {
+      const exists = await axios
+        .get(`${BASE}/api/purchase_orders/check-number/${po.psr_po_number}`)
+        .then((res) => res.data.exists)
+        .catch(() => false);
 
+      if (exists) {
+        alert("This PO Number already exists. Please use a unique PO Number.");
+        return;
+      }
+    } catch (err) {
+      console.error("❌ Error checking PO number:", err);
+      alert("Failed to validate PO number.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
 
       const res = await axios.post(`${BASE}/api/purchase_orders`, {
         ...po,
@@ -601,7 +578,6 @@ export default function PurchaseOrderForm({
         return;
       }
 
-      // Upload attachments AFTER PO exists
       if (attachments.length > 0) {
         const formData = new FormData();
         attachments.forEach((file) => {
@@ -629,43 +605,38 @@ export default function PurchaseOrderForm({
     }
   };
 
-  // ============================================
-  // 🔵 FINAL HANDLE SUBMIT WITH REVISED RFQ PROMPT
-  // ============================================
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (submitting || saved) return;
+
     setSubmitting(true);
 
-    // Validation
     if (!po.items || po.items.length === 0) {
-      alert("At least one Part must be added to the Purchase Order.");
+      alert("At least one Part must be added.");
       setSubmitting(false);
       return;
     }
 
     for (let i of po.items) {
       if (!i.partId) {
-        alert("Each line item must have a selected Part.");
+        alert("Each line needs a Part.");
         setSubmitting(false);
         return;
       }
       if (!i.quantity || Number(i.quantity) <= 0) {
-        alert("Quantity must be greater than 0.");
+        alert("Quantity must be > 0.");
         setSubmitting(false);
         return;
       }
       if (!i.unitPrice || Number(i.unitPrice) <= 0) {
-        alert("Unit Price must be greater than 0.");
+        alert("Unit Price must be > 0.");
         setSubmitting(false);
         return;
       }
     }
 
-    // Ensure totals are in sync
     recalcTotals(po.items);
 
-    // Duplicate check for NEW PO only
     if (!initialPo?.id) {
       try {
         const exists = await axios
@@ -676,20 +647,13 @@ export default function PurchaseOrderForm({
           .catch(() => false);
 
         if (exists) {
-          alert(
-            "This PO Number already exists. Please use a unique PO Number."
-          );
+          alert("PO Number exists. Use a unique one.");
           setSubmitting(false);
           return;
         }
-      } catch {
-        // ignore check failure, continue
-      }
+      } catch {}
     }
 
-    // --------------------------
-    // 🔵 AUTO REVISED RFQ PROMPT
-    // --------------------------
     let sendRevised = false;
 
     if (
@@ -702,40 +666,19 @@ export default function PurchaseOrderForm({
         originalNorm && JSON.stringify(originalNorm) !== JSON.stringify(po);
 
       if (userEditedSomething) {
-        // Ask user if they want to send a Revised RFQ now
-const wantRevised = window.confirm(
-  "This PO was already sent to the vendor.\n\n" +
-    "Do you want to send a *Revised RFQ* now?\n\n" +
-    "OK = Yes, send revised RFQ\n" +
-    "Cancel = No, only save changes"
-);
-
-if (wantRevised) {
-  sendRevised = true;        // only set flag
-} else {
-  sendRevised = false;       // clean: NO status change
-}
-
+        const wantRevised = window.confirm(
+          "This PO was already sent.\nSend revised RFQ now?"
+        );
+        sendRevised = wantRevised;
       }
     }
 
-    // ----------------------
-    // FINAL STATUS DECISION
-    // ----------------------
     let finalStatus = po.status;
 
-    // new POs always start as Draft
     if (!initialPo?.id) {
       finalStatus = "Draft";
     }
 
-// ❗ Do NOT change status here.
-// Status changes ONLY after the Revised RFQ email is actually sent.
-
-
-    // ----------------------
-    // BUILD PAYLOAD
-    // ----------------------
     const payload = {
       psr_po_number: po.psr_po_number,
       order_date: po.order_date,
@@ -764,7 +707,6 @@ if (wantRevised) {
 
     try {
       if (initialPo?.id) {
-        // UPDATE MODE
         await axios.put(
           `${BASE}/api/purchase_orders/${initialPo.id}`,
           payload
@@ -780,7 +722,6 @@ if (wantRevised) {
         }
 
         if (sendRevised) {
-          // ⭐ VALIDATE FULL PO BEFORE ALLOWING REVISED RFQ
           if (!validateBeforeRFQ()) {
             setSubmitting(false);
             return;
@@ -790,13 +731,13 @@ if (wantRevised) {
           return;
         }
 
-        alert("✅ PO updated successfully.");
+        alert("PO updated successfully.");
       } else {
-        // CREATE MODE
         const res = await axios.post(
           `${BASE}/api/purchase_orders`,
           payload
         );
+
         const poId = res.data?.po_id;
 
         if (poId && attachments.length) {
@@ -808,7 +749,7 @@ if (wantRevised) {
           );
         }
 
-        alert("✅ PO created successfully.");
+        alert("PO created successfully.");
       }
 
       setSaved(true);
@@ -817,67 +758,50 @@ if (wantRevised) {
       else navigate("/purchase-orders");
     } catch (err) {
       console.error("❌ PO save error:", err);
-      alert("Save failed. See console.");
+      alert("Save failed.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ---------------------
-  // STATE MACHINE ACTIONS
-  // ---------------------
   const status = po.status;
 
-  // =======================================================
-  // 🔵 VALIDATE FULL PO BEFORE ALLOWING RFQ OR REVISED RFQ
-  // =======================================================
   const validateBeforeRFQ = () => {
-    // Vendor required
     if (!po.vendor_id) {
-      alert("Please select a Vendor before sending RFQ.");
+      alert("Select vendor before sending.");
       return false;
     }
-
-    // Created by required
     if (!po.created_by) {
-      alert("Please select who created this PO.");
+      alert("Select who created.");
       return false;
     }
-
-    // At least one item
     if (!po.items || po.items.length === 0) {
-      alert("Please add at least one line item before sending RFQ.");
+      alert("Add at least one item.");
       return false;
     }
-
-    // Validate each item
     for (const i of po.items) {
       if (!i.partId) {
-        alert("Each item must have a Part selected.");
+        alert("Each item must have a Part.");
         return false;
       }
       if (!i.quantity || Number(i.quantity) <= 0) {
-        alert("Item quantity must be greater than 0.");
+        alert("Quantity must be > 0.");
         return false;
       }
       if (!i.unitPrice || Number(i.unitPrice) <= 0) {
-        alert("Unit Price must be greater than 0 for all items.");
+        alert("Unit Price must be > 0.");
         return false;
       }
     }
-
     return true;
   };
 
   const goToSendRFQ = () => {
     if (!initialPo?.id) {
-      alert("Please save the draft first.");
+      alert("Save draft first.");
       return;
     }
-
-    // ⭐ VALIDATE FULL PO BEFORE ALLOWING RFQ PAGE
     if (!validateBeforeRFQ()) return;
-
     navigate(`/purchase-orders/${initialPo.id}/send-rfq`);
   };
 
@@ -890,7 +814,7 @@ if (wantRevised) {
     });
 
     setPo((p) => ({ ...p, status: "Ordered" }));
-    alert("PO Marked As Ordered");
+    alert("PO Marked Ordered");
   };
 
   const markReceived = async () => {
@@ -902,7 +826,7 @@ if (wantRevised) {
     });
 
     setPo((p) => ({ ...p, status: "Received" }));
-    alert("PO Marked As Received");
+    alert("PO Marked Received");
   };
 
   const cancelPO = async () => {
@@ -918,12 +842,8 @@ if (wantRevised) {
     alert("PO Cancelled");
   };
 
-  // Only apply internal scroll when NOT in a modal
   const formScrollClasses = isModal ? "" : "max-h-[90vh] overflow-y-auto";
 
-  // ------------------------------------------------
-  //              FORM + FULL BUTTON BLOCK
-  // ------------------------------------------------
   return (
     <form
       onSubmit={handleSubmit}
@@ -977,7 +897,7 @@ if (wantRevised) {
             <option value="Sent Revised RFQ">Sent Revised RFQ</option>
             <option value="Ordered">Ordered</option>
             <option value="Received">Received</option>
-	    <option value="Paid">Paid</option>
+            <option value="Paid">Paid</option>
             <option value="Cancelled">Cancelled</option>
           </select>
         </div>
@@ -996,7 +916,7 @@ if (wantRevised) {
         </div>
 
         <div>
-          <label className="font-semibold">Created By *</label>
+          <label className="font-semibold">Ordered By *</label>
           <select
             className="border p-2 rounded w-full"
             value={po.created_by || ""}
@@ -1049,7 +969,7 @@ if (wantRevised) {
               display={(v) =>
                 v.location ? `${v.name} — ${v.location}` : v.name
               }
-              placeholder="Search vendor by name, city, country..."
+              placeholder="Search vendor..."
               disabled={submitting || saved}
             />
 
@@ -1160,7 +1080,6 @@ if (wantRevised) {
           </button>
         </div>
 
-        {/* Global Add New Part Panel */}
         {addingGlobalPart && (
           <div className="border p-3 bg-gray-50 rounded space-y-2">
             <input
@@ -1246,6 +1165,7 @@ if (wantRevised) {
             <th className="p-2 border text-center">Remove</th>
           </tr>
         </thead>
+
         <tbody>
           {po.items.map((item, i) => {
             const selectedPart =
@@ -1258,6 +1178,7 @@ if (wantRevised) {
             return (
               <tr key={i}>
                 <td className="border p-2">{i + 1}</td>
+
                 <td className="border p-2 align-top">
                   {!addingNewPartRow[i] ? (
                     <div className="space-y-1">
@@ -1274,11 +1195,10 @@ if (wantRevised) {
                             p.description || "No description"
                           }`
                         }
-                        placeholder="Search part # or description..."
+                        placeholder="Search part..."
                         disabled={submitting || saved}
                       />
 
-                      {/* Selected part description / last price helper */}
                       {selectedPart && (
                         <div className="text-[11px] text-gray-500 mt-1">
                           {selectedPart.description}
@@ -1350,6 +1270,7 @@ if (wantRevised) {
                         }
                         disabled={submitting || saved}
                       />
+
                       <div className="flex justify-end gap-2 mt-2">
                         <button
                           type="button"
@@ -1394,6 +1315,7 @@ if (wantRevised) {
                     }
                     disabled={submitting || saved}
                   />
+
                   {item.lastUnitPrice && (
                     <div className="text-xs text-gray-500">
                       Last: ${money(item.lastUnitPrice)}
@@ -1404,14 +1326,13 @@ if (wantRevised) {
                 <td className="border p-2 text-right">
                   ${money(item.totalPrice)}
                 </td>
-                {/* ✅ REMOVE ROW BUTTON */}
+
                 <td className="border p-2 text-center">
                   <button
                     type="button"
                     onClick={() => removeItemRow(i)}
                     disabled={submitting || saved}
                     className="text-red-600 font-bold hover:text-red-800"
-                    title="Remove row"
                   >
                     ✕
                   </button>
@@ -1422,7 +1343,6 @@ if (wantRevised) {
         </tbody>
       </table>
 
-      {/* --- Add Existing Part Button (below table) --- */}
       <div className="mt-2 flex justify-end">
         <button
           type="button"
@@ -1438,8 +1358,9 @@ if (wantRevised) {
       <div className="mt-6 border-t pt-4 text-right space-y-1">
         <div>Subtotal: ${money(po.subtotal)}</div>
         <div>Tax ({po.tax_percent}%): ${money(po.tax_amount)}</div>
+
         <div>
-          Shipping:${" "}
+          Shipping:{" "}
           <input
             type="number"
             value={po.shipping_charges || ""}
@@ -1448,12 +1369,13 @@ if (wantRevised) {
             disabled={submitting || saved}
           />
         </div>
+
         <div className="font-bold mt-2">
           Grand Total: ${money(po.grand_total)}
         </div>
       </div>
 
-      {/* --- Attachments --- */}
+      {/* --- Upload New Attachments --- */}
       <div className="mt-6">
         <label className="font-semibold">Attachments</label>
         <input
@@ -1465,19 +1387,21 @@ if (wantRevised) {
         />
       </div>
 
-      {/* Existing attachments list */}
+      {/* --- Existing Attachments --- */}
       {existingFiles.length > 0 && (
-        <div className="mt-2 border p-3 bg-gray-50 rounded">
+        <div className="mt-4 border p-3 bg-gray-50 rounded">
           <p className="font-semibold mb-1 text-gray-700">
             Existing Attachments:
           </p>
+
           <ul className="list-disc pl-6 text-sm space-y-1">
             {existingFiles.map((f) => {
-              const safePath = "/" + (f.filepath || "").replace(/^\/+/, "");
+              const safePath =
+                "/" + (f.filepath || "").replace(/^\/+/, "");
 
               return (
                 <li
-                  key={f.id || f.filepath}
+                  key={f.id}
                   className="flex items-center gap-3"
                 >
                   <a
@@ -1486,15 +1410,17 @@ if (wantRevised) {
                     rel="noreferrer"
                     className="text-blue-700 hover:underline"
                   >
-                    {f.original_filename || "File"} ({f.mime_type || ""},{" "}
-                    {f.size_bytes?.toLocaleString() || 0} bytes)
+                    {f.original_filename} ({f.mime_type},{" "}
+                    {f.size_bytes?.toLocaleString()} bytes)
                   </a>
+
                   {initialPo?.id && (
                     <button
                       type="button"
                       onClick={() => handleDeleteFile(f.id)}
                       disabled={
-                        submitting || deletingFileIds.includes(f.id)
+                        submitting ||
+                        deletingFileIds.includes(f.id)
                       }
                       className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200"
                     >
@@ -1525,9 +1451,13 @@ if (wantRevised) {
         />
       </div>
 
+      {/* ================================
+          PAID STAMP (optional display)
+      ================================= */}
+      {po.status === "Paid" && <PaidStamp />}
+
       {/* --- Buttons --- */}
       <div className="mt-6 flex justify-end space-x-4">
-        {/* CANCEL — always visible */}
         <button
           type="button"
           onClick={handleCancel}
@@ -1537,21 +1467,17 @@ if (wantRevised) {
           Cancel
         </button>
 
-        {/* 1️⃣ NEW PO — Only Draft (ID not created yet) */}
         {!initialPo?.id && status === "Draft" && (
-          <>
-            <button
-              type="button"
-              onClick={handleSaveDraft}
-              className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded shadow"
-              disabled={submitting}
-            >
-              Save as Draft
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={handleSaveDraft}
+            className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded shadow"
+            disabled={submitting}
+          >
+            Save as Draft
+          </button>
         )}
 
-        {/* 2️⃣ EXISTING: DRAFT → Save + Send RFQ */}
         {initialPo?.id && status === "Draft" && (
           <>
             <button
@@ -1561,6 +1487,7 @@ if (wantRevised) {
             >
               Save Changes
             </button>
+
             <button
               type="button"
               onClick={goToSendRFQ}
@@ -1572,7 +1499,6 @@ if (wantRevised) {
           </>
         )}
 
-        {/* 3️⃣ SENT RFQ → Ordered + Save (NO Send RFQ button) */}
         {initialPo?.id &&
           (status === "Sent RFQ" ||
             status === "Sent Revised RFQ") && (
@@ -1585,6 +1511,7 @@ if (wantRevised) {
               >
                 Mark As Ordered
               </button>
+
               <button
                 type="submit"
                 className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
@@ -1595,7 +1522,6 @@ if (wantRevised) {
             </>
           )}
 
-        {/* 4️⃣ ORDERED → Mark Received + Save */}
         {initialPo?.id && status === "Ordered" && (
           <>
             <button
@@ -1606,6 +1532,7 @@ if (wantRevised) {
             >
               Mark As Received
             </button>
+
             <button
               type="submit"
               className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
@@ -1616,27 +1543,17 @@ if (wantRevised) {
           </>
         )}
 
-        {/* 5️⃣ RECEIVED → Only Save Changes */}
-        {initialPo?.id && status === "Received" && (
-          <button
-            type="submit"
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
-            disabled={submitting}
-          >
-            Save Changes
-          </button>
-        )}
-
-        {/* 6️⃣ CANCELLED → Only Save Changes */}
-        {initialPo?.id && status === "Cancelled" && (
-          <button
-            type="submit"
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
-            disabled={submitting}
-          >
-            Save Changes
-          </button>
-        )}
+        {initialPo?.id &&
+          (status === "Received" ||
+            status === "Cancelled") && (
+            <button
+              type="submit"
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
+              disabled={submitting}
+            >
+              Save Changes
+            </button>
+          )}
       </div>
     </form>
   );

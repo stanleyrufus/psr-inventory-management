@@ -100,3 +100,19 @@ main {
   90% { opacity: 0; transform: scale(1.02); }
   100% { opacity: 0; transform: scale(1.02); }
 }
+
+/* 🔵 Ensure PO prints with full colors */
+@media print {
+  /* Force browser to keep background colors & borders */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Optional: remove default page margin if needed */
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

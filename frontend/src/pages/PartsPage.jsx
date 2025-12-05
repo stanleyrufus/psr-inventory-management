@@ -276,6 +276,15 @@ const ImageRenderer = (props) => {
       ),
     },
 
+ // ⭐ NEW DESCRIPTION COLUMN
+  {
+    headerName: "Description",
+    field: "description",
+    flex: 2,
+    wrapText: true,
+    autoHeight: true,
+  },
+
     {
       headerName: "Last Price",
       width: 110,

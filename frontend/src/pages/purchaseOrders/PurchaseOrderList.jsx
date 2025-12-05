@@ -29,35 +29,16 @@ export default function PurchaseOrderList() {
     direction: "asc",
   });
 
-  // -------------------------------------------------------------
-  // MAIN FETCH FUNCTION (kept original, not touched)
-  // -------------------------------------------------------------
   const loadOrders = async () => {
-    try {
-      const res = await axios.get(`${BASE}/api/purchase_orders`);
-      const data = Array.isArray(res.data) ? res.data : [];
-      setOrders(data);
+  try {
+    const res = await axios.get(`${BASE}/api/purchase_orders`);
+    const data = Array.isArray(res.data) ? res.data : [];
+    setOrders(data);
+  } catch (err) {
+    console.error("❌ Failed to load POs:", err);
+  }
+};
 
-      // Load RFQ status map
-      if (data.length > 0) {
-        const ids = data.map((o) => o.id);
-        try {
-          const resp = await axios.get(
-            `${BASE}/api/purchase_orders/rfq/status`,
-            { params: { po_ids: ids.join(",") } }
-          );
-          setRfqStatusMap(resp.data?.data || {});
-        } catch (e) {
-          console.error("RFQ status load failed:", e);
-          setRfqStatusMap({});
-        }
-      } else {
-        setRfqStatusMap({});
-      }
-    } catch (err) {
-      console.error("❌ Failed to load POs:", err);
-    }
-  };
 
   // -------------------------------------------------------------
   // INITIAL LOAD

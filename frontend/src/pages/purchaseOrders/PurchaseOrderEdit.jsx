@@ -67,14 +67,16 @@ export default function PurchaseOrderEdit() {
       </div>
 
       <PurchaseOrderForm
-        key={po.id}
-        initialPo={safeEditInitial}
-        onSaved={async () => {
-          await loadPo();
-          window.localStorage.setItem("refreshPOList", "1");
-        }}
-        onCancel={() => window.history.back()}
-      />
+  key={po.id}
+  initialPo={safeEditInitial}
+  existingFiles={po.files}   // ⭐ CRITICAL
+  onSaved={async () => {
+    await loadPo();
+    window.localStorage.setItem("refreshPOList", "1");
+  }}
+  onCancel={() => window.history.back()}
+/>
+
     </div>
   );
 }
