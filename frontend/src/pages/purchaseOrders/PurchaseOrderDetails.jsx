@@ -100,7 +100,7 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
 
   return (
     <Wrapper>
-      {/* PRINT STYLES */}
+      {/* PRINT STYLES – KEEPING ORIGINAL SO PRINT IS CLEAN */}
       <style>
         {`
           @media print {
@@ -217,144 +217,146 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
         </div>
 
         {/* =======================================================
-            HEADER STRIP (PSR + PO INFO)
-           ======================================================= */}
-        <div className="border border-gray-300 rounded-md mb-4">
-          <div className="flex justify-between items-center bg-blue-900 text-white px-3 py-1 rounded-t-md print-color">
-            <div className="font-semibold text-base tracking-wide">
-              PSR AUTOMATION INC.
-            </div>
-            <div className="text-sm font-semibold tracking-wide">
-              PO #: {po.psr_po_number || "-"}
-            </div>
-          </div>
+    ULTRA-COMPACT HEADER WITH PSR BLUE STRIP (UPDATED)
+   ======================================================= */}
+<div className="bg-blue-900 text-white rounded-md mb-4 px-4 py-3 border border-blue-900 flex justify-between items-start">
 
-          {/* =======================================================
-              THREE COLUMNS WITH CLEAN VERTICAL DIVIDERS
-             ======================================================= */}
-          <div className="grid grid-cols-3 text-sm border border-gray-300 rounded-md bg-gray-50">
-            <div className="p-3 border-r border-gray-300">
-              <div className="font-semibold text-gray-800">
-                {vendorInfo?.vendor_name || po.vendor_name || "Vendor"}
-              </div>
+  {/* LEFT: PSR ADDRESS */}
+  <div className="text-xs leading-tight">
+    <div className="font-bold text-lg tracking-wide">
+      PSR AUTOMATION INC.
+    </div>
+    <div>13318 SKYLINE CIRCLE</div>
+    <div>SHAKOPEE MN 55379</div>
+    <div>Phone: 952-233-1441 • Fax: 952-233-3731</div>
+    <div>Email: SHINEY@PSRAUTOMATION.COM</div>
+  </div>
 
-              {vendorInfo?.contact_name && (
-                <div>Attn: {vendorInfo.contact_name}</div>
-              )}
-              {vendorInfo?.address1 && <div>{vendorInfo.address1}</div>}
-              {vendorInfo?.address2 && <div>{vendorInfo.address2}</div>}
+  {/* RIGHT: PO INFO — SAME FONT SIZE AS ADDRESS */}
+  <div className="text-right text-xs leading-tight">
+    <div className="font-bold text-lg tracking-wide">
+      PURCHASE ORDER
+    </div>
 
-              {(vendorInfo?.city ||
-                vendorInfo?.state ||
-                vendorInfo?.postal_code) && (
-                <div>
-                  {vendorInfo.city || ""}
-                  {vendorInfo.city && vendorInfo.state ? ", " : ""}
-                  {vendorInfo.state || ""}
-                  {(vendorInfo.city || vendorInfo.state) &&
-                  vendorInfo.postal_code
-                    ? " "
-                    : ""}
-                  {vendorInfo.postal_code || ""}
-                </div>
-              )}
+    <div className="mt-1">
+      PO NUMBER: {po.psr_po_number || "-"}
+    </div>
 
-              {vendorInfo?.country && <div>{vendorInfo.country}</div>}
-              {vendorInfo?.phone && <div>📞 {vendorInfo.phone}</div>}
-              {vendorInfo?.email && <div>✉️ {vendorInfo.email}</div>}
-            </div>
+    <div>
+      ORDER DATE:{" "}
+      {po.order_date
+        ? new Date(po.order_date).toLocaleDateString()
+        : "—"}
+    </div>
 
-            <div className="p-3 border-r border-gray-300 space-y-1">
-              <div className="flex">
-                <span className="w-32 font-medium text-gray-700">PO Date:</span>
-                <span>
-                  {po.order_date
-                    ? new Date(po.order_date).toLocaleDateString()
-                    : "—"}
-                </span>
-              </div>
+    <div>
+      ORDER STATUS: {po.status || "—"}
+    </div>
+  </div>
 
-              <div className="flex">
-                <span className="w-32 font-medium text-gray-700">
-                  Expected Delivery:
-                </span>
-                <span>
-                  {po.expected_delivery_date
-                    ? new Date(po.expected_delivery_date).toLocaleDateString()
-                    : "—"}
-                </span>
-              </div>
+</div>
 
-              <div className="flex">
-                <span className="w-32 font-medium text-gray-700">Status:</span>
-                <span>{po.status || "—"}</span>
-              </div>
-            </div>
 
-            <div className="p-3 space-y-1">
-              <div className="flex">
-                <span className="w-32 font-medium text-gray-700">
-                  Created By:
-                </span>
-                <span>{po.created_by || "—"}</span>
-              </div>
 
-              <div className="flex">
-                <span className="w-32 font-medium text-gray-700">
-                  Payment Terms:
-                </span>
-                <span>{po.payment_terms || "—"}</span>
-              </div>
+{/* =======================================================
+    PURCHASED FROM + SUMMARY (compact + THICK BLUE BORDERS)
+   ======================================================= */}
+<div className="grid grid-cols-2 gap-4 mb-4 text-sm">
 
-              <div className="flex">
-                <span className="w-32 font-medium text-gray-700">
-                  Currency:
-                </span>
-                <span>{po.currency || "USD"}</span>
-              </div>
-            </div>
-          </div>
+  {/* ---------------------------------------------
+      PURCHASED FROM (Vendor) — Ultra Compact
+     --------------------------------------------- */}
+  <div className="border-2 border-blue-900 rounded-md bg-gray-50 p-3 leading-tight">
+    <div className="font-semibold text-gray-800 mb-1">
+      PURCHASED FROM:
+    </div>
 
-          {/* ⭐ FIXED: added missing closing div */}
-        </div>
+    <div className="font-bold text-gray-900">
+      {vendorInfo?.vendor_name || po.vendor_name || "Vendor"}
+    </div>
+
+    {vendorInfo?.contact_name && (
+      <div className="text-xs">Attn: {vendorInfo.contact_name}</div>
+    )}
+
+    {vendorInfo?.address1 && <div className="text-xs">{vendorInfo.address1}</div>}
+    {vendorInfo?.address2 && <div className="text-xs">{vendorInfo.address2}</div>}
+
+    {/* City + State + ZIP + USA */}
+    {(vendorInfo?.city ||
+      vendorInfo?.state ||
+      vendorInfo?.postal_code) && (
+      <div className="text-xs">
+        {(vendorInfo.city || "") +
+          (vendorInfo.city && vendorInfo.state ? ", " : "") +
+          (vendorInfo.state || "") +
+          ((vendorInfo.city || vendorInfo.state) && vendorInfo.postal_code ? " " : "") +
+          (vendorInfo.postal_code || "")}{" "}
+        USA
+      </div>
+    )}
+
+    {/* Phone + Email (NO icons) */}
+    {(vendorInfo?.phone || vendorInfo?.email) && (
+      <div className="text-xs mt-1">
+        {vendorInfo.phone && <>Phone: {vendorInfo.phone}</>}
+        {vendorInfo.phone && vendorInfo.email && " • "}
+        {vendorInfo.email && <>Email: {vendorInfo.email}</>}
+      </div>
+    )}
+  </div>
+
+  {/* ---------------------------------------------
+      ORDER SUMMARY (Ordered By + Dates + Terms + Remarks)
+     --------------------------------------------- */}
+  <div className="border-2 border-blue-900 rounded-md bg-gray-50 p-3 leading-tight space-y-1">
+
+    <div className="flex">
+      <span className="w-32 font-medium text-gray-700">Ordered By:</span>
+      <span>{po.created_by || "—"}</span>
+    </div>
+
+    <div className="flex">
+      <span className="w-32 font-medium text-gray-700">Expected Delivery:</span>
+      <span>
+        {po.expected_delivery_date
+          ? new Date(po.expected_delivery_date).toLocaleDateString()
+          : "—"}
+      </span>
+    </div>
+
+    <div className="flex">
+      <span className="w-32 font-medium text-gray-700">Payment Terms:</span>
+      <span>{po.payment_terms || "—"}</span>
+    </div>
+
+    {/* ⭐ Date Paid (auto when status = Paid) */}
+    <div className="flex">
+      <span className="w-32 font-medium text-gray-700">Date Paid:</span>
+      <span>
+        {po.status === "Paid" && po.updated_at
+          ? new Date(po.updated_at).toLocaleDateString()
+          : "—"}
+      </span>
+    </div>
+
+    {/* ⭐ Remarks */}
+    <div className="flex items-start">
+      <span className="w-32 font-medium text-gray-700">Remarks:</span>
+      <span className="whitespace-pre-wrap">
+        {po.remarks?.trim() || "—"}
+      </span>
+    </div>
+  </div>
+
+</div>
+
 
         {/* =======================================================
-            SOLD TO / SHIP TO — With Blue Header Strip
+            ORDER PARTS
            ======================================================= */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div className="border border-gray-300 rounded-md bg-gray-50 text-sm leading-tight">
-            <div className="bg-blue-900 text-white px-3 py-1 border-b border-gray-300 print-color">
-              <span className="font-semibold tracking-wide text-xs">
-                SOLD TO
-              </span>
-            </div>
-            <div className="px-3 py-2 leading-tight">
-              <p className="font-semibold text-gray-800">SHINEY RAMNARAIN</p>
-              <p className="text-gray-800">PSR AUTOMATION</p>
-              <p className="text-gray-800">13318 SKYLINE CIRCLE</p>
-              <p className="text-gray-800">SHAKOPEE MN 55379</p>
-              <p className="text-gray-800">Phone: 952-233-1441</p>
-              <p className="text-gray-800">Fax: 952-233-3731</p>
-              <p className="text-gray-800">Email: SHINEY@PSRAUTOMATION.COM</p>
-            </div>
-          </div>
-
-          <div className="border border-gray-300 rounded-md bg-gray-50 text-sm leading-tight">
-            <div className="bg-blue-900 text-white px-3 py-1 border-b border-gray-300 print-color">
-              <span className="font-semibold tracking-wide text-xs">
-                SHIP TO
-              </span>
-            </div>
-            <div className="px-3 py-2 leading-tight">
-              <p className="font-semibold text-gray-800">PSR AUTOMATION</p>
-              <p className="text-gray-800">13318 SKYLINE CIRCLE</p>
-              <p className="text-gray-800">SHAKOPEE MN 55379</p>
-            </div>
-          </div>
-        </div>
-
         <h3 className="mt-2 font-semibold text-gray-800 text-sm">
-          ORDER LINES
+          ORDER PARTS
         </h3>
 
         {items.length > 0 ? (
@@ -393,11 +395,29 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
                       String(p.part_id) === String(it.part_id || it.partId)
                   );
 
-                  const imgUrl =
-                    part?.image_url &&
-                    `${FILE_BASE}${
-                      part.image_url.startsWith("/") ? "" : "/"
-                    }${part.image_url}`;
+                  // ✅ FIX IMAGE: handle JSON array or single path
+                  let imgUrl = null;
+                  if (part?.image_url) {
+                    try {
+                      const arr = JSON.parse(part.image_url);
+                      if (Array.isArray(arr) && arr.length > 0) {
+                        const pth = arr[0].startsWith("/")
+                          ? arr[0]
+                          : "/" + arr[0];
+                        imgUrl = `${FILE_BASE}${pth}`;
+                      } else {
+                        const single = part.image_url.startsWith("/")
+                          ? part.image_url
+                          : "/" + part.image_url;
+                        imgUrl = `${FILE_BASE}${single}`;
+                      }
+                    } catch {
+                      const single = part.image_url.startsWith("/")
+                        ? part.image_url
+                        : "/" + part.image_url;
+                      imgUrl = `${FILE_BASE}${single}`;
+                    }
+                  }
 
                   return (
                     <tr
@@ -450,6 +470,9 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
           <p className="text-sm text-gray-500 mt-2">No items found.</p>
         )}
 
+        {/* =======================================================
+            TOTALS (Tax forced to 0)
+           ======================================================= */}
         <div className="mt-4 flex justify-end relative">
           {po.status === "Paid" && (
             <div className="absolute top-1/2 -translate-y-1/2 right-[18rem] rotate-[-12deg] opacity-70 pointer-events-none">
@@ -465,10 +488,8 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
               <span className="font-semibold">{money(po.subtotal)}</span>
             </div>
             <div className="flex justify-between mb-1">
-              <span className="text-gray-700">
-                Tax ({po.tax_percent ?? 0}%)
-              </span>
-              <span className="font-semibold">{money(po.tax_amount)}</span>
+              <span className="text-gray-700">Tax (0%)</span>
+              <span className="font-semibold">$0.00</span>
             </div>
             <div className="flex justify-between mb-1">
               <span className="text-gray-700">Shipping</span>
@@ -487,6 +508,9 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
           </div>
         </div>
 
+        {/* =======================================================
+            ATTACHMENTS
+           ======================================================= */}
         <h3 className="mt-6 font-semibold text-gray-800">Attachments</h3>
 
         {files.length > 0 ? (
