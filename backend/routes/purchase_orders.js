@@ -422,11 +422,13 @@ res.json({
 router.put("/:id", async (req, res) => {
   const id = Number(req.params.id);
 
-  const {
-    psr_po_number, order_date, expected_delivery_date, created_by, vendor_id,
-    payment_method, payment_terms, currency, remarks, tax_percent,
-    shipping_charges, subtotal, tax_amount, grand_total, status, items = [],
-  } = req.body || {};
+const {
+  psr_po_number, order_date, expected_delivery_date, created_by, vendor_id,
+  payment_method, payment_terms, currency, remarks, tax_percent,
+  shipping_charges, subtotal, tax_amount, grand_total, status, items = [],
+  received_by, received_on
+} = req.body || {};
+
 
   if (!psr_po_number || !vendor_id || !created_by) {
     return res.status(400).json({ success: 0, errormsg: "Missing required fields" });
@@ -435,23 +437,29 @@ router.put("/:id", async (req, res) => {
   const trx = await db.transaction();
   try {
     await trx("purchase_orders").where({ id }).update({
-      psr_po_number,
-      order_date: normalizeDate(order_date),
-      expected_delivery_date: normalizeDate(expected_delivery_date),
-      created_by,
-      vendor_id,
-      payment_method,
-      payment_terms,
-      currency,
-      remarks,
-      tax_percent,
-      shipping_charges,
-      subtotal,
-      tax_amount,
-      grand_total,
-      status,
-      updated_at: db.fn.now(),
-    });
+  psr_po_number,
+  order_date: normalizeDate(order_date),
+  expected_delivery_date: normalizeDate(expected_delivery_date),
+  created_by,
+  vendor_id,
+  payment_method,
+  payment_terms,
+  currency,
+  remarks,
+  tax_percent,
+  shipping_charges,
+  subtotal,
+  tax_amount,
+  grand_total,
+  status,
+
+  // ⭐ NEW FIELDS — important!
+  received_by: req.body.received_by || null,
+  received_on: normalizeDate(req.body.received_on),
+
+  updated_at: db.fn.now(),
+});
+
 
     await trx("purchase_order_items").where({ po_id: id }).del();
 

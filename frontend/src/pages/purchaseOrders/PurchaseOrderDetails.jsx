@@ -266,14 +266,15 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
   {/* ---------------------------------------------
       PURCHASED FROM (Vendor) — Ultra Compact
      --------------------------------------------- */}
-  <div className="border-2 border-blue-900 rounded-md bg-gray-50 p-3 leading-tight">
-    <div className="font-semibold text-gray-800 mb-1">
-      PURCHASED FROM:
-    </div>
+<div className="border-2 border-blue-900 rounded-md bg-gray-50 p-3 leading-tight">
+  <div className="font-semibold text-gray-800 mb-1">
+    VENDOR:
+  </div>
 
-    <div className="font-bold text-gray-900">
-      {vendorInfo?.vendor_name || po.vendor_name || "Vendor"}
-    </div>
+  <div className="text-gray-900">
+    {vendorInfo?.vendor_name || po.vendor_name || "Vendor"}
+  </div>
+
 
     {vendorInfo?.contact_name && (
       <div className="text-xs">Attn: {vendorInfo.contact_name}</div>
@@ -316,19 +317,21 @@ export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
       <span>{po.created_by || "—"}</span>
     </div>
 
-    <div className="flex">
-      <span className="w-32 font-medium text-gray-700">Expected Delivery:</span>
-      <span>
-        {po.expected_delivery_date
-          ? new Date(po.expected_delivery_date).toLocaleDateString()
-          : "—"}
-      </span>
-    </div>
+<div className="flex">
+  <span className="w-32 font-medium text-gray-700">Received On:</span>
+  <span>
+    {po.received_on
+      ? new Date(po.received_on).toLocaleDateString()
+      : "—"}
+  </span>
+</div>
 
-    <div className="flex">
-      <span className="w-32 font-medium text-gray-700">Payment Terms:</span>
-      <span>{po.payment_terms || "—"}</span>
-    </div>
+
+  <div className="flex">
+  <span className="w-32 font-medium text-gray-700">Received By:</span>
+  <span>{po.received_by || "—"}</span>
+</div>
+
 
     {/* ⭐ Date Paid (auto when status = Paid) */}
     <div className="flex">

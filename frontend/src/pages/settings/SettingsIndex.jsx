@@ -21,6 +21,12 @@ export default function SettingsIndex() {
       desc: "Configure application defaults and behaviour.",
       path: "/settings/system",
     },
+// ✅ NEW TILE — PSR Monitoring Dashboard
+  {
+    title: "System Health",
+    desc: "Monitor server, API, database, and business-level health.",
+    path: "/settings/monitoring",
+  },
     {
       title: "Backup & Data Import",
       desc: "Database backup and CSV import tools (future).",

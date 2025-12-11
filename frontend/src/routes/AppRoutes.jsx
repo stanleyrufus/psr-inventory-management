@@ -8,6 +8,9 @@ import SalesOrderPage from "../pages/SalesOrderPage";
 import ReportsPage from "../pages/Reports";
 import Login from "../pages/Login";
 
+import MonitoringPage from "../pages/MonitoringPage";
+
+
 import { AuthContext } from "../context/AuthContext";
 import Sidebar from "../components/Sidebar";
 
@@ -317,39 +320,49 @@ const PrivateLayout = ({ children }) => {
         )}
       />
 
-      {/* Settings */}
-      <Route
-        path="/settings"
-        element={Protected(
-          <PrivateLayout>
-            <SettingsIndex />
-          </PrivateLayout>
-        )}
-      />
+/* Settings */
+<Route
+  path="/settings"
+  element={Protected(
+    <PrivateLayout>
+      <SettingsIndex />
+    </PrivateLayout>
+  )}
+/>
 
-      <Route
-        path="/settings/users"
-        element={Protected(
-          <PrivateLayout>
-            <UserManagement />
-          </PrivateLayout>
-        )}
-      />
+<Route
+  path="/settings/users"
+  element={Protected(
+    <PrivateLayout>
+      <UserManagement />
+    </PrivateLayout>
+  )}
+/>
 
-      <Route
-        path="/settings/roles"
-        element={Protected(
-          <PrivateLayout>
-            <RolesManagement />
-          </PrivateLayout>
-        )}
-      />
+<Route
+  path="/settings/roles"
+  element={Protected(
+    <PrivateLayout>
+      <RolesManagement />
+    </PrivateLayout>
+  )}
+/>
 
-     <Route
+<Route
   path="/settings/system"
   element={Protected(
     <PrivateLayout>
       <SystemPreferences />
+    </PrivateLayout>
+  )}
+/>
+
+{/* ✅ PSR System Monitoring Dashboard (Under Settings) */}
+<Route
+  path="/settings/monitoring"
+  element={Protected(
+    <PrivateLayout>
+      <MonitoringPage />
     </PrivateLayout>
   )}
 />

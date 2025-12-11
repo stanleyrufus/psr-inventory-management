@@ -235,6 +235,8 @@ export default function PurchaseOrderForm({
           payment_terms: "",
           currency: "USD",
           remarks: "",
+	  received_by: "",
+	  received_on: "",
           tax_percent: 0,
           shipping_charges: 0,
           items: [],
@@ -1450,6 +1452,42 @@ export default function PurchaseOrderForm({
           disabled={submitting || saved}
         />
       </div>
+
+{/* RECEIVED SECTION */}
+<div className="mt-4 grid grid-cols-2 gap-4">
+  <div>
+    <label className="font-semibold">Received By</label>
+    <select
+      className="border p-2 rounded w-full"
+      value={po.received_by || ""}
+      onChange={(e) =>
+        setPo({ ...po, received_by: e.target.value })
+      }
+      disabled={submitting || saved}
+    >
+      <option value="">Select</option>
+      <option value="Shiney">Shiney</option>
+      <option value="Brian">Brian</option>
+      <option value="Pam">Pam</option>
+      <option value="Dave">Dave</option>
+      <option value="Chris">Chris</option>
+      <option value="Anushka">Anushka</option>
+    </select>
+  </div>
+
+  <div>
+    <label className="font-semibold">Received On (Date)</label>
+    <input
+      type="date"
+      className="border p-2 rounded w-full"
+      value={po.received_on || ""}
+      onChange={(e) =>
+        setPo({ ...po, received_on: e.target.value })
+      }
+      disabled={submitting || saved}
+    />
+  </div>
+</div>
 
       {/* ================================
           PAID STAMP (optional display)

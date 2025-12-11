@@ -12,6 +12,7 @@
     "seed": "node ./node_modules/knex/bin/cli.js seed:run --knexfile ./knexfile.cjs"
   },
   "dependencies": {
+    "@sendgrid/mail": "^8.1.6",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",

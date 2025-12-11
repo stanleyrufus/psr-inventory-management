@@ -17,6 +17,7 @@ import vendorRoutes from "./routes/vendors.js"; // ✅ single correct import
 import purchaseOrdersReportRoutes from "./routes/purchase_orders_report.js";
 import rfqRouter from "./routes/purchase_orders_rfq.js";   // ✅ ADD THIS
 import permissionsRoute from "./routes/permissions.js";
+import monitoringRoutes from "./routes/monitoring.js";
 
 
 import usersRoute from "./routes/users.js";
@@ -69,6 +70,9 @@ app.use("/api/purchase_orders_report", purchaseOrdersReportRoutes);
 
 // --- Other modules ---
 app.use("/api/products", productsRoutes);
+
+app.use("/api/monitoring", monitoringRoutes);
+
 
 // ✅ Health check
 app.get("/", (req, res) => {
