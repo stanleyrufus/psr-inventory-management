@@ -35,6 +35,7 @@ import PurchaseOrderDetails from "../pages/purchaseOrders/PurchaseOrderDetails";
 import PurchaseOrderEdit from "../pages/purchaseOrders/PurchaseOrderEdit";
 import PurchaseOrderBulkUpload from "../pages/purchaseOrders/PurchaseOrderBulkUpload";
 import SendRfqPage from "../pages/purchaseOrders/SendRfqPage";
+import PoImportFromPdfPage from "../pages/purchaseOrders/PoImportFromPdfPage";
 
 /* Vendors */
 import VendorsPage from "../pages/vendors/VendorsPage";
@@ -203,6 +204,11 @@ const PrivateLayout = ({ children }) => {
           </PrivateLayout>
         )}
       />
+
+<Route
+  path="/purchase-orders/import-from-pdf"
+  element={<PoImportFromPdfPage />}
+/>
       <Route
         path="/purchase-orders/new"
         element={Protected(

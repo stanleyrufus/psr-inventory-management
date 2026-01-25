@@ -11,6 +11,10 @@ const money = (v) =>
 
 export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
   const { id } = useParams();
+// ✅ DEFENSIVE GUARD
+if (!id || isNaN(Number(id))) {
+  return <div className="p-6">Invalid Purchase Order</div>;
+}
   const navigate = useNavigate();
 
   const [fetchedOrder, setFetchedOrder] = useState(null);

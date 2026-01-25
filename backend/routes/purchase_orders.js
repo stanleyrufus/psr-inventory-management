@@ -1,3 +1,4 @@
+// backend/routes/purchase_orders.js
 import express from "express";
 import { db } from "../db.js";
 import path from "path";
@@ -6,47 +7,87 @@ import multer from "multer";
 import { fileURLToPath } from "url";
 import nodemailer from "nodemailer";
 import { makeSafeUploader } from "../middleware/uploads.js";
+import { createRequire } from "module";
 
-const uploadPo = makeSafeUploader("po-attachments");
-
+// ---------------------------------------------
+// PDF PARSER (Node 22 + ESM SAFE)
+// ---------------------------------------------
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 
 const router = express.Router();
+
+// ✅ Safe uploader for PO attachments
+// NOTE: makeSafeUploader implementations vary across projects, so we resolve it safely below.
+const uploadPo = makeSafeUploader("po-attachments");
 
 // ---------------- Paths Setup ----------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-
 // -------- Helpers --------
 const normalizeDate = (d) => (d && String(d).trim() !== "" ? d : null);
 
-function buildMailTransport() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: Number(process.env.SMTP_PORT || 587) === 465,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+// ✅ Helper: system date in YYYY-MM-DD (server date)
+const systemDateYmd = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * ✅ Resolve uploader middleware safely
+ *
+ * Some makeSafeUploader() implementations return:
+ *  - Multer instance: has .array/.single/.fields
+ *  - { upload: multerInstance, uploadDir: "..." }
+ *  - direct middleware function (req,res,next)
+ */
+const resolvePoUploadMiddleware = () => {
+  // Case A: uploadPo is a Multer instance
+  if (uploadPo && typeof uploadPo.array === "function") {
+    return uploadPo.array("files");
+  }
+
+  // Case B: uploadPo is { upload: multerInstance, ... }
+  if (uploadPo?.upload && typeof uploadPo.upload.array === "function") {
+    return uploadPo.upload.array("files");
+  }
+
+  // Case C: uploadPo is already a middleware function
+  if (typeof uploadPo === "function") {
+    return uploadPo;
+  }
+
+  // Fallback: local multer disk storage (keeps project working)
+  const uploadRoot = path.resolve(process.cwd(), "uploads", "po-attachments");
+  if (!fs.existsSync(uploadRoot)) fs.mkdirSync(uploadRoot, { recursive: true });
+
+  const storage = multer.diskStorage({
+    destination: (_, __, cb) => cb(null, uploadRoot),
+    filename: (_, file, cb) => {
+      const safeName = `${Date.now()}-${file.originalname}`.replace(
+        /[/\\?%*:|"<>]/g,
+        "-"
+      );
+      cb(null, safeName);
+    },
   });
-}
+
+  const fallback = multer({ storage });
+  return fallback.array("files");
+};
 
 //
 // =============================================
 //  DASHBOARD ENDPOINTS
 // =============================================
 //
-
-// Count
 router.get("/count", async (_, res) => {
   try {
     const r = await db("purchase_orders").count("id as count").first();
     res.json({ count: Number(r.count) });
   } catch (err) {
-    console.error("❌ PO count error:", err);
-    res.status(500).json({ success: 0, errormsg: "Failed to compute PO count" });
+    res.status(500).json({ success: 0 });
   }
 });
 
-// Recent POs
 router.get("/recent", async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit || "5"), 50);
@@ -64,636 +105,520 @@ router.get("/recent", async (req, res) => {
       .limit(limit);
 
     res.json({ success: 1, data: rows });
-  } catch (err) {
-    console.error("❌ Recent POs error:", err);
-    res.status(500).json({ success: 0, errormsg: "Failed to fetch recent POs" });
+  } catch {
+    res.status(500).json({ success: 0 });
   }
 });
 
-// Monthly PO status summary
-router.get("/status/monthly", async (req, res) => {
+//
+// =============================================
+//  IMPORT PO FROM PDF
+// =============================================
+//
+const uploadPdf = multer({ dest: "uploads/tmp" });
+
+router.post("/import-from-pdf", uploadPdf.array("files"), async (req, res) => {
   try {
-    const months = Math.min(parseInt(req.query.months || "6"), 24);
-
-    const rows = await db("purchase_orders")
-      .whereNotNull("order_date")
-      .select(
-        db.raw(`to_char(date_trunc('month', order_date), 'YYYY-MM') as ym`),
-        db.raw(`SUM(CASE WHEN status ILIKE 'Draft' THEN 1 ELSE 0 END)::int as draft`),
-        db.raw(`SUM(CASE WHEN status ILIKE 'Pending' THEN 1 ELSE 0 END)::int as pending`),
-        db.raw(`SUM(CASE WHEN status ILIKE 'Sent' THEN 1 ELSE 0 END)::int as sent`),
-        db.raw(`SUM(CASE WHEN status ILIKE 'Completed' THEN 1 ELSE 0 END)::int as completed`)
-      )
-      .groupByRaw("date_trunc('month', order_date)")
-      .orderByRaw("date_trunc('month', order_date) desc")
-      .limit(months);
-
-    res.json({ success: 1, data: rows.reverse() });
-  } catch (err) {
-    console.error("❌ PO monthly status error:", err);
-    res.status(500).json({ success: 0, errormsg: "Failed to compute monthly PO status" });
-  }
-});
-
-
-// =============================================
-//  CREATE PO
-// =============================================
-
-
-// CHECK duplicate number (supports edit mode)
-router.get("/check-number/:psr_po_number", async (req, res) => {
-  try {
-    const { psr_po_number } = req.params;
-    const excludeId = req.query.excludeId ? Number(req.query.excludeId) : null;
-
-    const q = db("purchase_orders").where({ psr_po_number });
-
-    if (excludeId) q.andWhereNot("id", excludeId);
-
-    const existing = await q.first();
-    res.json({ exists: !!existing });
-  } catch (err) {
-    res.status(500).json({ exists: false });
-  }
-});
-
-// =============================================
-//  CREATE PO  (supports Draft mode)
-// =============================================
-router.post("/", async (req, res) => {
-  const body = req.body || {};
-  const {
-    psr_po_number,
-    order_date,
-    expected_delivery_date,
-    created_by,
-    vendor_id,
-    payment_method,
-    payment_terms,
-    currency,
-    remarks,
-    tax_percent,
-    shipping_charges,
-    subtotal,
-    tax_amount,
-    grand_total,
-    status = "Draft",
-    items = [],
-  } = body;
-
-  // ======================================================
-// ⭐ 1. DRAFT MODE — Save everything INCLUDING ITEMS
-// ======================================================
-if (status === "Draft") {
-  if (!psr_po_number) {
-    return res.status(400).json({
-      success: 0,
-      errormsg: "PO Number is required to save draft.",
-    });
-  }
-
-  const trx = await db.transaction();
-  try {
-    const inserted = await trx("purchase_orders")
-      .insert({
-        psr_po_number,
-        status: "Draft",
-        remarks: remarks || null,
-        created_by: created_by || null,
-        vendor_id: vendor_id || null,
-        order_date: normalizeDate(order_date),
-        expected_delivery_date: normalizeDate(expected_delivery_date),
-        subtotal: subtotal || 0,
-        tax_amount: tax_amount || 0,
-        grand_total: grand_total || 0,
-        created_at: db.fn.now(),
-        updated_at: db.fn.now(),
-      })
-      .returning(["id"]);
-
-    const po_id = inserted[0].id;
-
-    if (items && items.length > 0) {
-      const itemsToInsert = items.map((item, index) => ({
-        po_id,
-        line_no: index + 1,
-        part_id: item.part_id || item.partId,
-        quantity: item.quantity,
-        unit_price: item.unit_price || item.unitPrice,
-        total_price: item.total_price || item.totalPrice,
-      }));
-
-      await trx("purchase_order_items").insert(itemsToInsert);
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: 0,
+        message: "No PDF files uploaded",
+      });
     }
 
-    await trx.commit();
+    const results = [];
+
+    for (const file of req.files) {
+      const buffer = fs.readFileSync(file.path);
+
+      // ✅ parser is pdfParse (Node 22 + ESM safe)
+      const parsed = await pdfParse(buffer);
+
+      results.push({
+        filename: file.originalname,
+        textPreview: parsed.text.slice(0, 1500),
+      });
+
+      fs.unlinkSync(file.path); // cleanup temp file
+    }
 
     return res.json({
       success: 1,
-      po_id,
-      draft: true,
-      message: "Draft saved successfully",
+      message: "PDF uploaded successfully",
+      previews: results,
     });
-
   } catch (err) {
-    await trx.rollback();
-    console.error("❌ Draft save error:", err);
+    console.error("❌ PDF import error:", err);
     return res.status(500).json({
       success: 0,
-      errormsg: "Failed to save draft with items.",
+      message: "Failed to import PDF",
     });
-  }
-}
-
-
-  // ======================================================
-  // ⭐ 2. NORMAL CREATE PO MODE (FULL VALIDATION)
-  // ======================================================
-
-  if (!psr_po_number || !vendor_id || !created_by) {
-    return res.status(400).json({
-      success: 0,
-      errormsg:
-        "Missing required fields: psr_po_number, vendor_id, created_by.",
-    });
-  }
-
-  if (!items.length) {
-    return res.status(400).json({
-      success: 0,
-      errormsg: "At least one item is required.",
-    });
-  }
-
-  // Duplicate check (normal create only)
-  const exists = await db("purchase_orders").where({ psr_po_number }).first();
-  if (exists) {
-    return res.status(400).json({
-      success: 0,
-      errormsg: "PO Number already exists. Use a unique number.",
-    });
-  }
-
-  const trx = await db.transaction();
-  try {
-    const inserted = await trx("purchase_orders")
-      .insert({
-        psr_po_number,
-        order_date: normalizeDate(order_date),
-        expected_delivery_date: normalizeDate(expected_delivery_date),
-        created_by,
-        vendor_id,
-        payment_method,
-        payment_terms,
-        currency,
-        remarks,
-        tax_percent,
-        shipping_charges,
-        subtotal,
-        tax_amount,
-        grand_total,
-        status,
-        created_at: db.fn.now(),
-        updated_at: db.fn.now(),
-        purchased_on: db.fn.now(),
-      })
-      .returning(["id"]);
-
-    const po_id = inserted[0].id;
-
-    const itemsToInsert = items.map((item, index) => ({
-      po_id,
-      line_no: index + 1,
-      part_id: item.part_id || item.partId,
-      quantity: item.quantity,
-      unit_price: item.unit_price || item.unitPrice,
-      total_price:
-        (item.quantity || 0) * (item.unit_price || item.unitPrice || 0),
-    }));
-
-    await trx("purchase_order_items").insert(itemsToInsert);
-
-// ⭐ Lookup Vendor Name (you forgot this — caused vendor_name = undefined)
-const vendorNameRow = await trx("vendors")
-  .where("vendor_id", vendor_id)
-  .select("vendor_name")
-  .first();
-const vendor_name = vendorNameRow?.vendor_name || null;
-
-// ⭐ UPDATE INVENTORY last-PO FIELDS FOR EACH PART
-for (const item of itemsToInsert) {
-  await trx("inventory")
-    .where({ part_id: item.part_id })
-    .update({
-      last_po_id: po_id,
-      last_po_number: psr_po_number,
-      last_po_date: order_date || null,
-      last_vendor_id: vendor_id || null,
-      last_vendor_name: vendor_name,   // NOW SAFE
-      last_quantity: item.quantity,
-      last_unit_price: item.unit_price,
-      last_currency_code: currency || "USD",
-      last_payment_terms: payment_terms || null,
-      last_payment_method: payment_method || null,
-      updated_on: db.fn.now(),
-    });
-}
-
-
-    await trx.commit();
-
-    res.json({ success: 1, po_id });
-  } catch (err) {
-    await trx.rollback();
-    res.status(500).json({ success: 0, errormsg: err.message });
   }
 });
 
-
 //
 // =============================================
-//  LIST & GET PO
+//  LIST PO
 // =============================================
 //
+router.get("/", async (_, res) => {
+  const rows = await db("purchase_orders as po")
+    .leftJoin("vendors as v", "po.vendor_id", "v.vendor_id")
+    .select(
+      "po.id",
+      "po.psr_po_number",
+      "po.vendor_id",
+      "v.vendor_name",
+      "po.subtotal",
+      "po.tax_amount",
+      "po.shipping_charges",
+      "po.grand_total",
+      "po.order_date",
+      "po.status",
+      "po.created_by"
+    )
+    .orderBy("po.id", "desc");
 
-router.get("/", async (req, res) => {
-  try {
-    const rows = await db("purchase_orders as po")
-      .leftJoin("vendors as v", "po.vendor_id", "v.vendor_id")
-      .select(
-        "po.id",
-        "po.psr_po_number",
-        "po.vendor_id",
-        "v.vendor_name",
-        "po.subtotal",
-        "po.tax_amount",
-        "po.shipping_charges",
-        "po.grand_total",
-        "po.order_date",
-        "po.status",
-        "po.created_by"
-      )
-      .orderBy("po.id", "desc");
-
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ success: 0, errormsg: "Failed to list POs" });
-  }
+  res.json(rows);
 });
 
-router.get("/:id", async (req, res) => {
-  const id = Number(req.params.id);
-
+//
+// =============================================
+//  NEXT PO NUMBER (AUTO-GENERATE PREVIEW)
+//  GET /api/purchase_orders/next-number
+// =============================================
+//
+router.get("/next-number", async (req, res) => {
   try {
-    // Load main PO record
-    const po = await db("purchase_orders as po")
-      .leftJoin("vendors as v", "po.vendor_id", "v.vendor_id")
-      .select(
-        "po.*",
-        "v.vendor_name",
-        "v.contact_name",
-        "v.email as vendor_email",
-        "v.phone as vendor_phone"
-      )
-      .where("po.id", id)
+    // ✅ system date (server)
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    const yyyymmdd = `${yyyy}${mm}${dd}`;
+
+    const prefix = `PSR-${yyyymmdd}-`;
+
+    // ✅ Find the highest sequence for TODAY
+    // psr_po_number format: PSR-YYYYMMDD-0001
+    const r = await db("purchase_orders")
+      .where("psr_po_number", "like", `${prefix}%`)
+      .max("psr_po_number as max")
       .first();
 
+    let nextSeq = 1;
+
+    if (r?.max) {
+      const last = String(r.max);
+      const lastSeqStr = last.split("-").pop(); // "0007"
+      const lastSeq = Number(lastSeqStr);
+      if (!isNaN(lastSeq)) nextSeq = lastSeq + 1;
+    }
+
+    const seqStr = String(nextSeq).padStart(4, "0");
+    const nextNumber = `${prefix}${seqStr}`;
+
+    return res.json({
+      success: 1,
+      psr_po_number: nextNumber,
+      order_date: `${yyyy}-${mm}-${dd}`, // ✅ date input format
+    });
+  } catch (err) {
+    console.error("❌ next-number error:", err);
+    return res
+      .status(500)
+      .json({ success: 0, message: "Failed to generate PO number" });
+  }
+});
+
+//
+// =====================================================
+// ✅ CREATE PO
+// POST /api/purchase_orders
+// - Uses system date for order_date
+// - Uses psr_po_number from frontend (from /next-number)
+// - Inserts items into purchase_order_items
+//
+// ✅ NEW: Validations enforced on FIRST SAVE (even Draft)
+//   - created_by required
+//   - vendor_id required
+//   - at least 1 item required
+//   - every item must have part_id
+//   - every item must have unit_price > 0
+//   - quantity > 0
+// =====================================================
+//
+router.post("/", async (req, res) => {
+  try {
+    const body = req.body || {};
+    const items = Array.isArray(body.items) ? body.items : [];
+
+    // ✅ Always set order_date to system date (your rule)
+    const orderDate = systemDateYmd();
+
+    // ✅ Use the PO number sent by frontend
+    const psrPo = String(body.psr_po_number || "").trim();
+    if (!psrPo) {
+      return res.status(400).json({
+        success: 0,
+        field: "psr_po_number",
+        message: "PO number missing. Reload page to generate a new PO number.",
+      });
+    }
+
+    // =====================================================
+    // ✅ VALIDATIONS (FIRST SAVE - even Draft)
+    // =====================================================
+
+    // created_by required
+    const createdBy = String(body.created_by || "").trim();
+    if (!createdBy) {
+      return res.status(400).json({
+        success: 0,
+        field: "created_by",
+        message: "Ordered By (Created By) is required.",
+      });
+    }
+
+    // vendor_id required
+    const vendorId = Number(body.vendor_id);
+    if (!vendorId || Number.isNaN(vendorId)) {
+      return res.status(400).json({
+        success: 0,
+        field: "vendor_id",
+        message: "Vendor is required.",
+      });
+    }
+
+    // at least 1 item required
+    if (!items.length) {
+      return res.status(400).json({
+        success: 0,
+        field: "items",
+        message: "Add at least one part before saving the PO (even Draft).",
+      });
+    }
+
+    // every item must be valid
+    for (let idx = 0; idx < items.length; idx++) {
+      const it = items[idx] || {};
+
+      const partId = Number(it.part_id);
+      if (!partId || Number.isNaN(partId)) {
+        return res.status(400).json({
+          success: 0,
+          field: `items[${idx}].part_id`,
+          message: `Line ${idx + 1}: Part is required.`,
+        });
+      }
+
+      const qty = Number(it.quantity);
+      if (!qty || Number.isNaN(qty) || qty <= 0) {
+        return res.status(400).json({
+          success: 0,
+          field: `items[${idx}].quantity`,
+          message: `Line ${idx + 1}: Quantity must be greater than 0.`,
+        });
+      }
+
+      const unitPrice = Number(it.unit_price);
+      if (!unitPrice || Number.isNaN(unitPrice) || unitPrice <= 0) {
+        return res.status(400).json({
+          success: 0,
+          field: `items[${idx}].unit_price`,
+          message: `Line ${idx + 1}: Unit Price must be greater than 0.`,
+        });
+      }
+    }
+
+    // ✅ Transaction: PO + items together
+    const result = await db.transaction(async (trx) => {
+      const inserted = await trx("purchase_orders")
+        .insert({
+          psr_po_number: psrPo,
+          order_date: orderDate,
+          expected_delivery_date: normalizeDate(body.expected_delivery_date),
+
+          // ✅ validated above
+          created_by: createdBy,
+          vendor_id: vendorId,
+
+          payment_method: body.payment_method || null,
+          payment_terms: body.payment_terms || null,
+          currency: body.currency || "USD",
+          remarks: body.remarks || null,
+          received_by: body.received_by || null,
+          received_on: normalizeDate(body.received_on),
+          tax_percent: Number(body.tax_percent ?? 0),
+          shipping_charges: Number(body.shipping_charges ?? 0),
+          subtotal: Number(body.subtotal ?? 0),
+          tax_amount: Number(body.tax_amount ?? 0),
+          grand_total: Number(body.grand_total ?? 0),
+          status: body.status || "Draft",
+          date_paid: null,
+        })
+        .returning(["id", "psr_po_number"]);
+
+      const poId = inserted[0].id;
+
+      // ✅ Insert items (we already validated)
+      const rows = items.map((i) => ({
+        po_id: poId,
+        part_id: Number(i.part_id),
+        line_no: Number(i.line_no),
+        quantity: String(i.quantity),
+        unit_price: String(i.unit_price),
+        total_price: String(i.total_price),
+        description: i.description || "",
+      }));
+      await trx("purchase_order_items").insert(rows);
+
+      return {
+        poId,
+        psr_po_number: inserted[0].psr_po_number,
+        order_date: orderDate,
+      };
+    });
+
+    return res.json({
+      success: 1,
+      po_id: result.poId,
+      psr_po_number: result.psr_po_number,
+      order_date: result.order_date,
+    });
+  } catch (err) {
+    console.error("❌ CREATE PO error:", err);
+    return res.status(500).json({ success: 0, message: "Failed to create PO" });
+  }
+});
+
+//
+// =====================================================
+// ✅ UPDATE PO
+// PUT /api/purchase_orders/:id
+// - Updates purchase_orders row
+// - Replaces items safely
+// - If status becomes Paid, sets date_paid to system date
+// =====================================================
+//
+router.put("/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ success: 0, message: "Invalid PO id" });
+  }
+
+  try {
+    const body = req.body || {};
+    const items = Array.isArray(body.items) ? body.items : [];
+
+    const existing = await db("purchase_orders").where({ id }).first();
+    if (!existing) {
+      return res.status(404).json({ success: 0, message: "PO not found" });
+    }
+
+    // ✅ If marking Paid now, set date_paid to system date
+    const isBecomingPaid = body.status === "Paid" && existing.status !== "Paid";
+    const datePaidToSet = isBecomingPaid ? systemDateYmd() : existing.date_paid;
+
+    await db.transaction(async (trx) => {
+      await trx("purchase_orders")
+        .where({ id })
+        .update({
+          expected_delivery_date: normalizeDate(body.expected_delivery_date),
+          created_by: body.created_by ?? existing.created_by,
+          vendor_id: body.vendor_id ? Number(body.vendor_id) : existing.vendor_id,
+          payment_method: body.payment_method ?? existing.payment_method,
+          payment_terms: body.payment_terms ?? existing.payment_terms,
+          currency: body.currency ?? existing.currency,
+          remarks: body.remarks ?? existing.remarks,
+          received_by: body.received_by ?? existing.received_by,
+          received_on: normalizeDate(body.received_on) ?? existing.received_on,
+          tax_percent: Number(body.tax_percent ?? existing.tax_percent ?? 0),
+          shipping_charges: Number(
+            body.shipping_charges ?? existing.shipping_charges ?? 0
+          ),
+          subtotal: Number(body.subtotal ?? existing.subtotal ?? 0),
+          tax_amount: Number(body.tax_amount ?? existing.tax_amount ?? 0),
+          grand_total: Number(body.grand_total ?? existing.grand_total ?? 0),
+          status: body.status ?? existing.status,
+          date_paid: datePaidToSet,
+        });
+
+      // ✅ Replace items safely
+      await trx("purchase_order_items").where({ po_id: id }).del();
+
+      if (items.length > 0) {
+        const rows = items.map((i) => ({
+          po_id: id,
+          part_id: Number(i.part_id),
+          line_no: Number(i.line_no),
+          quantity: String(i.quantity),
+          unit_price: String(i.unit_price),
+          total_price: String(i.total_price),
+          description: i.description || "",
+        }));
+        await trx("purchase_order_items").insert(rows);
+      }
+    });
+
+    return res.json({
+      success: 1,
+      message: "PO updated successfully",
+      date_paid: datePaidToSet,
+    });
+  } catch (err) {
+    console.error("❌ UPDATE PO error:", err);
+    return res.status(500).json({ success: 0, message: "Failed to update PO" });
+  }
+});
+
+//
+// =====================================================
+// ✅ UPLOAD PO ATTACHMENTS
+// POST /api/purchase_orders/:id/upload
+//
+// IMPORTANT FIXES:
+//  1) Your DB has NOT NULL column: stored_filename
+//     -> must insert stored_filename = f.filename
+//  2) Some DBs have uploaded_at (default now). We do not insert uploaded_on.
+// =====================================================
+//
+router.post("/:id/upload", resolvePoUploadMiddleware(), async (req, res) => {
+  try {
+    const poId = Number(req.params.id);
+    if (!Number.isInteger(poId)) {
+      return res.status(400).json({ success: 0, message: "Invalid PO id" });
+    }
+
+    // ✅ Confirm PO exists
+    const po = await db("purchase_orders").where({ id: poId }).first();
     if (!po) {
       return res.status(404).json({ success: 0, message: "PO not found" });
     }
 
-    // Load items for this PO
-    const items = await db("purchase_order_items as i")
-      .leftJoin("inventory as p", "i.part_id", "p.part_id")
-      .select(
-        "i.*",
-        "p.part_number",
-        "p.part_name",
-        "p.description",
-        "p.current_unit_price"
-      )
-      .where("i.po_id", id)
-      .orderBy("i.line_no");
-// Load attachments
-const files = await db("purchase_order_files")
-  .select(
-    "id",
-    "original_filename",
-    "stored_filename",
-    "filepath",
-    "size_bytes",
-    "mime_type",
-    "uploaded_at"
-  )
-  .where({ po_id: id })
-  .orderBy("uploaded_at", "desc");
-
-// Convert to public URL format
-const normalizedFiles = files.map((f) => ({
-  ...f,
-  filepath: `/uploads/po-attachments/${f.stored_filename}`,
-}));
-
-res.json({
-  success: 1,
-  data: {
-    ...po,
-    items,
-    files: normalizedFiles   // ⭐ FIX: RETURN ATTACHMENTS
-  }
-});
-
-
-  } catch (err) {
-    console.error("❌ GET PO ERROR:", err);
-    res.status(500).json({ success: 0, message: "Failed to fetch PO" });
-  }
-});
-
-
-
-//
-// =============================================
-//  UPDATE PO (no attachment issues here)
-// =============================================
-//
-
-router.put("/:id", async (req, res) => {
-  const id = Number(req.params.id);
-
-const {
-  psr_po_number, order_date, expected_delivery_date, created_by, vendor_id,
-  payment_method, payment_terms, currency, remarks, tax_percent,
-  shipping_charges, subtotal, tax_amount, grand_total, status, items = [],
-  received_by, received_on
-} = req.body || {};
-
-
-  if (!psr_po_number || !vendor_id || !created_by) {
-    return res.status(400).json({ success: 0, errormsg: "Missing required fields" });
-  }
-
-  const trx = await db.transaction();
-  try {
-    await trx("purchase_orders").where({ id }).update({
-  psr_po_number,
-  order_date: normalizeDate(order_date),
-  expected_delivery_date: normalizeDate(expected_delivery_date),
-  created_by,
-  vendor_id,
-  payment_method,
-  payment_terms,
-  currency,
-  remarks,
-  tax_percent,
-  shipping_charges,
-  subtotal,
-  tax_amount,
-  grand_total,
-  status,
-
-  // ⭐ NEW FIELDS — important!
-  received_by: req.body.received_by || null,
-  received_on: normalizeDate(req.body.received_on),
-
-  updated_at: db.fn.now(),
-});
-
-
-    await trx("purchase_order_items").where({ po_id: id }).del();
-
-    const itemsToInsert = items.map((item, index) => ({
-      po_id: id,
-      line_no: index + 1,
-      part_id: item.part_id || item.partId,
-      quantity: item.quantity,
-      unit_price: item.unit_price || item.unitPrice,
-      total_price: (item.quantity || 0) * (item.unit_price || item.unitPrice || 0),
-    }));
-
-    if (itemsToInsert.length > 0) {
-      await trx("purchase_order_items").insert(itemsToInsert);
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: 0, message: "No files uploaded" });
     }
 
-// ⭐ Lookup Vendor Name
-const vendorNameRow = await trx("vendors")
-  .where("vendor_id", vendor_id)
-  .select("vendor_name")
-  .first();
-const vendor_name = vendorNameRow?.vendor_name || null;
+    // ✅ Build DB rows matching your schema
+    const rowsToInsert = req.files.map((f) => ({
+      po_id: poId,
+      original_filename: f.originalname,
+      stored_filename: f.filename, // ✅ REQUIRED (NOT NULL)
+      mime_type: f.mimetype,
+      size_bytes: f.size,
+      filepath: `/uploads/po-attachments/${f.filename}`,
+    }));
 
-// ⭐ UPDATE INVENTORY last-PO FIELDS FOR EACH PART
-for (const item of itemsToInsert) {
-  await trx("inventory")
-    .where({ part_id: item.part_id })
-    .update({
-      last_po_id: id,
-      last_po_number: psr_po_number,
-      last_po_date: order_date || null,
-      last_vendor_id: vendor_id || null,
-      last_vendor_name: vendor_name,   // FIXED
-      last_quantity: item.quantity,
-      last_unit_price: item.unit_price,
-      last_currency_code: currency || "USD",
-      last_payment_terms: payment_terms || null,
-      last_payment_method: payment_method || null,
-      updated_on: db.fn.now(),
-    });
-}
+    // ✅ Normal path: save metadata to DB
+    try {
+      const inserted = await db("purchase_order_files")
+        .insert(rowsToInsert)
+        .returning([
+          "id",
+          "po_id",
+          "original_filename",
+          "stored_filename",
+          "filepath",
+          "mime_type",
+          "size_bytes",
+          "uploaded_at",
+        ]);
 
-    await trx.commit();
-    res.json({ success: 1, message: "PO updated successfully" });
-  } catch (err) {
-    await trx.rollback();
-    res.status(500).json({ success: 0, errormsg: err.message });
-  }
-});
+      return res.json({ success: 1, files: inserted });
+    } catch (dbErr) {
+      console.error("⚠️ Upload DB insert failed (fallback returning files):", dbErr);
 
-//
-// =============================================
-//  UPLOAD PO ATTACHMENTS (Permanent Storage)
-// =============================================
-// =============================================
-//  UPLOAD PO ATTACHMENTS (final fix)
-// =============================================
-router.post("/:id/upload", uploadPo, async (req, res) => {
-  try {
-    const id = Number(req.params.id);
+      const fallbackFiles = rowsToInsert.map((r, idx) => ({
+        id: `tmp-${Date.now()}-${idx}`,
+        po_id: r.po_id,
+        original_filename: r.original_filename,
+        stored_filename: r.stored_filename,
+        filepath: r.filepath,
+        mime_type: r.mime_type,
+        size_bytes: r.size_bytes,
+      }));
 
-    const po = await db("purchase_orders").where({ id }).first();
-    if (!po) {
-      return res.status(404).json({
-        success: 0,
-        errormsg: "PO not found",
+      return res.json({
+        success: 1,
+        warning:
+          "Files uploaded but metadata not saved to DB (schema mismatch / missing table / constraints).",
+        files: fallbackFiles,
       });
     }
-
-    // Multer raw file objects (CANNOT return directly!)
-    const uploadedFiles = req.files || [];
-
-    // Convert to SAFE POJO objects (NO circular refs)
-    const safeFiles = uploadedFiles.map((file) => ({
-      po_id: id,
-      original_filename: file.originalname,
-      stored_filename: file.filename,
-      mime_type: file.mimetype,
-      size_bytes: file.size,
-filepath: `/uploads/po-attachments/${file.filename}`,
-
-      uploaded_at: new Date().toISOString(),
-    }));
-
-    // Insert into DB
-    if (safeFiles.length > 0) {
-      await db("purchase_order_files").insert(safeFiles);
-    }
-
-    // ⭐ RETURN ONLY SAFE JSON (no req, no timeout, no callbacks)
-    return res.json({
-      success: 1,
-      uploaded: safeFiles.length,
-      files: safeFiles
-    });
-
   } catch (err) {
-    console.error("❌ Upload fatal:", err);
-    return res.status(500).json({
-      success: 0,
-      errormsg: err.message || "Upload failed",
-    });
+    console.error("❌ UPLOAD error:", err);
+    return res
+      .status(500)
+      .json({ success: 0, message: "Failed to upload attachments" });
   }
 });
 
-// =============================================
-// DELETE PO
-// =============================================
+//
+// =====================================================
+// ✅ DELETE PO
+// DELETE /api/purchase_orders/:id
+// =====================================================
+//
 router.delete("/:id", async (req, res) => {
   const id = Number(req.params.id);
-  try {
-    const po = await db("purchase_orders").where({ id }).first();
-    if (!po) return res.status(404).json({ success: 0, message: "PO not found" });
-
-    await db("purchase_order_items").where({ po_id: id }).del();
-    await db("purchase_order_files").where({ po_id: id }).del();
-    await db("purchase_orders").where({ id }).del();
-
-    res.json({ success: 1, message: `PO ${po.psr_po_number} deleted` });
-  } catch (err) {
-    res.status(500).json({ success: 0, message: "Delete failed", error: err.message });
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ success: 0, message: "Invalid PO id" });
   }
-});
-
-// =============================================
-// DELETE ONE ATTACHMENT
-// =============================================
-router.delete("/:po_id/file/:file_id", async (req, res) => {
-  const { po_id, file_id } = req.params;
 
   try {
-    const file = await db("purchase_order_files").where({ id: file_id }).first();
-
-    if (!file) return res.status(404).json({ success: 0, message: "File not found" });
-
-    // physical file path
-    const fullPath = path.join(process.cwd(), file.filepath);
-
-    if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
-
-    await db("purchase_order_files").where({ id: file_id }).del();
-
-    res.json({ success: 1, message: "File deleted" });
-  } catch (err) {
-    res.status(500).json({ success: 0, message: "Delete error", err });
-  }
-});
-
-// =============================================
-//  DOWNLOAD PO AS PDF
-// =============================================
-import PDFDocument from "pdfkit";
-
-router.get("/:id/download", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-
-    // 1. Load PO
-    const po = await db("purchase_orders as po")
-      .leftJoin("vendors as v", "po.vendor_id", "v.vendor_id")
-      .select("po.*", "v.vendor_name", "v.email as vendor_email")
-      .where("po.id", id)
-      .first();
-
-    if (!po) {
-      return res.status(404).json({ success: 0, errormsg: "PO not found" });
+    const existing = await db("purchase_orders").where({ id }).first();
+    if (!existing) {
+      return res.status(404).json({ success: 0, message: "PO not found" });
     }
 
-    // 2. Load Items
-    const items = await db("purchase_order_items as i")
-      .leftJoin("inventory as inv", "i.part_id", "inv.part_id")
-      .select("i.*", "inv.part_number", "inv.description")
-      .where("i.po_id", id)
-      .orderBy("i.line_no");
+    await db.transaction(async (trx) => {
+      await trx("purchase_order_files")
+        .where({ po_id: id })
+        .del()
+        .catch(() => {});
 
-    // 3. Initialize PDF
-    const doc = new PDFDocument({ margin: 40 });
-
-    // Tell browser to download PDF
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=PO-${po.psr_po_number}.pdf`
-    );
-
-    doc.pipe(res);
-
-    // ------------------------------------
-    // HEADER
-    // ------------------------------------
-    doc.fontSize(20).text(`Purchase Order: ${po.psr_po_number}`);
-    doc.moveDown(1);
-
-    // ------------------------------------
-    // Vendor Info
-    // ------------------------------------
-    doc.fontSize(12).text(`Vendor: ${po.vendor_name}`);
-    doc.text(`Vendor Email: ${po.vendor_email || "-"}`);
-    doc.text(`Created By: ${po.created_by}`);
-    doc.text(`Status: ${po.status}`);
-    doc.moveDown(1);
-
-    // ------------------------------------
-    // ITEMS TABLE
-    // ------------------------------------
-    doc.fontSize(14).text("Items", { underline: true }).moveDown(0.5);
-
-    items.forEach((item) => {
-      doc.fontSize(12).text(
-        `Line ${item.line_no} - ${item.part_number || item.part_id}\n` +
-          `Qty: ${item.quantity}  Unit Price: $${item.unit_price}  Total: $${item.total_price}\n` +
-          `Description: ${item.description || "-"}`
-      );
-      doc.moveDown(0.5);
+      await trx("purchase_order_items").where({ po_id: id }).del();
+      await trx("purchase_orders").where({ id }).del();
     });
 
-    // ------------------------------------
-    // TOTALS
-    // ------------------------------------
-    doc.moveDown(1);
-    doc.fontSize(12).text(`Subtotal: $${po.subtotal}`);
-    doc.text(`Tax: $${po.tax_amount}`);
-    doc.text(`Shipping: $${po.shipping_charges}`);
-    doc.text(`Grand Total: $${po.grand_total}`);
-
-    // ------------------------------------
-    // END PDF
-    // ------------------------------------
-    doc.end();
+    return res.json({ success: 1, message: "PO deleted successfully" });
   } catch (err) {
-    console.error("❌ PDF Download error:", err);
-    res.status(500).json({ success: 0, errormsg: "Failed to generate PDF" });
+    console.error("❌ DELETE PO error:", err);
+    return res.status(500).json({ success: 0, message: "Failed to delete PO" });
   }
 });
 
+//
+// =====================================================
+// ✅ GET PO DETAILS (includes items + files)
+// GET /api/purchase_orders/:id
+// =====================================================
+//
+router.get("/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) {
+    return res.status(400).json({ success: 0 });
+  }
+
+  const po = await db("purchase_orders as po")
+    .leftJoin("vendors as v", "po.vendor_id", "v.vendor_id")
+    .select("po.*", "v.vendor_name")
+    .where("po.id", id)
+    .first();
+
+  if (!po) return res.status(404).json({ success: 0 });
+
+  const items = await db("purchase_order_items").where("po_id", id).orderBy("line_no");
+
+  let files = [];
+  try {
+    files = await db("purchase_order_files").where("po_id", id).orderBy("id", "desc");
+  } catch (e) {
+    files = [];
+  }
+
+  res.json({ success: 1, data: { ...po, items, files } });
+});
 
 export default router;

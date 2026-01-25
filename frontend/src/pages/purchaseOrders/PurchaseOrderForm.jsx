@@ -166,6 +166,14 @@ export default function PurchaseOrderForm({
   const [staffList] = useState(["Shiney Ramnarain"]);
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
+// ✅ Frontend validation (inline, instant UX)
+  const [errors, setErrors] = useState({});
+  const [formError, setFormError] = useState(""); // optional top banner message
+
+  // ✅ Refs to focus first invalid field
+  const createdByRef = useRef(null);
+  const vendorRef = useRef(null);
+  const firstPartRef = useRef(null);
 
   const [existingFiles, setExistingFiles] = useState(initialPo?.files || []);
   const [deletingFileIds, setDeletingFileIds] = useState([]);
@@ -196,6 +204,69 @@ export default function PurchaseOrderForm({
   });
 
   const toDateOnly = (val) => (val ? String(val).slice(0, 10) : "");
+
+  // ✅ Validation helpers (frontend UX)
+  const setFieldError = (key, msg) => {
+    setErrors((prev) => ({ ...prev, [key]: msg }));
+  };
+
+  const clearFieldError = (key) => {
+    setErrors((prev) => {
+      if (!prev[key]) return prev;
+      const copy = { ...prev };
+      delete copy[key];
+      return copy;
+    });
+  };
+
+  const focusFirstError = (errs) => {
+    if (errs.created_by && createdByRef.current) {
+      createdByRef.current.focus();
+      return;
+    }
+    if (errs.vendor_id && vendorRef.current) {
+      const el = vendorRef.current.querySelector("input");
+      el?.focus?.();
+      return;
+    }
+    const itemKeys = Object.keys(errs).filter((k) => k.startsWith("items["));
+    if (itemKeys.length && firstPartRef.current) {
+      const el = firstPartRef.current.querySelector("input");
+      el?.focus?.();
+    }
+  };
+
+  const validatePO = ({ requireItems = true } = {}) => {
+    const errs = {};
+
+    if (!po.created_by || !String(po.created_by).trim()) {
+      errs.created_by = "Ordered By is required.";
+    }
+
+    if (!po.vendor_id || String(po.vendor_id).trim() === "") {
+      errs.vendor_id = "Vendor is required.";
+    }
+
+    if (requireItems) {
+      if (!po.items || po.items.length === 0) {
+        errs.items = "Add at least one part.";
+      } else {
+        po.items.forEach((it, idx) => {
+          if (!it.partId) errs[`items[${idx}].partId`] = "Part is required.";
+          if (!it.quantity || Number(it.quantity) <= 0)
+            errs[`items[${idx}].quantity`] = "Qty must be > 0.";
+          if (!it.unitPrice || Number(it.unitPrice) <= 0)
+            errs[`items[${idx}].unitPrice`] = "Unit price must be > 0.";
+        });
+      }
+    }
+
+    setErrors(errs);
+    setFormError(Object.keys(errs).length ? "Please fix the highlighted fields." : "");
+    if (Object.keys(errs).length) focusFirstError(errs);
+
+    return Object.keys(errs).length === 0;
+  };
 
   const normalizePo = (poData) => {
     if (!poData) return null;
@@ -246,6 +317,46 @@ export default function PurchaseOrderForm({
           status: "Draft",
         }
   );
+
+
+// =============================================
+// ✅ AUTO-POPULATE PO NUMBER + ORDER DATE (NEW PO ONLY)
+// =============================================
+useEffect(() => {
+  // Only for "New PO" (not edit)
+  if (initialPo?.id) return;
+
+  // If already populated, do nothing (prevents refetch)
+  if (po.psr_po_number && po.psr_po_number.trim() !== "") return;
+
+  let cancelled = false;
+
+  axios
+    .get(`${BASE}/api/purchase_orders/next-number`)
+    .then((res) => {
+      if (cancelled) return;
+
+      const next = res.data?.psr_po_number;
+      const od = res.data?.order_date;
+
+      setPo((prev) => ({
+        ...prev,
+        psr_po_number: next || prev.psr_po_number,
+        // ✅ keep system date same as order_date
+        order_date: od || prev.order_date,
+      }));
+    })
+    .catch((err) => {
+      console.error("❌ Failed to auto-generate PO number:", err);
+      // Optional: show message but do not block user
+    });
+
+  return () => {
+    cancelled = true;
+  };
+}, [initialPo?.id, po.psr_po_number]);
+
+
 
   // Load vendors + parts
   useEffect(() => {
@@ -536,24 +647,11 @@ export default function PurchaseOrderForm({
     }
   };
   const handleSaveDraft = async () => {
+// ✅ frontend validation for FIRST SAVE
+  // requireItems=true because backend requires at least one part even for Draft
+  if (!validatePO({ requireItems: true })) return;
     if (!po.psr_po_number.trim()) {
       alert("PO Number is required to save a draft.");
-      return;
-    }
-
-    try {
-      const exists = await axios
-        .get(`${BASE}/api/purchase_orders/check-number/${po.psr_po_number}`)
-        .then((res) => res.data.exists)
-        .catch(() => false);
-
-      if (exists) {
-        alert("This PO Number already exists. Please use a unique PO Number.");
-        return;
-      }
-    } catch (err) {
-      console.error("❌ Error checking PO number:", err);
-      alert("Failed to validate PO number.");
       return;
     }
 
@@ -563,6 +661,9 @@ export default function PurchaseOrderForm({
       const res = await axios.post(`${BASE}/api/purchase_orders`, {
         ...po,
         status: "Draft",
+ // ✅ force include
+  received_by: po.received_by || "",
+  received_on: po.received_on || "",
         items: po.items.map((i, index) => ({
           id: null,
           part_id: Number(i.partId),
@@ -599,10 +700,20 @@ export default function PurchaseOrderForm({
 
       alert("Draft saved successfully.");
       navigate("/purchase-orders");
-    } catch (err) {
-      console.error("❌ Draft save failed:", err);
-      alert("Failed to save draft.");
-    } finally {
+   } catch (err) {
+  console.error("❌ Draft save failed:", err);
+
+  const data = err?.response?.data;
+  if (data?.field) {
+    setErrors((prev) => ({ ...prev, [data.field]: data.message || "Invalid" }));
+    setFormError(data?.message || "Please fix the highlighted fields.");
+    focusFirstError({ [data.field]: data.message || "Invalid" });
+    return;
+  }
+
+  alert(data?.message || "Failed to save draft.");
+} finally {
+
       setSubmitting(false);
     }
   };
@@ -613,48 +724,14 @@ export default function PurchaseOrderForm({
 
     setSubmitting(true);
 
-    if (!po.items || po.items.length === 0) {
-      alert("At least one Part must be added.");
-      setSubmitting(false);
-      return;
-    }
-
-    for (let i of po.items) {
-      if (!i.partId) {
-        alert("Each line needs a Part.");
-        setSubmitting(false);
-        return;
-      }
-      if (!i.quantity || Number(i.quantity) <= 0) {
-        alert("Quantity must be > 0.");
-        setSubmitting(false);
-        return;
-      }
-      if (!i.unitPrice || Number(i.unitPrice) <= 0) {
-        alert("Unit Price must be > 0.");
-        setSubmitting(false);
-        return;
-      }
-    }
+// ✅ use the new frontend validation + inline errors
+if (!validatePO({ requireItems: true })) {
+  setSubmitting(false);
+  return;
+}
 
     recalcTotals(po.items);
-
-    if (!initialPo?.id) {
-      try {
-        const exists = await axios
-          .get(
-            `${BASE}/api/purchase_orders/check-number/${po.psr_po_number}`
-          )
-          .then((res) => res.data.exists)
-          .catch(() => false);
-
-        if (exists) {
-          alert("PO Number exists. Use a unique one.");
-          setSubmitting(false);
-          return;
-        }
-      } catch {}
-    }
+  
 
     let sendRevised = false;
 
@@ -687,6 +764,9 @@ export default function PurchaseOrderForm({
       expected_delivery_date: po.expected_delivery_date,
       created_by: po.created_by,
       vendor_id: po.vendor_id,
+// ✅ ADD THESE (so backend actually receives them)
+  received_by: po.received_by || "",
+  received_on: po.received_on || "",
       payment_terms: po.payment_terms,
       currency: po.currency,
       remarks: po.remarks,
@@ -851,6 +931,13 @@ export default function PurchaseOrderForm({
       onSubmit={handleSubmit}
       className={`bg-white p-6 rounded shadow ${formScrollClasses}`}
     >
+  {/* ✅ Top validation banner */}
+  {formError && (
+    <div className="mb-4 rounded border border-red-300 bg-red-50 text-red-800 px-3 py-2 text-sm">
+      {formError}
+    </div>
+  )}
+
       {/* HEADER */}
       <div className="relative flex items-start justify-between mb-4">
         <h2 className="text-xl font-bold text-blue-700">
@@ -873,17 +960,15 @@ export default function PurchaseOrderForm({
       {/* --- Basic Details --- */}
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
-          <label className="font-semibold">PSR PO Number *</label>
-          <input
-            type="text"
-            className="border p-2 rounded w-full"
-            value={po.psr_po_number || ""}
-            onChange={(e) =>
-              setPo({ ...po, psr_po_number: e.target.value })
-            }
-            required
-            disabled={submitting || saved}
-          />
+        <label className="font-semibold">PSR PO Number</label>
+<input
+  type="text"
+  className="border p-2 rounded w-full bg-gray-100"
+  value={po.psr_po_number || ""}
+  readOnly
+  disabled={submitting || saved}
+/>
+
         </div>
 
         <div>
@@ -919,20 +1004,27 @@ export default function PurchaseOrderForm({
 
         <div>
           <label className="font-semibold">Ordered By *</label>
-          <select
-            className="border p-2 rounded w-full"
-            value={po.created_by || ""}
-            onChange={(e) =>
-              setPo({ ...po, created_by: e.target.value })
-            }
-            required
-            disabled={submitting || saved}
-          >
+            <select
+    ref={createdByRef}
+    className={`border p-2 rounded w-full ${errors.created_by ? "border-red-500" : ""}`}
+    value={po.created_by || ""}
+    onChange={(e) => {
+      setPo({ ...po, created_by: e.target.value });
+      clearFieldError("created_by");
+    }}
+    required
+    disabled={submitting || saved}
+  >
+
             <option value="">Select</option>
             {staffList.map((s) => (
               <option key={s}>{s}</option>
             ))}
           </select>
+  {errors.created_by && (
+    <div className="text-xs text-red-600 mt-1">{errors.created_by}</div>
+  )}
+
         </div>
       </div>
 
@@ -950,38 +1042,46 @@ export default function PurchaseOrderForm({
           </button>
         </div>
 
-        {!addingNewVendor ? (
-          <div className="space-y-2">
-            <SearchSelect
-              items={vendors.map((v) => {
-                const id = v.vendor_id || v.id;
-                const name = v.vendor_name || v.name || "Unnamed Vendor";
-                const city = v.city || "";
-                const region = v.state || v.country || "";
-                const location = [city, region].filter(Boolean).join(", ");
-                return { id, name, location };
-              })}
-              value={po.vendor_id}
-              onChange={(id) =>
-                setPo((prev) => ({
-                  ...prev,
-                  vendor_id: id,
-                }))
-              }
-              display={(v) =>
-                v.location ? `${v.name} — ${v.location}` : v.name
-              }
-              placeholder="Search vendor..."
-              disabled={submitting || saved}
-            />
+{!addingNewVendor ? (
+  <div className="space-y-2">
+    {/* Vendor selector wrapper (for red border + focus) */}
+    <div
+      ref={vendorRef}
+      className={errors.vendor_id ? "rounded border border-red-500" : ""}
+    >
+      <SearchSelect
+        items={vendors.map((v) => {
+          const id = v.vendor_id || v.id;
+          const name = v.vendor_name || v.name || "Unnamed Vendor";
+          const city = v.city || "";
+          const region = v.state || v.country || "";
+          const location = [city, region].filter(Boolean).join(", ");
+          return { id, name, location };
+        })}
+        value={po.vendor_id}
+        onChange={(id) => {
+          setPo((prev) => ({ ...prev, vendor_id: id }));
+          clearFieldError("vendor_id");
+        }}
+        display={(v) => (v.location ? `${v.name} — ${v.location}` : v.name)}
+        placeholder="Search vendor..."
+        disabled={submitting || saved}
+      />
+    </div>
 
-            {po.vendor_id && (
-              <div className="text-xs text-gray-600 mt-1">
-                Selected vendor ID: {po.vendor_id}
-              </div>
-            )}
-          </div>
-        ) : (
+    {/* Inline error message */}
+    {errors.vendor_id && (
+      <div className="text-xs text-red-600">{errors.vendor_id}</div>
+    )}
+
+    {/* Optional helper */}
+    {po.vendor_id && (
+      <div className="text-xs text-gray-600">
+        Selected vendor ID: {po.vendor_id}
+      </div>
+    )}
+  </div>
+) : (
           <div className="border p-3 bg-gray-50 rounded space-y-2">
             <input
               placeholder="Vendor Name *"
@@ -1156,6 +1256,11 @@ export default function PurchaseOrderForm({
       </div>
 
       {/* --- Items Table --- */}
+      {/* ✅ Items validation message */}
+      {errors.items && (
+        <div className="mb-2 text-sm text-red-600">{errors.items}</div>
+      )}
+
       <table className="w-full border mb-4 text-sm">
         <thead className="bg-gray-100">
           <tr>
@@ -1182,147 +1287,176 @@ export default function PurchaseOrderForm({
                 <td className="border p-2">{i + 1}</td>
 
                 <td className="border p-2 align-top">
-                  {!addingNewPartRow[i] ? (
-                    <div className="space-y-1">
-                      <SearchSelect
-                        items={parts.map((p) => ({
-                          id: p.part_id || p.id,
-                          part_number: p.part_number,
-                          description: p.description || "",
-                        }))}
-                        value={item.partId || item.part_id || ""}
-                        onChange={(id) => handlePartSelect(i, id)}
-                        display={(p) =>
-                          `${p.part_number || "No Part #"} — ${
-                            p.description || "No description"
-                          }`
-                        }
-                        placeholder="Search part..."
-                        disabled={submitting || saved}
-                      />
+  {!addingNewPartRow[i] ? (
+    <div className="space-y-1">
+      {/* Part selector wrapper (border + first-row focus) */}
+      <div
+        ref={i === 0 ? firstPartRef : null}
+        className={
+          errors[`items[${i}].partId`] ? "rounded border border-red-500" : ""
+        }
+      >
+        <SearchSelect
+          items={parts.map((p) => ({
+            id: p.part_id || p.id,
+            part_number: p.part_number,
+            description: p.description || "",
+          }))}
+          value={item.partId || item.part_id || ""}
+          onChange={(id) => {
+            handlePartSelect(i, id);
+            clearFieldError(`items[${i}].partId`);
+          }}
+          display={(p) =>
+            `${p.part_number || "No Part #"} — ${p.description || "No description"}`
+          }
+          placeholder="Search part..."
+          disabled={submitting || saved}
+        />
+      </div>
 
-                      {selectedPart && (
-                        <div className="text-[11px] text-gray-500 mt-1">
-                          {selectedPart.description}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="bg-gray-50 border rounded p-2 space-y-1">
-                      <input
-                        placeholder="Part Number *"
-                        className="border p-1 rounded w-full"
-                        value={newPartDraft[i]?.part_number || ""}
-                        onChange={(e) =>
-                          setNewPartDraft({
-                            ...newPartDraft,
-                            [i]: {
-                              ...newPartDraft[i],
-                              part_number: e.target.value,
-                            },
-                          })
-                        }
-                        disabled={submitting || saved}
-                      />
-                      <input
-                        placeholder="Part Name"
-                        className="border p-1 rounded w-full"
-                        value={newPartDraft[i]?.part_name || ""}
-                        onChange={(e) =>
-                          setNewPartDraft({
-                            ...newPartDraft,
-                            [i]: {
-                              ...newPartDraft[i],
-                              part_name: e.target.value,
-                            },
-                          })
-                        }
-                        disabled={submitting || saved}
-                      />
-                      <input
-                        placeholder="Description"
-                        className="border p-1 rounded w-full"
-                        value={newPartDraft[i]?.description || ""}
-                        onChange={(e) =>
-                          setNewPartDraft({
-                            ...newPartDraft,
-                            [i]: {
-                              ...newPartDraft[i],
-                              description: e.target.value,
-                            },
-                          })
-                        }
-                        disabled={submitting || saved}
-                      />
-                      <input
-                        type="number"
-                        placeholder="Unit Price"
-                        className="border p-1 rounded w-full"
-                        value={
-                          newPartDraft[i]?.current_unit_price || ""
-                        }
-                        onChange={(e) =>
-                          setNewPartDraft({
-                            ...newPartDraft,
-                            [i]: {
-                              ...newPartDraft[i],
-                              current_unit_price: e.target.value,
-                            },
-                          })
-                        }
-                        disabled={submitting || saved}
-                      />
+      {/* Inline error message */}
+      {errors[`items[${i}].partId`] && (
+        <div className="text-xs text-red-600">
+          {errors[`items[${i}].partId`]}
+        </div>
+      )}
 
-                      <div className="flex justify-end gap-2 mt-2">
-                        <button
-                          type="button"
-                          className="px-2 py-1 bg-gray-200 rounded"
-                          onClick={() => cancelNewPartForRow(i)}
-                          disabled={submitting || saved}
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          className="px-2 py-1 bg-blue-600 text-white rounded"
-                          onClick={() => saveNewPartForRow(i)}
-                          disabled={submitting || saved}
-                        >
-                          Save Part
-                        </button>
-                      </div>
-                    </div>
-                  )}
+      {selectedPart && (
+        <div className="text-[11px] text-gray-500 mt-1">
+          {selectedPart.description}
+        </div>
+      )}
+    </div>
+  ) : (
+    <div className="bg-gray-50 border rounded p-2 space-y-1">
+      <input
+        placeholder="Part Number *"
+        className="border p-1 rounded w-full"
+        value={newPartDraft[i]?.part_number || ""}
+        onChange={(e) =>
+          setNewPartDraft({
+            ...newPartDraft,
+            [i]: {
+              ...newPartDraft[i],
+              part_number: e.target.value,
+            },
+          })
+        }
+        disabled={submitting || saved}
+      />
+      <input
+        placeholder="Part Name"
+        className="border p-1 rounded w-full"
+        value={newPartDraft[i]?.part_name || ""}
+        onChange={(e) =>
+          setNewPartDraft({
+            ...newPartDraft,
+            [i]: {
+              ...newPartDraft[i],
+              part_name: e.target.value,
+            },
+          })
+        }
+        disabled={submitting || saved}
+      />
+      <input
+        placeholder="Description"
+        className="border p-1 rounded w-full"
+        value={newPartDraft[i]?.description || ""}
+        onChange={(e) =>
+          setNewPartDraft({
+            ...newPartDraft,
+            [i]: {
+              ...newPartDraft[i],
+              description: e.target.value,
+            },
+          })
+        }
+        disabled={submitting || saved}
+      />
+      <input
+        type="number"
+        placeholder="Unit Price"
+        className="border p-1 rounded w-full"
+        value={newPartDraft[i]?.current_unit_price || ""}
+        onChange={(e) =>
+          setNewPartDraft({
+            ...newPartDraft,
+            [i]: {
+              ...newPartDraft[i],
+              current_unit_price: e.target.value,
+            },
+          })
+        }
+        disabled={submitting || saved}
+      />
+
+      <div className="flex justify-end gap-2 mt-2">
+        <button
+          type="button"
+          className="px-2 py-1 bg-gray-200 rounded"
+          onClick={() => cancelNewPartForRow(i)}
+          disabled={submitting || saved}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="px-2 py-1 bg-blue-600 text-white rounded"
+          onClick={() => saveNewPartForRow(i)}
+          disabled={submitting || saved}
+        >
+          Save Part
+        </button>
+      </div>
+    </div>
+  )}
+</td>
+
+
+                <td className="border p-2">
+                 <input
+  type="number"
+  value={item.quantity}
+  className={`border p-1 rounded w-full ${
+    errors[`items[${i}].quantity`] ? "border-red-500" : ""
+  }`}
+  onChange={(e) => {
+    updateItem(i, "quantity", e.target.value);
+    clearFieldError(`items[${i}].quantity`);
+  }}
+  disabled={submitting || saved}
+/>
+
+{errors[`items[${i}].quantity`] && (
+  <div className="text-xs text-red-600 mt-1">
+    {errors[`items[${i}].quantity`]}
+  </div>
+)}
+
                 </td>
 
                 <td className="border p-2">
-                  <input
-                    type="number"
-                    value={item.quantity}
-                    className="border p-1 rounded w-full"
-                    onChange={(e) =>
-                      updateItem(i, "quantity", e.target.value)
-                    }
-                    disabled={submitting || saved}
-                  />
-                </td>
+                <input
+  type="number"
+  value={item.unitPrice}
+  className={`border p-1 rounded w-full ${
+    errors[`items[${i}].unitPrice`] ? "border-red-500" : ""
+  }`}
+  onChange={(e) => {
+    updateItem(i, "unitPrice", e.target.value);
+    clearFieldError(`items[${i}].unitPrice`);
+  }}
+  disabled={submitting || saved}
+/>
 
-                <td className="border p-2">
-                  <input
-                    type="number"
-                    value={item.unitPrice}
-                    className="border p-1 rounded w-full"
-                    onChange={(e) =>
-                      updateItem(i, "unitPrice", e.target.value)
-                    }
-                    disabled={submitting || saved}
-                  />
+{errors[`items[${i}].unitPrice`] && (
+  <div className="text-xs text-red-600 mt-1">
+    {errors[`items[${i}].unitPrice`]}
+  </div>
+)}
 
-                  {item.lastUnitPrice && (
-                    <div className="text-xs text-gray-500">
-                      Last: ${money(item.lastUnitPrice)}
-                    </div>
-                  )}
                 </td>
 
                 <td className="border p-2 text-right">

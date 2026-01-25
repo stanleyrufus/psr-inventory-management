@@ -7,6 +7,12 @@ const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function PurchaseOrderEdit() {
   const { id } = useParams();
+
+// ✅ DEFENSIVE GUARD
+if (!id || isNaN(Number(id))) {
+  return <div className="p-6">Invalid Purchase Order</div>;
+}
+
   const [po, setPo] = useState(null);
   const [loading, setLoading] = useState(true);
 

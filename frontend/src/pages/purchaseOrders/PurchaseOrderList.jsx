@@ -1,6 +1,6 @@
 // src/pages/purchaseOrders/PurchaseOrderList.jsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";   // ✅ FIXED
+import { Link, useNavigate, useLocation } from "react-router-dom"; // ✅ FIXED
 import axios from "axios";
 
 // AG Grid
@@ -14,7 +14,7 @@ const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function PurchaseOrderList() {
   const navigate = useNavigate();
-  const location = useLocation();          // ✅ FIXED
+  const location = useLocation(); // ✅ FIXED
   const gridRef = useRef();
 
   const [orders, setOrders] = useState([]);
@@ -30,15 +30,14 @@ export default function PurchaseOrderList() {
   });
 
   const loadOrders = async () => {
-  try {
-    const res = await axios.get(`${BASE}/api/purchase_orders`);
-    const data = Array.isArray(res.data) ? res.data : [];
-    setOrders(data);
-  } catch (err) {
-    console.error("❌ Failed to load POs:", err);
-  }
-};
-
+    try {
+      const res = await axios.get(`${BASE}/api/purchase_orders`);
+      const data = Array.isArray(res.data) ? res.data : [];
+      setOrders(data);
+    } catch (err) {
+      console.error("❌ Failed to load POs:", err);
+    }
+  };
 
   // -------------------------------------------------------------
   // INITIAL LOAD
@@ -49,10 +48,9 @@ export default function PurchaseOrderList() {
 
   // -------------------------------------------------------------
   // REFRESH when navigating back from PO Form
-  // (Your previous loadPOs() was undefined → FIXED)
   // -------------------------------------------------------------
   useEffect(() => {
-    loadOrders();               // ✅ FIXED
+    loadOrders(); // ✅ FIXED
   }, [location.pathname]);
 
   // -------------------------------------------------------------
@@ -101,9 +99,7 @@ export default function PurchaseOrderList() {
         o.psr_po_number?.toLowerCase().includes(q) ||
         o.vendor_name?.toLowerCase().includes(q);
 
-      const matchSupplier = supplierFilter
-        ? o.vendor_name === supplierFilter
-        : true;
+      const matchSupplier = supplierFilter ? o.vendor_name === supplierFilter : true;
 
       const matchStatus = statusFilter ? o.status === statusFilter : true;
 
@@ -131,11 +127,23 @@ export default function PurchaseOrderList() {
     {
       headerName: "PO #",
       field: "psr_po_number",
-      width: 140,
+
+      // ✅ FIX: widen the column so the PO number doesn't clip
+      width: 220,
+      minWidth: 220,
+      flex: 0,
+
+      // ✅ Bonus: show full PO number on hover
+      tooltipField: "psr_po_number",
+
+      // ✅ prevent wrapping
+      cellClass: "whitespace-nowrap",
+
       cellRenderer: (params) => (
         <span
-          className="text-blue-600 underline cursor-pointer"
+          className="text-blue-600 underline cursor-pointer whitespace-nowrap"
           onClick={() => navigate(`/purchase-orders/${params.data.id}`)}
+          title={params.value || ""}
         >
           {params.value}
         </span>
@@ -151,15 +159,13 @@ export default function PurchaseOrderList() {
       headerName: "Grand Total",
       field: "grand_total",
       width: 140,
-      valueFormatter: (p) =>
-        p.value != null ? `$${p.value.toLocaleString()}` : "-",
+      valueFormatter: (p) => (p.value != null ? `$${p.value.toLocaleString()}` : "-"),
     },
     {
       headerName: "Order Date",
       field: "order_date",
       width: 160,
-      valueFormatter: (p) =>
-        p.value ? new Date(p.value).toLocaleDateString() : "-",
+      valueFormatter: (p) => (p.value ? new Date(p.value).toLocaleDateString() : "-"),
     },
     {
       headerName: "Status",
@@ -216,12 +222,8 @@ export default function PurchaseOrderList() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-800">
-            Purchase Orders
-          </h2>
-          <p className="text-gray-500 text-sm">
-            Create, track and manage purchase orders
-          </p>
+          <h2 className="text-2xl font-semibold text-gray-800">Purchase Orders</h2>
+          <p className="text-gray-500 text-sm">Create, track and manage purchase orders</p>
         </div>
 
         <div className="flex gap-2">
@@ -230,6 +232,13 @@ export default function PurchaseOrderList() {
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow"
           >
             📤 Bulk Upload
+          </button>
+
+          <button
+            onClick={() => navigate("/purchase-orders/import-from-pdf")}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
+          >
+            📄 Import from PDF
           </button>
 
           <button
@@ -262,9 +271,7 @@ export default function PurchaseOrderList() {
           className="border rounded px-2 py-2 w-40"
         >
           <option value="">All Vendors</option>
-          {Array.from(
-            new Set(orders.map((o) => o.vendor_name).filter(Boolean))
-          ).map((s) => (
+          {Array.from(new Set(orders.map((o) => o.vendor_name).filter(Boolean))).map((s) => (
             <option key={s}>{s}</option>
           ))}
         </select>
@@ -278,11 +285,9 @@ export default function PurchaseOrderList() {
           className="border rounded px-2 py-2 w-32"
         >
           <option value="">All Status</option>
-          {Array.from(new Set(orders.map((o) => o.status).filter(Boolean))).map(
-            (s) => (
-              <option key={s}>{s}</option>
-            )
-          )}
+          {Array.from(new Set(orders.map((o) => o.status).filter(Boolean))).map((s) => (
+            <option key={s}>{s}</option>
+          ))}
         </select>
 
         <select
