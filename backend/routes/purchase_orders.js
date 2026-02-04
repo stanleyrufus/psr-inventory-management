@@ -10,10 +10,77 @@ import { makeSafeUploader } from "../middleware/uploads.js";
 import { createRequire } from "module";
 
 // ---------------------------------------------
-// PDF PARSER (Node 22 + ESM SAFE)
+// ---------------------------------------------
+// PDF PARSER (supports pdf-parse v1 FUNCTION and v2/v3 PDFParse CLASS)
 // ---------------------------------------------
 const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
+const pdfParsePkg = require("pdf-parse");
+
+// v1 style: pdfParse(buffer) => { text, ... }
+const pdfParseFn =
+  typeof pdfParsePkg === "function"
+    ? pdfParsePkg
+    : typeof pdfParsePkg?.default === "function"
+    ? pdfParsePkg.default
+    : null;
+
+// v2/v3 style: new PDFParse({ file/url/... }).getText() / getRaw()
+const PDFParseClass =
+  pdfParsePkg?.PDFParse ||
+  pdfParsePkg?.default?.PDFParse ||
+  null;
+
+// Robust helper that returns { text: "..." } like v1
+async function parsePdfToText({ buffer, filePath }) {
+  // Prefer v1 function if available
+  if (pdfParseFn) {
+    return await pdfParseFn(buffer);
+  }
+
+  // Otherwise use v2/v3 class
+  if (PDFParseClass) {
+    // Try the most likely load parameter keys without guessing too much
+    // We’ll attempt a few common options in order.
+    const attempts = [
+      { file: filePath },  // most common for local file
+      { path: filePath },  // some libs use path
+      { data: buffer },    // raw buffer
+      { buffer },          // raw buffer alt
+    ];
+
+    let lastErr = null;
+
+    for (const params of attempts) {
+      try {
+        const parser = new PDFParseClass(params);
+
+        // getRaw() is specifically mentioned as “v1 compatibility”
+        if (typeof parser.getRaw === "function") {
+          return await parser.getRaw();
+        }
+
+        // fallback to getText() if getRaw not present
+        if (typeof parser.getText === "function") {
+          const r = await parser.getText();
+          // normalize to v1 shape
+          return { text: r?.text ?? String(r ?? "") };
+        }
+
+        throw new Error("PDFParse instance has no getRaw() or getText() method");
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+
+    throw lastErr || new Error("Failed to parse PDF using PDFParse class");
+  }
+
+  // If neither is available, hard fail with clear message
+  throw new TypeError(
+    `pdf-parse export not supported. Keys: ${Object.keys(pdfParsePkg || {}).join(", ")}`
+  );
+}
+
 
 const router = express.Router();
 
@@ -132,7 +199,7 @@ router.post("/import-from-pdf", uploadPdf.array("files"), async (req, res) => {
       const buffer = fs.readFileSync(file.path);
 
       // ✅ parser is pdfParse (Node 22 + ESM safe)
-      const parsed = await pdfParse(buffer);
+const parsed = await parsePdfToText({ buffer, filePath: file.path });
 
       results.push({
         filename: file.originalname,
@@ -197,7 +264,7 @@ router.get("/next-number", async (req, res) => {
     const dd = String(now.getDate()).padStart(2, "0");
     const yyyymmdd = `${yyyy}${mm}${dd}`;
 
-    const prefix = `PSR-${yyyymmdd}-`;
+    const prefix = `PO${yyyymmdd}-`;
 
     // ✅ Find the highest sequence for TODAY
     // psr_po_number format: PSR-YYYYMMDD-0001
@@ -588,6 +655,7 @@ router.delete("/:id", async (req, res) => {
     return res.status(500).json({ success: 0, message: "Failed to delete PO" });
   }
 });
+
 
 //
 // =====================================================

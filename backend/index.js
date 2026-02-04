@@ -12,7 +12,7 @@ import inventoryRoutes from "./routes/inventory.js";
 import purchaseOrdersRoutes from "./routes/purchase_orders.js";
 import productsRoutes from "./routes/products.js";
 import purchaseOrdersBulkRouter from "./routes/purchase_orders_bulk.js";
-import purchaseOrderImportRoutes from "./routes/purchase_orders_import.js";
+import poImportRoutes from "./routes/po_import.js";
 import vendorRoutes from "./routes/vendors.js"; // ✅ single correct import
 import purchaseOrdersReportRoutes from "./routes/purchase_orders_report.js";
 import rfqRouter from "./routes/purchase_orders_rfq.js";   // ✅ ADD THIS
@@ -63,7 +63,7 @@ app.use("/api/purchase_orders", rfqRouter);
 app.use("/api/purchase_orders_bulk", purchaseOrdersBulkRouter);
 
 // --- Dedicated Import routes (now safe, isolated path) ---
-app.use("/api/po_import", purchaseOrderImportRoutes);
+app.use("/api/po_import", poImportRoutes);
 
 // Reports PO
 app.use("/api/purchase_orders_report", purchaseOrdersReportRoutes);

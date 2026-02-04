@@ -4,7 +4,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { db } from "../db.js";
-import { extractPoFromPdf } from "../services/poPdfExtractor.js";
+import { extractPoHybrid } from "../services/poHybridExtractor.js";
 
 const router = express.Router();
 
@@ -12,6 +12,7 @@ const router = express.Router();
 
 const UPLOADS_ROOT =
   process.env.UPLOADS_ROOT || path.join(process.cwd(), "uploads");
+
 const IMPORT_SUBFOLDER = "po-import";
 
 const storage = multer.diskStorage({
@@ -40,19 +41,64 @@ const upload = multer({
 
 /* ---------------- Helpers: ensure vendor & part ---------------- */
 
+function normalizeVendorName(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[\.\,\'\"\-]/g, " ")
+    .replace(/\b(inc|llc|l\.l\.c|co|company|corp|corporation|ltd|limited)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 async function ensureVendor(trx, vendor) {
-  if (!vendor?.name) {
-    throw new Error("Vendor name missing in extracted PDF");
-  }
+  if (!vendor?.name) throw new Error("Vendor name missing in extracted PDF");
 
   const name = vendor.name.trim();
+  const norm = normalizeVendorName(name);
 
-  // Try to find existing (case-insensitive)
-  const existing = await trx("vendors")
-    .where("vendor_name", "ilike", name)
-    .first();
+  // ✅ 1) Try exact-ish match first (keeps old behavior)
+  let existing = await trx("vendors").where("vendor_name", "ilike", name).first();
 
-  if (existing) return existing.vendor_id || existing.id;
+  // ✅ 2) If not found, try normalized match (punctuation/suffix safe)
+  if (!existing) {
+    existing = await trx("vendors")
+      .whereRaw(
+        `
+        regexp_replace(
+          regexp_replace(lower(vendor_name), '[^a-z0-9 ]', '', 'g'),
+          '\\s+', ' ', 'g'
+        ) = ?
+        `,
+        [norm]
+      )
+      .first();
+  }
+
+  if (existing) {
+    // ✅ Update missing vendor fields (fill blanks only; do NOT overwrite existing values)
+    const patch = {};
+
+    const setIfEmpty = (dbCol, newVal) => {
+      const cur = existing[dbCol];
+      const hasCur = cur !== null && cur !== undefined && String(cur).trim() !== "";
+      const hasNew = newVal !== null && newVal !== undefined && String(newVal).trim() !== "";
+      if (!hasCur && hasNew) patch[dbCol] = String(newVal).trim();
+    };
+
+    setIfEmpty("contact_name", vendor.contactName);
+    setIfEmpty("email", vendor.email);
+    setIfEmpty("phone", vendor.phone);
+    setIfEmpty("fax", vendor.fax);
+    setIfEmpty("city", vendor.city);
+    setIfEmpty("state", vendor.state);
+    setIfEmpty("country", vendor.country);
+
+    if (Object.keys(patch).length > 0) {
+      await trx("vendors").where({ vendor_id: existing.vendor_id }).update(patch);
+    }
+
+    return existing.vendor_id;
+  }
 
   const [inserted] = await trx("vendors")
     .insert({
@@ -60,28 +106,24 @@ async function ensureVendor(trx, vendor) {
       contact_name: vendor.contactName || null,
       email: vendor.email || null,
       phone: vendor.phone || null,
+      fax: vendor.fax || null,
       city: vendor.city || null,
       state: vendor.state || null,
       country: vendor.country || null,
       is_active: true,
     })
-    .returning(["vendor_id", "id"]);
+    .returning(["vendor_id"]);
 
-  return inserted.vendor_id || inserted.id;
+  return inserted.vendor_id;
 }
 
 async function ensurePart(trx, line) {
-  if (!line.partNumber) {
-    throw new Error("Line item missing partNumber");
-  }
+  if (!line.partNumber) throw new Error("Line item missing partNumber");
 
   const pn = line.partNumber.trim();
 
-  const existing = await trx("inventory")
-    .where({ part_number: pn })
-    .first();
-
-  if (existing) return existing.part_id || existing.id;
+  const existing = await trx("inventory").where({ part_number: pn }).first();
+  if (existing) return existing.part_id;
 
   const [inserted] = await trx("inventory")
     .insert({
@@ -91,24 +133,22 @@ async function ensurePart(trx, line) {
       current_unit_price: line.unitPrice ?? 0,
       status: "Active",
     })
-    .returning(["part_id", "id"]);
+    .returning(["part_id"]);
 
-  return inserted.part_id || inserted.id;
+  return inserted.part_id;
 }
 
 /* ---------------- Main import endpoint ---------------- */
 
 router.post("/pdf", upload.array("files", 10), async (req, res) => {
   if (!req.files || req.files.length === 0) {
-    return res
-      .status(400)
-      .json({ success: 0, message: "No PDF files uploaded" });
+    return res.status(400).json({ success: 0, message: "No PDF files uploaded" });
   }
 
   const created = [];
   const errors = [];
 
-  // If you have auth middleware that sets req.user.name, use that.
+  // If you have auth middleware, use real user; else default
   const uploaderName = req.user?.name || "PDF Import";
 
   const trx = await db.transaction();
@@ -116,9 +156,67 @@ router.post("/pdf", upload.array("files", 10), async (req, res) => {
   try {
     for (const file of req.files) {
       try {
-        const extracted = await extractPoFromPdf(file.path);
+        const filePath = file.path; // multer gives full saved path
+        const extracted = await extractPoHybrid(filePath);
 
-        // 1) Ensure vendor exists
+        console.log("✅ Hybrid extraction source:", extracted?.extractionSource);
+        console.log("✅ Hybrid PO:", extracted?.psrPoNumber);
+
+        // ✅ MUST HAVE PO#
+        if (!extracted?.psrPoNumber) {
+          throw new Error("Could not detect PO number from PDF");
+        }
+
+        // ✅ Duplicate check by PO#
+        const dup = await trx("purchase_orders")
+          .where({ psr_po_number: extracted.psrPoNumber })
+          .first();
+
+        if (dup) {
+          errors.push({
+            filename: file.originalname,
+            error: `Duplicate PO number ${extracted.psrPoNumber} already exists (PO ID: ${dup.id}). Skipped.`,
+          });
+          continue;
+        }
+
+        /* =========================================================
+           ✅ PERMANENT FIX BLOCK (ADD HERE)
+           - runs BEFORE ensureVendor()
+           - prevents vendor contact poisoning
+           ========================================================= */
+
+        // 1) Move "Attn: X" out of vendor.contactName -> orderedBy
+        if (extracted?.vendor?.contactName) {
+          const cn = String(extracted.vendor.contactName).trim();
+          const m = cn.match(/\battn\b[:\-]?\s*(.+)$/i);
+          if (m?.[1]) {
+            extracted.orderedBy = extracted.orderedBy || m[1].trim();
+            extracted.vendor.contactName = null;
+          }
+        }
+
+        // 2) McMaster: any person-like vendor contact is really PSR orderedBy
+        if (String(extracted?.vendor?.name || "").toLowerCase().includes("mcmaster")) {
+          const cn = String(extracted?.vendor?.contactName || "").trim();
+          if (cn && cn.split(/\s+/).length >= 2) {
+            extracted.orderedBy = extracted.orderedBy || cn;
+            extracted.vendor.contactName = null;
+          }
+        }
+
+        // 3) Quality: remove known PSR names from vendor contact
+        if (String(extracted?.vendor?.name || "").toLowerCase().includes("quality")) {
+          const cnLower = String(extracted?.vendor?.contactName || "").toLowerCase();
+          if (cnLower.includes("shiney") || cnLower.includes("ramnarain")) {
+            extracted.orderedBy = extracted.orderedBy || extracted.vendor.contactName;
+            extracted.vendor.contactName = null;
+          }
+        }
+
+        /* ========================================================= */
+
+        // 1) Ensure vendor exists (safe now)
         const vendorId = await ensureVendor(trx, extracted.vendor);
 
         // 2) Ensure parts exist and collect items
@@ -128,13 +226,18 @@ router.post("/pdf", upload.array("files", 10), async (req, res) => {
           lineItems.push({ ...li, part_id: partId });
         }
 
+        // ✅ MUST HAVE items
+        if (!lineItems.length) {
+          throw new Error("Could not extract line items from PDF");
+        }
+
         // 3) Insert PO
         const [poRow] = await trx("purchase_orders")
           .insert({
             psr_po_number: extracted.psrPoNumber,
-            order_date: extracted.orderDate,             // history date from PDF
+            order_date: extracted.orderDate,
             expected_delivery_date: extracted.expectedDeliveryDate,
-            created_by: uploaderName,                    // you can change this default
+            created_by: extracted.orderedBy || uploaderName,
             vendor_id: vendorId,
             payment_terms: extracted.paymentTerms || null,
             currency: extracted.currency || "USD",
@@ -144,43 +247,39 @@ router.post("/pdf", upload.array("files", 10), async (req, res) => {
             subtotal: extracted.subtotal ?? 0,
             tax_amount: extracted.taxAmount ?? 0,
             grand_total: extracted.grandTotal ?? 0,
-            status: "Draft",                             // user will edit/review
+            status: "Received",
           })
           .returning(["id", "psr_po_number"]);
 
         const poId = poRow.id;
 
-        // 4) Insert PO line items
-        if (lineItems.length) {
-          const itemsToInsert = lineItems.map((li, idx) => ({
-            po_id: poId,
-            line_no: idx + 1,
-            part_id: li.part_id,
-            quantity: String(li.quantity ?? 0),
-            unit_price: String(li.unitPrice ?? 0),
-            total_price: String(
-              li.totalPrice ??
-                (Number(li.quantity) || 0) * (Number(li.unitPrice) || 0)
-            ),
-            description: li.description || "",
-          }));
+        // 4) Insert PO items
+        const itemsToInsert = lineItems.map((li, idx) => ({
+          po_id: poId,
+          line_no: idx + 1,
+          part_id: li.part_id,
+          quantity: String(li.quantity ?? 0),
+          unit_price: String(li.unitPrice ?? 0),
+          total_price: String(
+            li.totalPrice ?? (Number(li.quantity) || 0) * (Number(li.unitPrice) || 0)
+          ),
+          description: li.description || "",
+        }));
 
-          await trx("purchase_order_items").insert(itemsToInsert);
-        }
+        await trx("purchase_order_items").insert(itemsToInsert);
 
-        // 5) Attach the PDF to the PO (PO files table)
-        const relativePath = path
-          .join(IMPORT_SUBFOLDER, path.basename(file.path))
-          .replace(/\\/g, "/");
+        // 5) Attach PDF
+        const storedFilename = path.basename(file.path);
+        const relativePath = path.join(IMPORT_SUBFOLDER, storedFilename).replace(/\\/g, "/");
 
-        await trx("purchase_order_files") // ⚠️ if your table name differs, update here
-          .insert({
-            po_id: poId,
-            original_filename: file.originalname,
-            filepath: "/" + relativePath,
-            mime_type: file.mimetype,
-            size_bytes: file.size,
-          });
+        await trx("purchase_order_files").insert({
+          po_id: poId,
+          original_filename: file.originalname,
+          stored_filename: storedFilename,
+          filepath: `/uploads/${relativePath}`,
+          mime_type: file.mimetype,
+          size_bytes: file.size,
+        });
 
         created.push({
           po_id: poId,
@@ -198,19 +297,22 @@ router.post("/pdf", upload.array("files", 10), async (req, res) => {
 
     if (!created.length) {
       await trx.rollback();
-      return res.status(400).json({
+
+      const allDup =
+        errors.length > 0 &&
+        errors.every((e) => String(e.error || "").toLowerCase().includes("duplicate po number"));
+
+      return res.status(allDup ? 409 : 400).json({
         success: 0,
-        message: "All PDF imports failed",
+        message: allDup
+          ? "All uploaded PDFs were duplicates. No new POs created."
+          : "No POs were created.",
         errors,
       });
     }
 
     await trx.commit();
-    return res.json({
-      success: 1,
-      created,
-      errors,
-    });
+    return res.json({ success: 1, created, errors });
   } catch (err) {
     await trx.rollback();
     console.error("❌ PDF import fatal error:", err);
