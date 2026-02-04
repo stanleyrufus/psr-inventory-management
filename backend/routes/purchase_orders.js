@@ -11,7 +11,8 @@ import { createRequire } from "module";
 
 // ---------------------------------------------
 // ---------------------------------------------
-// PDF PARSER (supports pdf-parse v1 FUNCTION and v2/v3 PDFParse CLASS)
+// ---------------------------------------------
+// PDF PARSER (supports pdf-parse v1 FUNCTION and v2+ PDFParse CLASS)
 // ---------------------------------------------
 const require = createRequire(import.meta.url);
 const pdfParsePkg = require("pdf-parse");
@@ -24,63 +25,50 @@ const pdfParseFn =
     ? pdfParsePkg.default
     : null;
 
-// v2/v3 style: new PDFParse({ file/url/... }).getText() / getRaw()
+// v2+ style: exports an object containing PDFParse class
 const PDFParseClass =
   pdfParsePkg?.PDFParse ||
   pdfParsePkg?.default?.PDFParse ||
   null;
 
-// Robust helper that returns { text: "..." } like v1
+// Robust helper that always returns { text: "..." }
 async function parsePdfToText({ buffer, filePath }) {
   // Prefer v1 function if available
   if (pdfParseFn) {
     return await pdfParseFn(buffer);
   }
 
-  // Otherwise use v2/v3 class
+  // Otherwise use v2+ class
   if (PDFParseClass) {
-    // Try the most likely load parameter keys without guessing too much
-    // We’ll attempt a few common options in order.
-    const attempts = [
-      { file: filePath },  // most common for local file
-      { path: filePath },  // some libs use path
-      { data: buffer },    // raw buffer
-      { buffer },          // raw buffer alt
-    ];
+    const parser = new PDFParseClass();
 
-    let lastErr = null;
-
-    for (const params of attempts) {
-      try {
-        const parser = new PDFParseClass(params);
-
-        // getRaw() is specifically mentioned as “v1 compatibility”
-        if (typeof parser.getRaw === "function") {
-          return await parser.getRaw();
-        }
-
-        // fallback to getText() if getRaw not present
-        if (typeof parser.getText === "function") {
-          const r = await parser.getText();
-          // normalize to v1 shape
-          return { text: r?.text ?? String(r ?? "") };
-        }
-
-        throw new Error("PDFParse instance has no getRaw() or getText() method");
-      } catch (e) {
-        lastErr = e;
-      }
+    if (filePath) {
+      await parser.load(filePath);
+    } else if (buffer) {
+      await parser.load(buffer);
+    } else {
+      throw new Error("parsePdfToText: missing both filePath and buffer");
     }
 
-    throw lastErr || new Error("Failed to parse PDF using PDFParse class");
+    const out = await parser.getText?.();
+    if (typeof parser.destroy === "function") {
+      await parser.destroy();
+    }
+
+    const text =
+      typeof out === "string"
+        ? out
+        : typeof out?.text === "string"
+        ? out.text
+        : String(out ?? "");
+
+    return { text };
   }
 
-  // If neither is available, hard fail with clear message
   throw new TypeError(
     `pdf-parse export not supported. Keys: ${Object.keys(pdfParsePkg || {}).join(", ")}`
   );
 }
-
 
 const router = express.Router();
 
