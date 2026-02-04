@@ -6,9 +6,13 @@ import fs from "fs/promises";
 
 const execFileAsync = promisify(execFile);
 
+// utils/pdfToPng.js
 const PDFTOPPM_EXE =
   process.env.PDFTOPPM_EXE ||
-  "C:\\poppler\\poppler-25.12.0\\Library\\bin\\pdftoppm.exe";
+  (process.platform === "win32"
+    ? "C:\\poppler\\poppler-25.12.0\\Library\\bin\\pdftoppm.exe"
+    : "pdftoppm"); // linux/mac use PATH
+
 
 async function fileExists(p) {
   try {

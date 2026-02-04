@@ -9,9 +9,12 @@ import Tesseract from "tesseract.js";
 const execFileAsync = promisify(execFile);
 
 // ✅ Hard-coded Poppler path (no PATH needed)
+// utils/pdfOcr.js
 const PDFTOPPM_EXE =
   process.env.PDFTOPPM_EXE ||
-  "C:\\poppler\\poppler-25.12.0\\Library\\bin\\pdftoppm.exe";
+  (process.platform === "win32"
+    ? "C:\\poppler\\poppler-25.12.0\\Library\\bin\\pdftoppm.exe"
+    : "pdftoppm"); // linux/mac use PATH
 
 async function fileExists(p) {
   try {
@@ -36,11 +39,15 @@ export async function ocrPdfWithPoppler(filePath, pagesToScan = 1, debug = false
 
   try {
     // Ensure pdftoppm exists
-    if (!(await fileExists(PDFTOPPM_EXE))) {
-      throw new Error(
-        `pdftoppm not found at: ${PDFTOPPM_EXE}. Set PDFTOPPM_EXE env var or install Poppler.`
-      );
-    }
+    // only check file existence when it's a full path
+if (PDFTOPPM_EXE.includes("\\") || PDFTOPPM_EXE.includes("/")) {
+  if (!(await fileExists(PDFTOPPM_EXE))) {
+    throw new Error(
+      `pdftoppm not found at: ${PDFTOPPM_EXE}. Set PDFTOPPM_EXE env var or install Poppler.`
+    );
+  }
+}
+
 
     if (debug) console.log("🧠 OCR: running pdftoppm:", { first, last, tmpDir });
 
