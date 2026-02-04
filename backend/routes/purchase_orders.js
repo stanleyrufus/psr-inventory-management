@@ -40,7 +40,7 @@ async function parsePdfToText({ buffer, filePath }) {
 
   // Otherwise use v2+ class
   if (PDFParseClass) {
-    const parser = new PDFParseClass();
+const parser = new PDFParseClass({ verbosity: 0 });
 
     if (filePath) {
       await parser.load(filePath);
