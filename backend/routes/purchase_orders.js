@@ -40,30 +40,31 @@ async function parsePdfToText({ buffer, filePath }) {
 
   // Otherwise use v2+ class
   if (PDFParseClass) {
-const parser = new PDFParseClass({ verbosity: 0 });
+  // ✅ pdf-parse v2+ expects options in constructor (verbosity) and pdf input via url/data
+  const opts = filePath
+    ? { url: filePath, verbosity: 0 }
+    : { data: buffer, verbosity: 0 };
 
-    if (filePath) {
-      await parser.load(filePath);
-    } else if (buffer) {
-      await parser.load(buffer);
-    } else {
-      throw new Error("parsePdfToText: missing both filePath and buffer");
-    }
+  const parser = new PDFParseClass(opts);
 
-    const out = await parser.getText?.();
-    if (typeof parser.destroy === "function") {
-      await parser.destroy();
-    }
+  const out = await (typeof parser.getText === "function"
+    ? parser.getText()
+    : parser.getRaw());
 
-    const text =
-      typeof out === "string"
-        ? out
-        : typeof out?.text === "string"
-        ? out.text
-        : String(out ?? "");
-
-    return { text };
+  if (typeof parser.destroy === "function") {
+    await parser.destroy();
   }
+
+  const text =
+    typeof out === "string"
+      ? out
+      : typeof out?.text === "string"
+      ? out.text
+      : String(out ?? "");
+
+  return { text };
+}
+
 
   throw new TypeError(
     `pdf-parse export not supported. Keys: ${Object.keys(pdfParsePkg || {}).join(", ")}`
