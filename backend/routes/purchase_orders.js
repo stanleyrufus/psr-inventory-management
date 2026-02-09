@@ -288,6 +288,95 @@ router.get("/next-number", async (req, res) => {
 });
 
 //
+// =============================================
+//  RESERVE PO NUMBER (PLACEHOLDER PO)
+//  POST /api/purchase_orders/reserve
+//  - Requires: psr_po_number, created_by
+//  - Optional: vendor_id, remarks
+//  - Creates a purchase_orders row with status = "Reserved"
+//  - NO items required
+// =============================================
+//
+router.post("/reserve", async (req, res) => {
+  try {
+    const body = req.body || {};
+
+    const psrPo = String(body.psr_po_number || "").trim();
+    if (!psrPo) {
+      return res.status(400).json({
+        success: 0,
+        message: "psr_po_number is required",
+      });
+    }
+
+    const createdBy = String(body.created_by || "").trim();
+    if (!createdBy) {
+      return res.status(400).json({
+        success: 0,
+        message: "created_by is required",
+      });
+    }
+
+    const vendorId =
+      body.vendor_id != null && body.vendor_id !== ""
+        ? Number(body.vendor_id)
+        : null;
+
+    if (vendorId !== null && Number.isNaN(vendorId)) {
+      return res.status(400).json({
+        success: 0,
+        message: "vendor_id must be a number",
+      });
+    }
+
+    // ✅ system date (same rule you use elsewhere)
+    const orderDate = systemDateYmd();
+
+    // ✅ prevent duplicates
+    const exists = await db("purchase_orders")
+      .where({ psr_po_number: psrPo })
+      .first();
+
+    if (exists) {
+      return res.status(409).json({
+        success: 0,
+        message: "This PO number is already used/reserved. Please regenerate.",
+      });
+    }
+
+    const inserted = await db("purchase_orders")
+      .insert({
+        psr_po_number: psrPo,
+        order_date: orderDate,
+        status: "Reserved",
+        created_by: createdBy,
+        vendor_id: vendorId, // can be null
+        remarks: body.remarks || null,
+
+        // safe defaults
+        payment_method: null,
+        payment_terms: null,
+        currency: "USD",
+        received_by: null,
+        received_on: null,
+        tax_percent: 0,
+        shipping_charges: 0,
+        subtotal: 0,
+        tax_amount: 0,
+        grand_total: 0,
+        date_paid: null,
+      })
+      .returning(["id", "psr_po_number", "order_date", "status"]);
+
+    return res.json({ success: 1, data: inserted[0] });
+  } catch (err) {
+    console.error("❌ RESERVE PO error:", err);
+    return res.status(500).json({ success: 0, message: "Failed to reserve PO" });
+  }
+});
+
+
+//
 // =====================================================
 // ✅ CREATE PO
 // POST /api/purchase_orders

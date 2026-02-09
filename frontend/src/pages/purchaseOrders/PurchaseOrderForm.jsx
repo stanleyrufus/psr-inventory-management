@@ -752,11 +752,18 @@ if (!validatePO({ requireItems: true })) {
       }
     }
 
-    let finalStatus = po.status;
+let finalStatus = po.status;
 
-    if (!initialPo?.id) {
-      finalStatus = "Draft";
-    }
+// New PO always starts as Draft
+if (!initialPo?.id) {
+  finalStatus = "Draft";
+}
+
+// ✅ If editing a Reserved placeholder and user saves, convert to Draft
+if (initialPo?.id && po.status === "Reserved") {
+  finalStatus = "Draft";
+}
+
 
     const payload = {
       psr_po_number: po.psr_po_number,
@@ -980,6 +987,8 @@ if (!validatePO({ requireItems: true })) {
             disabled={submitting || saved}
           >
             <option value="Draft">Draft</option>
+<option value="Reserved" disabled>Reserved</option>
+
             <option value="Sent RFQ">Sent RFQ</option>
             <option value="Sent Revised RFQ">Sent Revised RFQ</option>
             <option value="Ordered">Ordered</option>
@@ -1670,6 +1679,17 @@ if (!validatePO({ requireItems: true })) {
             </button>
           </>
         )}
+
+{initialPo?.id && status === "Reserved" && (
+  <button
+    type="submit"
+    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
+    disabled={submitting}
+  >
+    Save Changes
+  </button>
+)}
+
 
         {initialPo?.id &&
           (status === "Sent RFQ" ||

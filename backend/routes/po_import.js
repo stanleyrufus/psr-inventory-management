@@ -167,18 +167,29 @@ router.post("/pdf", upload.array("files", 10), async (req, res) => {
           throw new Error("Could not detect PO number from PDF");
         }
 
-        // ✅ Duplicate check by PO#
-        const dup = await trx("purchase_orders")
-          .where({ psr_po_number: extracted.psrPoNumber })
-          .first();
+      // ✅ Check existing PO by PO# (Reserved-aware)
+const existing = await trx("purchase_orders")
+  .where({ psr_po_number: extracted.psrPoNumber })
+  .first();
 
-        if (dup) {
-          errors.push({
-            filename: file.originalname,
-            error: `Duplicate PO number ${extracted.psrPoNumber} already exists (PO ID: ${dup.id}). Skipped.`,
-          });
-          continue;
-        }
+let targetPoId = null;
+let mode = "INSERT_NEW"; // for response/debug
+
+if (existing) {
+  // If it's Reserved, we will COMPLETE it (update instead of skip)
+  if (String(existing.status || "").toLowerCase() === "reserved") {
+    targetPoId = existing.id;
+    mode = "UPDATE_RESERVED";
+  } else {
+    // Real duplicate (already exists and not Reserved)
+    errors.push({
+      filename: file.originalname,
+      error: `Duplicate PO number ${extracted.psrPoNumber} already exists (PO ID: ${existing.id}, status: ${existing.status}). Skipped.`,
+    });
+    continue;
+  }
+}
+
 
         /* =========================================================
            ✅ PERMANENT FIX BLOCK (ADD HERE)
@@ -231,27 +242,67 @@ router.post("/pdf", upload.array("files", 10), async (req, res) => {
           throw new Error("Could not extract line items from PDF");
         }
 
-        // 3) Insert PO
-        const [poRow] = await trx("purchase_orders")
-          .insert({
-            psr_po_number: extracted.psrPoNumber,
-            order_date: extracted.orderDate,
-            expected_delivery_date: extracted.expectedDeliveryDate,
-            created_by: extracted.orderedBy || uploaderName,
-            vendor_id: vendorId,
-            payment_terms: extracted.paymentTerms || null,
-            currency: extracted.currency || "USD",
-            remarks: extracted.remarks || "",
-            tax_percent: extracted.taxPercent ?? 0,
-            shipping_charges: extracted.shipping ?? 0,
-            subtotal: extracted.subtotal ?? 0,
-            tax_amount: extracted.taxAmount ?? 0,
-            grand_total: extracted.grandTotal ?? 0,
-            status: "Received",
-          })
-          .returning(["id", "psr_po_number"]);
+      let poRow;
 
-        const poId = poRow.id;
+if (mode === "UPDATE_RESERVED") {
+  // ✅ Update reserved PO to become a real PO
+  const updated = await trx("purchase_orders")
+    .where({ id: targetPoId })
+    .update({
+      order_date: extracted.orderDate || existing.order_date,
+      expected_delivery_date: extracted.expectedDeliveryDate || null,
+
+      // keep whoever reserved it if created_by already exists; else fill
+      created_by: existing.created_by || extracted.orderedBy || uploaderName,
+
+      // if vendor differs, we update to extracted vendor (your call; this is safest)
+      vendor_id: vendorId,
+
+      payment_terms: extracted.paymentTerms || null,
+      currency: extracted.currency || "USD",
+      remarks: extracted.remarks || "",
+      tax_percent: extracted.taxPercent ?? 0,
+      shipping_charges: extracted.shipping ?? 0,
+      subtotal: extracted.subtotal ?? 0,
+      tax_amount: extracted.taxAmount ?? 0,
+      grand_total: extracted.grandTotal ?? 0,
+
+      // ✅ status moves out of Reserved
+      status: "Received",
+      updated_at: trx.fn.now(),
+    })
+    .returning(["id", "psr_po_number"]);
+
+  poRow = updated[0];
+
+  // ✅ Replace items for this PO (since Reserved PO has none)
+  await trx("purchase_order_items").where({ po_id: targetPoId }).del();
+} else {
+  // ✅ Insert brand new PO (legacy imports will come here)
+  const inserted = await trx("purchase_orders")
+    .insert({
+      psr_po_number: extracted.psrPoNumber,
+      order_date: extracted.orderDate,
+      expected_delivery_date: extracted.expectedDeliveryDate,
+      created_by: extracted.orderedBy || uploaderName,
+      vendor_id: vendorId,
+      payment_terms: extracted.paymentTerms || null,
+      currency: extracted.currency || "USD",
+      remarks: extracted.remarks || "",
+      tax_percent: extracted.taxPercent ?? 0,
+      shipping_charges: extracted.shipping ?? 0,
+      subtotal: extracted.subtotal ?? 0,
+      tax_amount: extracted.taxAmount ?? 0,
+      grand_total: extracted.grandTotal ?? 0,
+      status: "Received",
+    })
+    .returning(["id", "psr_po_number"]);
+
+  poRow = inserted[0];
+}
+
+const poId = poRow.id;
+
 
         // 4) Insert PO items
         const itemsToInsert = lineItems.map((li, idx) => ({
@@ -281,11 +332,13 @@ router.post("/pdf", upload.array("files", 10), async (req, res) => {
           size_bytes: file.size,
         });
 
-        created.push({
-          po_id: poId,
-          psr_po_number: poRow.psr_po_number,
-          filename: file.originalname,
-        });
+   created.push({
+  po_id: poId,
+  psr_po_number: poRow.psr_po_number,
+  filename: file.originalname,
+  mode, // ✅ "UPDATE_RESERVED" or "INSERT_NEW"
+});
+
       } catch (err) {
         console.error("❌ PDF import failed for", file.originalname, err);
         errors.push({
