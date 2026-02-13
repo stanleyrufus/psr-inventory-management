@@ -569,13 +569,22 @@ export default function PurchaseOrderList() {
 
               <div>
                 <label className="block text-sm font-semibold mb-1">Reserved By *</label>
-                <input
-                  value={reserveForm.created_by}
-                  onChange={(e) => setReserveForm((p) => ({ ...p, created_by: e.target.value }))}
-                  className="border rounded px-3 py-2 w-full text-sm"
-                  disabled={reserveSubmitting}
-                  placeholder="Name"
-                />
+                <select
+  value={reserveForm.created_by}
+  onChange={(e) => setReserveForm((p) => ({ ...p, created_by: e.target.value }))}
+  className="border rounded px-3 py-2 w-full text-sm"
+  disabled={reserveSubmitting}
+>
+  <option value="">— Select —</option>
+  <option value="Stanley">Pam</option>
+  <option value="Shiney">Shiney</option>
+  <option value="Bryan">Brian</option>
+  <option value="Bryan">Anushka</option>
+  <option value="Bryan">Chris</option>
+  <option value="Bryan">Dave</option>
+
+
+</select>
               </div>
 
               <div>

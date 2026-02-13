@@ -7,6 +7,8 @@ import { db } from "../db.js";
 import { extractPoHybrid } from "../services/poHybridExtractor.js";
 
 const router = express.Router();
+const IMPORT_FINAL_STATUS = "Placed";
+
 
 /* ---------------- Upload config ---------------- */
 
@@ -268,7 +270,7 @@ if (mode === "UPDATE_RESERVED") {
       grand_total: extracted.grandTotal ?? 0,
 
       // ✅ status moves out of Reserved
-      status: "Received",
+status: IMPORT_FINAL_STATUS,
       updated_at: trx.fn.now(),
     })
     .returning(["id", "psr_po_number"]);
@@ -294,7 +296,7 @@ if (mode === "UPDATE_RESERVED") {
       subtotal: extracted.subtotal ?? 0,
       tax_amount: extracted.taxAmount ?? 0,
       grand_total: extracted.grandTotal ?? 0,
-      status: "Received",
+status: IMPORT_FINAL_STATUS,
     })
     .returning(["id", "psr_po_number"]);
 

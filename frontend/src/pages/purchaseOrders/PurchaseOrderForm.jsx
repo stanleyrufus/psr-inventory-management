@@ -991,7 +991,7 @@ if (initialPo?.id && po.status === "Reserved") {
 
             <option value="Sent RFQ">Sent RFQ</option>
             <option value="Sent Revised RFQ">Sent Revised RFQ</option>
-            <option value="Ordered">Ordered</option>
+            <option value="Placed">Placed</option>
             <option value="Received">Received</option>
             <option value="Paid">Paid</option>
             <option value="Cancelled">Cancelled</option>
