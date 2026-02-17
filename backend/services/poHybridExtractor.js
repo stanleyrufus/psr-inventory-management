@@ -83,7 +83,12 @@ function looksValid(r) {
 export async function extractPoHybrid(filePath) {
   // ✅ Always use AI first
   try {
-    const ai = await extractAi(filePath, { pages: 1, debug: false });
+const MAX_PAGES = Number(process.env.PO_IMPORT_MAX_PAGES || 3);
+
+const ai = await extractAi(filePath, {
+  pages: MAX_PAGES,
+  debug: false
+});
 
     sanitizeAttn(ai);
     normalizeTotals(ai);

@@ -16,7 +16,7 @@ function getPartImageUrl(raw) {
     // JSON array?
     const arr = JSON.parse(raw);
     if (Array.isArray(arr) && arr.length > 0) {
-      path = arr[0];   // use first image
+      path = arr[0]; // use first image
     }
   } catch (e) {
     // single string → do nothing
@@ -28,7 +28,6 @@ function getPartImageUrl(raw) {
   const base = import.meta.env.VITE_API_URL.replace(/\/$/, "");
   return `${base}${path}`;
 }
-
 
 export default function PartsPage() {
   // ⭐ NEW – moved inside component to follow React rules
@@ -57,7 +56,10 @@ export default function PartsPage() {
 
   const [zoomImage, setZoomImage] = useState(null);
 
-  const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
+  const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
+    /\/$/,
+    ""
+  );
 
   // ⭐ NEW: safe image URL normalizer
   const normalizeImageUrl = (raw) => {
@@ -171,53 +173,51 @@ export default function PartsPage() {
    ✅ CELL RENDERERS (Updated for multi-image support)
 *************************************/
 
-// Helper: supports JSON-array OR single string
-function getPartImageUrl(image_url) {
-  if (!image_url) return "/no-image.png";
+  // Helper: supports JSON-array OR single string
+  function getPartImageUrl(image_url) {
+    if (!image_url) return "/no-image.png";
 
-  let firstPath = image_url;
+    let firstPath = image_url;
 
-  try {
-    const parsed = JSON.parse(image_url);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      firstPath = parsed[0];
+    try {
+      const parsed = JSON.parse(image_url);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        firstPath = parsed[0];
+      }
+    } catch (e) {
+      // single string → do nothing
     }
-  } catch (e) {
-    // single string → do nothing
+
+    if (!firstPath.startsWith("/")) {
+      firstPath = "/" + firstPath;
+    }
+
+    const base = import.meta.env.VITE_API_URL.replace(/\/$/, "");
+    return `${base}${firstPath}`;
   }
 
-  if (!firstPath.startsWith("/")) {
-    firstPath = "/" + firstPath;
-  }
+  const ImageRenderer = (props) => {
+    const url = getPartImageUrl(props.value);
 
-  const base = import.meta.env.VITE_API_URL.replace(/\/$/, "");
-  return `${base}${firstPath}`;
-}
-
-const ImageRenderer = (props) => {
-  const url = getPartImageUrl(props.value);
-
-  return (
-    <img
-      src={url}
-      className="w-12 h-12 object-cover rounded border cursor-pointer"
-      onClick={() => setZoomImage(url)}
-      onError={(e) => {
-        e.target.src = "/no-image.png";
-        e.target.onerror = null;
-      }}
-    />
-  );
-};
+    return (
+      <img
+        src={url}
+        className="w-12 h-12 object-cover rounded border cursor-pointer"
+        onClick={() => setZoomImage(url)}
+        onError={(e) => {
+          e.target.src = "/no-image.png";
+          e.target.onerror = null;
+        }}
+      />
+    );
+  };
 
   const StatusRenderer = (props) => {
     const s = props.value || "Unknown";
     return (
       <span
         className={`px-2 py-1 rounded-full text-xs font-medium ${
-          s === "Active"
-            ? "bg-green-100 text-green-700"
-            : "bg-gray-200 text-gray-600"
+          s === "Active" ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"
         }`}
       >
         {s}
@@ -276,14 +276,14 @@ const ImageRenderer = (props) => {
       ),
     },
 
- // ⭐ NEW DESCRIPTION COLUMN
-  {
-    headerName: "Description",
-    field: "description",
-    flex: 2,
-    wrapText: true,
-    autoHeight: true,
-  },
+    // ⭐ NEW DESCRIPTION COLUMN
+    {
+      headerName: "Description",
+      field: "description",
+      flex: 2,
+      wrapText: true,
+      autoHeight: true,
+    },
 
     {
       headerName: "Last Price",
@@ -318,14 +318,14 @@ const ImageRenderer = (props) => {
               setEditingPart(null);
               setShowForm(true);
             }}
-            className="bg-blue-600 text-white px-4 py-2 rounded shadow"
+            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 text-sm rounded shadow"
           >
             ➕ Add Part
           </button>
 
           <button
             onClick={() => setShowBulk(true)}
-            className="border border-blue-600 text-blue-600 px-4 py-2 rounded"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-sm rounded shadow"
           >
             ⬆️ Bulk Upload
           </button>
@@ -395,7 +395,7 @@ const ImageRenderer = (props) => {
           <button
             disabled={currentPage === 1}
             onClick={() => goToPage(currentPage - 1)}
-            className="px-3 py-1 border rounded"
+            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
           >
             Prev
           </button>
@@ -407,7 +407,7 @@ const ImageRenderer = (props) => {
           <button
             disabled={currentPage === totalPages}
             onClick={() => goToPage(currentPage + 1)}
-            className="px-3 py-1 border rounded"
+            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
           >
             Next
           </button>
@@ -465,7 +465,7 @@ const ImageRenderer = (props) => {
               <a
                 href={zoomImage}
                 download
-                className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-sm rounded shadow inline-block"
               >
                 ⬇ Download
               </a>

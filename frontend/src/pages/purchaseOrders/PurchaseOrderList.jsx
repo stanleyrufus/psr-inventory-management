@@ -278,7 +278,6 @@ export default function PurchaseOrderList() {
           className="text-blue-600 underline cursor-pointer whitespace-nowrap bg-transparent border-0 p-0"
           title={params.value || ""}
           onClick={(e) => {
-            // ✅ THIS is the missing reliable part:
             e.preventDefault();
             e.stopPropagation();
             const id = params?.data?.id;
@@ -389,6 +388,14 @@ export default function PurchaseOrderList() {
             className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 text-sm rounded shadow"
           >
             📄 Import PDF
+          </button>
+
+          {/* ✅ NEW: Import Excel (only addition) */}
+          <button
+            onClick={() => navigate("/purchase-orders/import-from-excel")}
+            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 text-sm rounded shadow"
+          >
+            📊 Import Excel
           </button>
 
           <button
@@ -570,21 +577,19 @@ export default function PurchaseOrderList() {
               <div>
                 <label className="block text-sm font-semibold mb-1">Reserved By *</label>
                 <select
-  value={reserveForm.created_by}
-  onChange={(e) => setReserveForm((p) => ({ ...p, created_by: e.target.value }))}
-  className="border rounded px-3 py-2 w-full text-sm"
-  disabled={reserveSubmitting}
->
-  <option value="">— Select —</option>
-  <option value="Stanley">Pam</option>
-  <option value="Shiney">Shiney</option>
-  <option value="Bryan">Brian</option>
-  <option value="Bryan">Anushka</option>
-  <option value="Bryan">Chris</option>
-  <option value="Bryan">Dave</option>
-
-
-</select>
+                  value={reserveForm.created_by}
+                  onChange={(e) => setReserveForm((p) => ({ ...p, created_by: e.target.value }))}
+                  className="border rounded px-3 py-2 w-full text-sm"
+                  disabled={reserveSubmitting}
+                >
+                  <option value="">— Select —</option>
+                  <option value="Stanley">Pam</option>
+                  <option value="Shiney">Shiney</option>
+                  <option value="Bryan">Brian</option>
+                  <option value="Bryan">Anushka</option>
+                  <option value="Bryan">Chris</option>
+                  <option value="Bryan">Dave</option>
+                </select>
               </div>
 
               <div>

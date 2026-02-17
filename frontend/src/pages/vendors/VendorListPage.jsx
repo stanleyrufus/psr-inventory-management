@@ -47,19 +47,21 @@ export default function VendorListPage() {
       {/* Header */}
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-semibold text-gray-800">Vendors</h1>
+
         <div className="flex gap-2">
           <button
             onClick={() => setShowBulkUpload(true)}
-            className="px-3 py-2 bg-gray-200 rounded hover:bg-gray-300"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-sm rounded shadow"
           >
             Bulk Upload
           </button>
+
           <button
             onClick={() => {
               setEditingVendor(null);
               setShowForm(true);
             }}
-            className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 text-sm rounded shadow"
           >
             + Add Vendor
           </button>
@@ -71,9 +73,7 @@ export default function VendorListPage() {
         {loading ? (
           <div className="text-center py-10 text-gray-500">Loading...</div>
         ) : vendors.length === 0 ? (
-          <div className="text-center py-10 text-gray-500">
-            No vendors found.
-          </div>
+          <div className="text-center py-10 text-gray-500">No vendors found.</div>
         ) : (
           <table className="min-w-full text-sm">
             <thead className="bg-gray-100">
@@ -88,6 +88,7 @@ export default function VendorListPage() {
                 <th className="px-3 py-2 text-center">Actions</th>
               </tr>
             </thead>
+
             <tbody>
               {vendors.map((v) => (
                 <tr
@@ -109,6 +110,7 @@ export default function VendorListPage() {
                       <span className="text-gray-500">Inactive</span>
                     )}
                   </td>
+
                   <td className="px-3 py-2 text-center">
                     <div className="flex justify-center gap-2">
                       <button
@@ -116,22 +118,24 @@ export default function VendorListPage() {
                           setSelectedVendor(v);
                           setShowDetail(true);
                         }}
-                        className="px-2 py-1 text-xs rounded bg-gray-200 hover:bg-gray-300"
+                        className="bg-gray-200 hover:bg-gray-300 px-2 py-1 text-xs rounded"
                       >
                         View
                       </button>
+
                       <button
                         onClick={() => {
                           setEditingVendor(v);
                           setShowForm(true);
                         }}
-                        className="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 text-xs rounded"
                       >
                         Edit
                       </button>
+
                       <button
                         onClick={() => handleDelete(v.vendor_id)}
-                        className="px-2 py-1 text-xs rounded bg-red-600 text-white hover:bg-red-700"
+                        className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 text-xs rounded"
                       >
                         Delete
                       </button>

@@ -65,7 +65,6 @@ function sanitizeAttnAndOrderedBy(result) {
   const vendorName = String(result.vendor.name || "").toLowerCase();
   const contact = String(result.vendor.contactName || "").trim();
 
-  // Move "Attn: X" out of vendor contact -> orderedBy
   const m = contact.match(/\battn\b[:\-]?\s*(.+)$/i);
   if (m?.[1]) {
     const name = String(m[1]).trim();
@@ -73,7 +72,6 @@ function sanitizeAttnAndOrderedBy(result) {
     result.vendor.contactName = null;
   }
 
-  // McMaster: vendor contact should not be a PSR person name
   if (vendorName.includes("mcmaster")) {
     const cn = String(result.vendor.contactName || "").trim();
     if (cn && isPersonLikeName(cn)) {
@@ -85,20 +83,58 @@ function sanitizeAttnAndOrderedBy(result) {
   return result;
 }
 
+/**
+ * ✅ STRONG totals normalization:
+ * - force numeric
+ * - if subtotal/grandTotal are missing or 0 but items have totals, compute from items
+ * - infer tax when possible
+ */
 function normalizeTotals(result) {
   if (!result) return result;
 
+  // normalize numeric first
   result.subtotal = toNum(result.subtotal);
   result.shipping = toNum(result.shipping);
   result.taxAmount = toNum(result.taxAmount);
   result.taxPercent = toNum(result.taxPercent);
   result.grandTotal = toNum(result.grandTotal);
 
-  if (!result.grandTotal || result.grandTotal <= 0) {
-    result.grandTotal = result.subtotal + result.shipping + result.taxAmount;
+  // sum line totals from items (robust)
+  const items = Array.isArray(result.items) ? result.items : [];
+  const itemsSum = items.reduce((sum, it) => {
+    const lt = toNum(it?.totalPrice);
+    return sum + (lt > 0 ? lt : 0);
+  }, 0);
+
+  // If PDF totals are blank/0 but line totals exist, compute subtotal from line totals
+  if ((result.subtotal <= 0 || !Number.isFinite(result.subtotal)) && itemsSum > 0) {
+    result.subtotal = Number(itemsSum.toFixed(2));
   }
+
+  // If grandTotal missing/0, compute from subtotal + shipping + tax
+  if ((result.grandTotal <= 0 || !Number.isFinite(result.grandTotal)) && result.subtotal > 0) {
+    result.grandTotal = Number(
+      (result.subtotal + (result.shipping || 0) + (result.taxAmount || 0)).toFixed(2)
+    );
+  }
+
+  // If tax is 0 but grandTotal and subtotal imply tax, infer it
+  if (
+    (result.taxAmount === 0 || result.taxAmount === null) &&
+    result.grandTotal > 0 &&
+    result.subtotal > 0
+  ) {
+    const inferred = result.grandTotal - result.subtotal - (result.shipping || 0);
+    if (inferred > 0 && inferred < result.grandTotal) {
+      result.taxAmount = Number(inferred.toFixed(2));
+    }
+  }
+
+  // Safety: if grandTotal < subtotal, recompute
   if (result.grandTotal < result.subtotal) {
-    result.grandTotal = result.subtotal + result.shipping + result.taxAmount;
+    result.grandTotal = Number(
+      (result.subtotal + (result.shipping || 0) + (result.taxAmount || 0)).toFixed(2)
+    );
   }
 
   return result;
@@ -106,9 +142,6 @@ function normalizeTotals(result) {
 
 /**
  * Extract PO data using Azure OpenAI Vision.
- * Reads first N pages as images and asks model to return strict JSON.
- *
- * ✅ RETURNS PSR SHAPE (same as extractPoFromPdf)
  */
 export async function extractPoWithAzureAi(pdfPath, { pages = 1, debug = false } = {}) {
   if (!endpoint || !deployment || !apiKey) {
@@ -136,14 +169,14 @@ Return ONLY valid JSON (no markdown, no code fences).
 
 CRITICAL RULES (avoid wrong PO numbers):
 - PO number must be the customer's purchase order number (PSR's PO).
-- DO NOT use address numbers (e.g., 13318 Skyline Cir), ship-to codes, customer IDs, invoice numbers, sales order numbers.
+- DO NOT use address numbers, ship-to codes, customer IDs, invoice numbers, sales order numbers.
 - If document is a SALES ORDER / ACKNOWLEDGEMENT and the customer PO is NOT present, return poNumber as null.
 - If multiple numbers exist, choose ONLY the number explicitly labeled as "PO", "P.O.", "Purchase Order", or "Customer PO".
 
 ORDERED BY (PSR person):
 - orderedBy is the PSR person who placed/requested the order.
 - Look for labels like: "Attn:", "Attention:", "Requested by", "Placed by", "Ordered by", "Buyer".
-- IMPORTANT for McMaster: "Attn: Pam ..." is PSR orderedBy, NOT vendor contact.
+- IMPORTANT: "Attn: <PSR name>" is PSR orderedBy, NOT vendor contact.
 
 DATES:
 - orderDate must be ISO format YYYY-MM-DD if found, else null.
@@ -152,7 +185,7 @@ TOTALS:
 - totals must be numbers (no currency symbols).
 - If tax is not explicitly labeled but grandTotal and subtotal are present:
   tax = grandTotal - subtotal - shipping (assume shipping 0 if missing).
-- Return your best numeric extraction; do NOT default tax to 0 if totals show a difference.
+- Return best numeric extraction; do NOT default tax to 0 if totals show a difference.
 
 ITEMS:
 - Extract: partNumber (if present), description, qty, unitPrice, lineTotal.
@@ -199,10 +232,7 @@ Return JSON with this exact shape:
 
   try {
     const resp = await axios.post(url, payload, {
-      headers: {
-        "Content-Type": "application/json",
-        "api-key": apiKey,
-      },
+      headers: { "Content-Type": "application/json", "api-key": apiKey },
       timeout: 90000,
     });
 
@@ -214,7 +244,6 @@ Return JSON with this exact shape:
       throw new Error("AI returned non-JSON output");
     }
 
-    // Vendor mapping
     const v = ai.vendor || {};
     const vendorName = toNullStr(v.name) || "Unknown Vendor";
 
@@ -230,10 +259,8 @@ Return JSON with this exact shape:
       country: toNullStr(v.country),
     };
 
-    // OrderedBy (PSR person)
     const orderedBy = toNullStr(ai.orderedBy);
 
-    // Items mapping
     const items = Array.isArray(ai.items) ? ai.items : [];
     const normItems = items
       .map((it, idx) => ({
@@ -248,13 +275,11 @@ Return JSON with this exact shape:
       }))
       .filter((x) => x.partNumber || x.description);
 
-    // Totals mapping + ✅ TAX INFERENCE ENFORCED
     let subtotal = toNum(ai?.totals?.subtotal);
     let shipping = toNum(ai?.totals?.shipping);
     let taxAmount = toNum(ai?.totals?.tax);
     let grandTotal = toNum(ai?.totals?.grandTotal);
 
-    // ✅ If tax missing but totals imply it, compute it
     if ((taxAmount === 0 || taxAmount === null) && grandTotal > 0 && subtotal > 0) {
       const inferred = grandTotal - subtotal - (shipping || 0);
       if (inferred > 0 && inferred < grandTotal) taxAmount = Number(inferred.toFixed(2));
@@ -269,9 +294,7 @@ Return JSON with this exact shape:
       psrPoNumber: poNumber ? String(poNumber).trim() : null,
       orderDate: toNullStr(ai.orderDate),
       expectedDeliveryDate: null,
-
       items: normItems,
-
       currency: "USD",
       subtotal,
       shipping,
@@ -286,7 +309,6 @@ Return JSON with this exact shape:
 
     return result;
   } finally {
-    // cleanup temp folder
     try {
       const files = await fs.readdir(tmpDir);
       await Promise.all(files.map((f) => fs.unlink(path.join(tmpDir, f))));

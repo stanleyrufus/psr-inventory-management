@@ -36,6 +36,8 @@ import PurchaseOrderEdit from "../pages/purchaseOrders/PurchaseOrderEdit";
 import PurchaseOrderBulkUpload from "../pages/purchaseOrders/PurchaseOrderBulkUpload";
 import SendRfqPage from "../pages/purchaseOrders/SendRfqPage";
 import PoImportFromPdfPage from "../pages/purchaseOrders/PoImportFromPdfPage";
+import PoImportFromExcelPage from "../pages/purchaseOrders/PoImportFromExcelPage";
+
 
 /* Vendors */
 import VendorsPage from "../pages/vendors/VendorsPage";
@@ -205,10 +207,25 @@ const PrivateLayout = ({ children }) => {
         )}
       />
 
+{/* ✅ Import routes MUST be above /purchase-orders/:id */}
 <Route
   path="/purchase-orders/import-from-pdf"
-  element={<PoImportFromPdfPage />}
+  element={Protected(
+    <PrivateLayout>
+      <PoImportFromPdfPage />
+    </PrivateLayout>
+  )}
 />
+
+<Route
+  path="/purchase-orders/import-from-excel"
+  element={Protected(
+    <PrivateLayout>
+      <PoImportFromExcelPage />
+    </PrivateLayout>
+  )}
+/>
+
       <Route
         path="/purchase-orders/new"
         element={Protected(
