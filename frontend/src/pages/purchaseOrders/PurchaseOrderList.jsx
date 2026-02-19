@@ -583,12 +583,12 @@ export default function PurchaseOrderList() {
                   disabled={reserveSubmitting}
                 >
                   <option value="">— Select —</option>
-                  <option value="Stanley">Pam</option>
-                  <option value="Shiney">Shiney</option>
-                  <option value="Bryan">Brian</option>
-                  <option value="Bryan">Anushka</option>
-                  <option value="Bryan">Chris</option>
-                  <option value="Bryan">Dave</option>
+                  <option value="Pam Ramnarain">Pam</option>
+                  <option value="Shiney Ramnarain">Shiney</option>
+                  <option value="Bryan Ramnarain">Brian</option>
+                  <option value="Anushka Ramnarain">Anushka</option>
+                  <option value="Chris Ramnarain">Chris</option>
+                  <option value="Dave Ramnarain">Dave</option>
                 </select>
               </div>
 

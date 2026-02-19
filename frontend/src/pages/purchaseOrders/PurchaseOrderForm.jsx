@@ -163,7 +163,14 @@ export default function PurchaseOrderForm({
   const [vendors, setVendors] = useState([]);
   const [parts, setParts] = useState([]);
   const [attachments, setAttachments] = useState([]);
-  const [staffList] = useState(["Shiney Ramnarain"]);
+const [staffList] = useState([
+  "Pam Ramnarain",
+  "Shiney Ramnarain",
+  "Brian Ramnarain",
+  "Dave Ramnarain",
+  "Chris Ramnarain",
+  "Anushka Ramnarain",
+]);
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
 // ✅ Frontend validation (inline, instant UX)
