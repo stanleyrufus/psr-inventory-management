@@ -1,9 +1,17 @@
 // src/pages/DashboardPage.jsx
+import {
+  BarChart,
+  Bar,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  LabelList,
+  Cell
+} from "recharts";
 import PurchaseOrderForm from "../pages/purchaseOrders/PurchaseOrderForm";
 import { useEffect, useState } from "react";
-import {
-  LineChart, Line, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer
-} from "recharts";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { apiRaw as api } from "../utils/api"; // axios instance
@@ -20,10 +28,9 @@ export default function DashboardPage() {
     purchaseOrders: 0,
   });
 
-  const [inventoryTrend, setInventoryTrend] = useState([]);
+  const [partsMonthly, setPartsMonthly] = useState([]);
   const [poMonthly, setPoMonthly] = useState([]);
-  const [recentPOs, setRecentPOs] = useState([]);
-  const [lowStockList, setLowStockList] = useState([]);
+  const [topVendors, setTopVendors] = useState([]);
 
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [showPartModal, setShowPartModal] = useState(false);
@@ -35,7 +42,73 @@ export default function DashboardPage() {
     else document.body.classList.remove("overflow-hidden");
   }, [showPoModal]);
 
-  // --- Loaders split so we can call them again ---
+  /* ---------------------------
+     Helpers
+  ---------------------------- */
+  const toShortMonth = (ym) => {
+    // ym: "2026-02" -> "02-26"
+    const [year, month] = String(ym || "").split("-");
+    if (!year || !month) return ym;
+    return `${month}-${year.slice(-2)}`;
+  };
+
+  const money = (n) => `$${Number(n || 0).toLocaleString()}`;
+
+  /* ---------------------------
+     Label renderers
+     - Keep labels simple to avoid congestion
+  ---------------------------- */
+  const PoBarLabel = (props) => {
+    const { x, y, width, value } = props;
+    return (
+      <text
+        x={x + width / 2}
+        y={y - 8}
+        fill="#111"
+        textAnchor="middle"
+        fontSize="12"
+        fontWeight="600"
+      >
+        {value}
+      </text>
+    );
+  };
+
+  const PartsBarLabel = (props) => {
+    const { x, y, width, value } = props;
+    return (
+      <text
+        x={x + width / 2}
+        y={y - 8}
+        fill="#111"
+        textAnchor="middle"
+        fontSize="12"
+        fontWeight="600"
+      >
+        {value}
+      </text>
+    );
+  };
+
+  const VendorBarLabel = (props) => {
+    const { x, y, width, value } = props;
+    return (
+      <text
+        x={x + width + 10}
+        y={y + 12}
+        fill="#111"
+        textAnchor="start"
+        fontSize="12"
+        fontWeight="600"
+      >
+        {money(value)}
+      </text>
+    );
+  };
+
+  /* ---------------------------
+     Loaders
+  ---------------------------- */
   const loadCards = async () => {
     try {
       const [partsRes, lowStockRes, vendorsRes, poRes] = await Promise.all([
@@ -44,6 +117,7 @@ export default function DashboardPage() {
         api.get("/vendors/count"),
         api.get("/purchase_orders/count"),
       ]);
+
       setSummary({
         partsCount: partsRes.data?.count ?? 0,
         lowStock: lowStockRes.data?.count ?? 0,
@@ -57,42 +131,45 @@ export default function DashboardPage() {
 
   const loadCharts = async () => {
     try {
-      const [trendRes, statusRes] = await Promise.all([
-        api.get("/parts/trend/monthly?months=6"),
-        api.get("/purchase_orders/status/monthly?months=6"),
+      const [partsRes, poRes, vendorsRes] = await Promise.all([
+        api.get("/purchase_orders/items/monthly?months=6"),
+        api.get("/purchase_orders/trend/monthly?months=6"),
+        api.get("/purchase_orders/vendors/top-spend?months=12&limit=5"),
       ]);
-      setInventoryTrend((trendRes.data?.data || []).map((r) => ({
-        month: r.ym,
-        count: r.count,
-      })));
-      setPoMonthly((statusRes.data?.data || []).map((r) => ({
-        month: r.ym,
-        draft: r.draft,
-        pending: r.pending,
-        sent: r.sent,
-        completed: r.completed,
-      })));
+
+      const partsRows = partsRes.data?.data || partsRes.data || [];
+      const poRows = poRes.data?.data || poRes.data || [];
+      const vendorRows = vendorsRes.data?.data || vendorsRes.data || [];
+
+      setPartsMonthly(
+        (Array.isArray(partsRows) ? partsRows : []).map((r) => ({
+          month: toShortMonth(r.ym),
+          qty: Number(r.qty || r.count || 0),
+          total: Number(r.total_value || r.total || 0),
+        }))
+      );
+
+      setPoMonthly(
+        (Array.isArray(poRows) ? poRows : []).map((r) => ({
+          month: toShortMonth(r.ym),
+          count: Number(r.count || 0),
+          total: Number(r.total_value || r.total || 0),
+        }))
+      );
+
+      setTopVendors(
+        (Array.isArray(vendorRows) ? vendorRows : []).map((r) => ({
+          vendor: r.vendor_name || r.vendor || "Unknown",
+          total: Number(r.total_spend || r.total || r.total_value || 0),
+        }))
+      );
     } catch (err) {
       console.error("Dashboard charts error:", err);
     }
   };
 
-  const loadTables = async () => {
-    try {
-      const [recentRes, lowRes] = await Promise.all([
-        api.get("/purchase_orders/recent?limit=5"),
-        api.get("/parts/low-stock?limit=10"),
-      ]);
-      setRecentPOs(recentRes.data?.data || []);
-      setLowStockList(lowRes.data?.data || []);
-    } catch (err) {
-      console.error("Dashboard tables error:", err);
-    }
-  };
-
-  // ✅ NEW: a single refresher you can call from anywhere
   const refreshCounts = async () => {
-    await Promise.all([loadCards(), loadCharts(), loadTables()]);
+    await Promise.all([loadCards(), loadCharts()]);
   };
 
   useEffect(() => {
@@ -100,10 +177,18 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ---------------------------
+     Stat cards
+  ---------------------------- */
   const StatCard = ({ title, value, color }) => (
-    <motion.div whileHover={{ scale: 1.02 }} className="bg-white shadow rounded-xl p-5 border">
-      <h3 className="text-sm text-gray-500">{title}</h3>
-      <p className={`text-2xl mt-2 font-semibold ${color}`}>{value}</p>
+    <motion.div
+      whileHover={{ scale: 1.01 }}
+      className="bg-white shadow-sm rounded-lg px-4 py-3 border"
+    >
+      <h3 className="text-xs uppercase tracking-wide text-gray-800 font-semibold">
+        {title}
+      </h3>
+      <p className={`text-xl mt-1 font-semibold ${color}`}>{value}</p>
     </motion.div>
   );
 
@@ -115,6 +200,7 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-semibold text-gray-800">Dashboard</h1>
           <p className="text-gray-500 text-sm">Inventory & Operations Overview</p>
         </div>
+
         <div className="flex gap-3">
           <button
             className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700"
@@ -136,6 +222,7 @@ export default function DashboardPage() {
           >
             + Add Part
           </button>
+
           <button
             className="px-4 py-2 bg-gray-800 text-white rounded-xl hover:bg-black"
             onClick={() => setShowVendorModal(true)}
@@ -146,128 +233,176 @@ export default function DashboardPage() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Total Parts" value={summary.partsCount} color="text-blue-600" />
         <StatCard title="Low Stock Items" value={summary.lowStock} color="text-red-600" />
         <StatCard title="Vendors" value={summary.vendorsCount} color="text-green-600" />
-        <StatCard title="Purchase Orders" value={summary.purchaseOrders} color="text-purple-600" />
+        <StatCard
+          title="Purchase Orders"
+          value={summary.purchaseOrders}
+          color="text-purple-600"
+        />
       </div>
 
-      {/* Charts */}
+      {/* Charts Row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* PO Chart */}
         <div className="bg-white rounded-xl shadow p-5 border">
-          <h3 className="text-lg font-semibold mb-4">Inventory Trend</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={inventoryTrend}>
-              <Line type="monotone" dataKey="count" stroke="#2563eb" strokeWidth={3} />
+          <h3 className="text-lg font-semibold mb-4">POs Placed (Last 6 Months)</h3>
+
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart
+              data={poMonthly}
+              margin={{ top: 24, right: 16, left: 0, bottom: 10 }}
+            >
               <CartesianGrid stroke="#f3f4f6" />
               <XAxis dataKey="month" />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-            </LineChart>
+              <YAxis allowDecimals={false} width={40} />
+              <Tooltip
+                labelFormatter={() => ""} // remove month line
+                content={({ payload }) => {
+                  if (!payload?.length) return null;
+                  const row = payload[0].payload;
+                  return (
+                    <div className="bg-white border shadow-md rounded px-3 py-2 text-sm">
+                      <div>
+                        <strong>PO Count:</strong> {row.count}
+                      </div>
+                      <div>
+                        <strong>Total Cost:</strong> {money(row.total)}
+                      </div>
+                    </div>
+                  );
+                }}
+              />
+             <Bar dataKey="count">
+  {poMonthly.map((entry, index) => {
+    const colors = [
+      "#2563EB",
+      "#3B82F6",
+      "#60A5FA",
+      "#93C5FD",
+      "#1D4ED8",
+      "#0EA5E9",
+    ];
+    return (
+      <Cell
+        key={`cell-po-${index}`}
+        fill={colors[index % colors.length]}
+      />
+    );
+  })}
+  <LabelList content={PoBarLabel} />
+</Bar>
+            </BarChart>
           </ResponsiveContainer>
         </div>
 
+        {/* Parts Chart (✅ Tooltip FIXED like PO tooltip) */}
         <div className="bg-white rounded-xl shadow p-5 border">
-          <h3 className="text-lg font-semibold mb-4">PO Status Trend</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={poMonthly}>
+          <h3 className="text-lg font-semibold mb-4">Parts Bought (Last 6 Months)</h3>
+
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart
+              data={partsMonthly}
+              margin={{ top: 24, right: 16, left: 0, bottom: 10 }}
+            >
               <CartesianGrid stroke="#f3f4f6" />
               <XAxis dataKey="month" />
-              <YAxis allowDecimals={false} />
-              <Tooltip />
-              <Bar dataKey="draft" fill="#9ca3af" />
-              <Bar dataKey="pending" fill="#f97316" />
-              <Bar dataKey="sent" fill="#2563eb" />
-              <Bar dataKey="completed" fill="#16a34a" />
+              <YAxis allowDecimals={false} width={50} />
+              <Tooltip
+                labelFormatter={() => ""} // remove month line
+                content={({ payload }) => {
+                  if (!payload?.length) return null;
+                  const row = payload[0].payload;
+                  return (
+                    <div className="bg-white border shadow-md rounded px-3 py-2 text-sm">
+                      <div>
+                        <strong>Qty:</strong> {row.qty}
+                      </div>
+                      <div>
+                        <strong>Total Cost:</strong> {money(row.total)}
+                      </div>
+                    </div>
+                  );
+                }}
+              />
+             <Bar dataKey="qty">
+  {partsMonthly.map((entry, index) => {
+    const colors = [
+      "#10B981",
+      "#059669",
+      "#34D399",
+      "#22C55E",
+      "#16A34A",
+      "#14B8A6",
+    ];
+    return (
+      <Cell
+        key={`cell-parts-${index}`}
+        fill={colors[index % colors.length]}
+      />
+    );
+  })}
+  <LabelList content={PartsBarLabel} />
+</Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Tables */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent POs */}
-        <div className="bg-white rounded-xl shadow p-5 border">
-          <h3 className="text-lg font-semibold mb-4">Recent Purchase Orders</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left text-gray-500 border-b">
-                  <th className="py-2 pr-4">PO #</th>
-                  <th className="py-2 pr-4">Vendor</th>
-                  <th className="py-2 pr-4">Date</th>
-                  <th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentPOs.map((po) => (
-                  <tr
-                    key={po.id}
-                    className="border-b hover:bg-gray-50 cursor-pointer"
-                    onClick={() => navigate(`/purchase-orders/${po.id}`)}
-                  >
-                    <td className="py-2 pr-4 font-medium text-gray-800">{po.psr_po_number}</td>
-                    <td className="py-2 pr-4">{po.vendor_name || "-"}</td>
-                    <td className="py-2 pr-4">
-                      {po.order_date ? new Date(po.order_date).toISOString().split("T")[0] : "-"}
-                    </td>
-                    <td className="py-2 pr-4">
-                      <span className="px-2 py-1 rounded-full text-xs bg-gray-100">{po.status}</span>
-                    </td>
-                    <td className="py-2 pr-0 text-right">
-                      {po.grand_total != null ? `$${Number(po.grand_total).toFixed(2)}` : "-"}
-                    </td>
-                  </tr>
-                ))}
-                {!recentPOs.length && (
-                  <tr>
-                    <td className="py-4 text-gray-500" colSpan={5}>
-                      No recent purchase orders.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {/* Vendors Chart (clean + same tooltip style) */}
+      <div className="bg-white rounded-xl shadow p-5 border">
+        <h3 className="text-lg font-semibold mb-4">
+          Top 5 Vendors by Spend (Last 12 Months)
+        </h3>
 
-        {/* Low Stock */}
-        <div className="bg-white rounded-xl shadow p-5 border">
-          <h3 className="text-lg font-semibold mb-4">Low Stock Preview</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left text-gray-500 border-b">
-                  <th className="py-2 pr-4">Part #</th>
-                  <th className="py-2 pr-4">Name</th>
-                  <th className="py-2 pr-4">On Hand</th>
-                  <th className="py-2 pr-4">Min</th>
-                  <th className="py-2 pr-4">Location</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lowStockList.map((p) => (
-                  <tr key={p.part_id} className="border-b hover:bg-gray-50">
-                    <td className="py-2 pr-4 font-medium text-gray-800">{p.part_number}</td>
-                    <td className="py-2 pr-4">{p.part_name}</td>
-                    <td className="py-2 pr-4">{p.quantity_on_hand}</td>
-                    <td className="py-2 pr-4">{p.minimum_stock_level}</td>
-                    <td className="py-2 pr-4">{p.location || "-"}</td>
-                  </tr>
-                ))}
-                {!lowStockList.length && (
-                  <tr>
-                    <td className="py-4 text-gray-500" colSpan={5}>
-                      No low stock items.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart
+            data={topVendors}
+            layout="vertical"
+            margin={{ top: 10, right: 80, left: 160, bottom: 10 }}
+          >
+            <CartesianGrid stroke="#f3f4f6" />
+            <XAxis type="number" tickFormatter={(v) => `$${Number(v).toLocaleString()}`} />
+            <YAxis type="category" dataKey="vendor" width={160} />
+            <Tooltip
+              labelFormatter={() => ""} // remove vendor line above tooltip
+              content={({ payload }) => {
+                if (!payload?.length) return null;
+                const row = payload[0].payload;
+                return (
+                  <div className="bg-white border shadow-md rounded px-3 py-2 text-sm">
+                    <div>
+                      <strong>Vendor:</strong> {row.vendor}
+                    </div>
+                    <div>
+                      <strong>Total Spend:</strong> {money(row.total)}
+                    </div>
+                  </div>
+                );
+              }}
+            />
+           <Bar dataKey="total">
+  {topVendors.map((entry, index) => {
+    const colors = [
+      "#F59E0B",
+      "#F97316",
+      "#FB923C",
+      "#EA580C",
+      "#D97706",
+    ];
+    return (
+      <Cell
+        key={`cell-vendor-${index}`}
+        fill={colors[index % colors.length]}
+      />
+    );
+  })}
+  <LabelList content={VendorBarLabel} />
+</Bar>
+          </BarChart>
+        </ResponsiveContainer>
       </div>
 
       {/* Vendor Modal */}
@@ -278,12 +413,7 @@ export default function DashboardPage() {
               initial={{}}
               onSaved={() => {
                 setShowVendorModal(false);
-                api.get("/vendors/count").then((res) =>
-                  setSummary((prev) => ({
-                    ...prev,
-                    vendorsCount: res.data?.count ?? prev.vendorsCount,
-                  }))
-                );
+                refreshCounts();
               }}
               onCancel={() => setShowVendorModal(false)}
             />
@@ -299,12 +429,7 @@ export default function DashboardPage() {
               initial={{}}
               onSaved={() => {
                 setShowPartModal(false);
-                api.get("/parts/count").then((res) =>
-                  setSummary((prev) => ({
-                    ...prev,
-                    partsCount: res.data?.count ?? prev.partsCount,
-                  }))
-                );
+                refreshCounts();
               }}
               onCancel={() => setShowPartModal(false)}
             />
@@ -321,7 +446,7 @@ export default function DashboardPage() {
               initialPo={null}
               onSaved={() => {
                 setShowPoModal(false);
-                refreshCounts(); // ✅ defined now
+                refreshCounts();
               }}
               onCancel={() => setShowPoModal(false)}
             />

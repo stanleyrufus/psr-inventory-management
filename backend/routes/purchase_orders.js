@@ -166,6 +166,174 @@ router.get("/recent", async (req, res) => {
   }
 });
 
+// =============================================
+//  DASHBOARD: PO TREND (MONTHLY COUNT)f
+//  GET /api/purchase_orders/trend/monthly?months=6
+//  Returns: [{ ym: "YYYY-MM", count: 12 }, ...]
+// =============================================
+router.get("/trend/monthly", async (req, res) => {
+  try {
+    const months = Math.min(Number(req.query.months || 12), 24);
+
+    const rows = await db("purchase_orders")
+      .select(
+        db.raw(`to_char(order_date, 'YYYY-MM') as ym`),
+        db.raw(`COUNT(*)::int as count`),
+        db.raw(`COALESCE(SUM(grand_total),0)::numeric as total_value`)
+      )
+      .whereRaw(
+        `order_date >= (date_trunc('month', CURRENT_DATE) - interval '${months - 1} months')`
+      )
+      .groupBy("ym")
+      .orderBy("ym", "asc");
+
+    res.json({ success: 1, data: rows });
+  } catch (err) {
+    console.error("❌ PO trend/monthly error:", err);
+    res.status(500).json({
+      success: 0,
+      message: "Failed to load PO monthly trend",
+    });
+  }
+});
+
+// ✅ GET /api/purchase_orders/status/monthly?months=6
+router.get("/status/monthly", async (req, res) => {
+  try {
+    const months = Math.max(1, Math.min(24, Number(req.query.months || 6)));
+
+    // Build month labels: oldest -> newest (YYYY-MM)
+    const monthLabels = [];
+    const now = new Date();
+    const firstMonth = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
+
+    for (let i = 0; i < months; i++) {
+      const d = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + i, 1);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      monthLabels.push(ym);
+    }
+
+    // Start date = first month (YYYY-MM-01)
+    const startYmd = `${monthLabels[0]}-01`;
+
+    // Pull grouped counts by month + status
+    const rows = await db("purchase_orders")
+      .where("order_date", ">=", startYmd)
+      .select(
+        db.raw(`to_char(date_trunc('month', order_date), 'YYYY-MM') as ym`),
+        db.raw(`lower(coalesce(status, 'draft')) as status`),
+        db.raw(`count(*)::int as cnt`)
+      )
+      .groupBy("ym", "status")
+      .orderBy("ym", "asc");
+
+    // Normalize your real statuses into the dashboard buckets
+    const normalizeStatus = (s) => {
+      const x = String(s || "").toLowerCase().trim();
+
+      if (x === "draft") return "draft";
+      if (x === "pending") return "pending";
+      if (x === "sent") return "sent";
+      if (x === "completed") return "completed";
+
+      // map common PSR statuses (adjust if needed)
+      if (x === "reserved") return "pending";
+      if (x === "paid") return "completed";
+      if (x === "received") return "completed";
+      if (x === "closed") return "completed";
+
+      // anything else -> ignore (or you can map to pending)
+      return null;
+    };
+
+    // Initialize months with zeros
+    const outMap = {};
+    monthLabels.forEach((ym) => {
+      outMap[ym] = { ym, draft: 0, pending: 0, sent: 0, completed: 0 };
+    });
+
+    // Apply counts
+    for (const r of rows) {
+      const ym = r.ym;
+      if (!outMap[ym]) continue;
+
+      const bucket = normalizeStatus(r.status);
+      if (!bucket) continue;
+
+      outMap[ym][bucket] += Number(r.cnt || 0);
+    }
+
+    // Send array in correct order
+    const data = monthLabels.map((ym) => outMap[ym]);
+
+    return res.json({ success: 1, data });
+  } catch (err) {
+    console.error("❌ /purchase_orders/status/monthly error:", err);
+    return res.status(500).json({
+      success: 0,
+      message: "Failed to load PO status trend",
+    });
+  }
+});
+
+// =============================================
+// DASHBOARD: PARTS BOUGHT MONTHLY
+// GET /api/purchase_orders/items/monthly?months=6
+// Returns: [{ ym: "YYYY-MM", qty: "123", total_value: "456.78" }]
+// =============================================
+router.get("/items/monthly", async (req, res) => {
+  try {
+    const months = Math.min(Number(req.query.months || 6), 24);
+
+    const rows = await db("purchase_orders as po")
+      .join("purchase_order_items as i", "i.po_id", "po.id")
+      .whereRaw(
+        `po.order_date >= (date_trunc('month', CURRENT_DATE) - interval '${months - 1} months')`
+      )
+      .select(
+        db.raw(`to_char(po.order_date, 'YYYY-MM') as ym`),
+        db.raw(`COALESCE(SUM(COALESCE(i.quantity::numeric,0)),0) as qty`),
+        db.raw(
+          `COALESCE(SUM(COALESCE(i.quantity::numeric,0) * COALESCE(i.unit_price::numeric,0)),0) as total_value`
+        )
+      )
+      .groupBy("ym")
+      .orderBy("ym", "asc");
+
+    return res.json({ success: 1, data: rows });
+  } catch (err) {
+    console.error("❌ items/monthly error:", err);
+    return res
+      .status(500)
+      .json({ success: 0, message: "Failed to load parts bought trend" });
+  }
+});
+
+// =============================================
+// DASHBOARD: TOP 5 VENDORS BY SPEND (12 MONTHS)
+// GET /api/purchase_orders/vendors/top-spend
+// =============================================
+router.get("/vendors/top-spend", async (req, res) => {
+  try {
+    const rows = await db("purchase_orders as po")
+      .join("vendors as v", "v.vendor_id", "po.vendor_id")
+      .whereRaw(`po.order_date >= CURRENT_DATE - interval '12 months'`)
+      .select(
+        "v.vendor_id",
+        "v.vendor_name",
+        db.raw("COALESCE(SUM(po.grand_total),0) as total_spend")
+      )
+      .groupBy("v.vendor_id", "v.vendor_name")
+      .orderBy("total_spend", "desc")
+      .limit(5);
+
+    res.json({ success: 1, data: rows });
+  } catch (err) {
+    console.error("❌ top-spend error:", err);
+    res.status(500).json({ success: 0 });
+  }
+});
+
 //
 // =============================================
 //  IMPORT PO FROM PDF
