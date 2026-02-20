@@ -1,8 +1,33 @@
-// src/components/VendorDetail.jsx
-import React from "react";
+// src/pages/vendors/VendorDetails.jsx
+import React, { useState } from "react";
+import { deleteVendor } from "../../utils/api";
 
-export default function VendorDetail({ vendor, onClose }) {
+export default function VendorDetails({ vendor, onClose, onDeleted, onEdit }) {
+  const [deleting, setDeleting] = useState(false);
+
   if (!vendor) return null;
+
+  const handleDelete = async () => {
+    if (deleting) return;
+
+    const ok = window.confirm(
+      `Are you sure you want to delete vendor "${vendor.vendor_name}"?`
+    );
+    if (!ok) return;
+
+    try {
+      setDeleting(true);
+      await deleteVendor(vendor.vendor_id);
+
+      // ✅ tell parent so it can close + refresh state
+      onDeleted?.(vendor.vendor_id);
+    } catch (err) {
+      console.error("❌ Error deleting vendor:", err);
+      alert(err?.response?.data?.message || "Failed to delete vendor");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
@@ -15,6 +40,8 @@ export default function VendorDetail({ vendor, onClose }) {
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 text-lg"
+            disabled={deleting}
+            title="Close"
           >
             ✕
           </button>
@@ -55,7 +82,9 @@ export default function VendorDetail({ vendor, onClose }) {
               {vendor.discount ? `${vendor.discount}%` : "—"}
             </p>
             <p>
-              <span className="font-medium text-gray-700">Preferred Carrier:</span>{" "}
+              <span className="font-medium text-gray-700">
+                Preferred Carrier:
+              </span>{" "}
               {vendor.preferredcarrier || "—"}
             </p>
             <p>
@@ -65,16 +94,14 @@ export default function VendorDetail({ vendor, onClose }) {
           </div>
         </div>
 
-        {/* Address Info */}
+        {/* Address */}
         <div className="mt-5 border-t pt-3">
           <h3 className="font-medium text-gray-800 mb-1">Address</h3>
           <p className="text-sm text-gray-700 whitespace-pre-line">
             {[vendor.address1, vendor.address2].filter(Boolean).join("\n") || "—"}
           </p>
           <p className="text-sm text-gray-700 mt-1">
-            {[vendor.city, vendor.state, vendor.country]
-              .filter(Boolean)
-              .join(", ")}{" "}
+            {[vendor.city, vendor.state, vendor.country].filter(Boolean).join(", ")}{" "}
             {vendor.postal_code ? ` ${vendor.postal_code}` : ""}
           </p>
         </div>
@@ -94,7 +121,9 @@ export default function VendorDetail({ vendor, onClose }) {
             {vendor.taxingscheme || "—"}
           </p>
           <p>
-            <span className="font-medium text-gray-700">Tax Inclusive Pricing:</span>{" "}
+            <span className="font-medium text-gray-700">
+              Tax Inclusive Pricing:
+            </span>{" "}
             {vendor.istaxinclusivepricing ? "Yes" : "No"}
           </p>
         </div>
@@ -107,38 +136,34 @@ export default function VendorDetail({ vendor, onClose }) {
           </p>
         </div>
 
-<div className="flex justify-end gap-3 mt-6 border-t pt-4">
-  <button
-    className="px-4 py-2 bg-blue-600 text-white rounded"
-    onClick={() => {
-      onClose();     // close details modal
-      window.__openVendorEdit?.(vendor); // trigger edit from parent
-    }}
-  >
-    Edit Vendor
-  </button>
+        {/* Actions */}
+        <div className="flex justify-end gap-3 mt-6 border-t pt-4">
+          <button
+            className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-60"
+            disabled={deleting}
+            onClick={() => onEdit?.(vendor)}
+          >
+            Edit Vendor
+          </button>
 
-  <button
-    className="px-4 py-2 bg-red-600 text-white rounded"
-    onClick={() => window.__deleteVendor?.(vendor.vendor_id, vendor.vendor_name)}
-  >
-    Delete Vendor
-  </button>
-</div>
+          <button
+            className="px-4 py-2 bg-red-600 text-white rounded disabled:opacity-60"
+            disabled={deleting}
+            onClick={handleDelete}
+          >
+            {deleting ? "Deleting..." : "Delete Vendor"}
+          </button>
+        </div>
 
-        {/* Footer Info */}
+        {/* Footer */}
         <div className="mt-6 text-xs text-gray-500 border-t pt-3">
           <p>
             <span className="font-medium">Created On:</span>{" "}
-            {vendor.created_on
-              ? new Date(vendor.created_on).toLocaleString()
-              : "—"}
+            {vendor.created_on ? new Date(vendor.created_on).toLocaleString() : "—"}
           </p>
           <p>
             <span className="font-medium">Updated On:</span>{" "}
-            {vendor.updated_on
-              ? new Date(vendor.updated_on).toLocaleString()
-              : "—"}
+            {vendor.updated_on ? new Date(vendor.updated_on).toLocaleString() : "—"}
           </p>
         </div>
       </div>

@@ -5,14 +5,12 @@ import DashboardPage from "../pages/DashboardPage";
 import ProductsPage from "../pages/ProductsPage";
 import PartsPage from "../pages/PartsPage";
 import SalesOrderPage from "../pages/SalesOrderPage";
-import ReportsPage from "../pages/Reports";
 import Login from "../pages/Login";
-
 import MonitoringPage from "../pages/MonitoringPage";
-
 
 import { AuthContext } from "../context/AuthContext";
 import Sidebar from "../components/Sidebar";
+import AdminRoute from "../components/AdminRoute";
 
 /* Settings Pages */
 import SettingsIndex from "../pages/settings/SettingsIndex";
@@ -38,7 +36,6 @@ import SendRfqPage from "../pages/purchaseOrders/SendRfqPage";
 import PoImportFromPdfPage from "../pages/purchaseOrders/PoImportFromPdfPage";
 import PoImportFromExcelPage from "../pages/purchaseOrders/PoImportFromExcelPage";
 
-
 /* Vendors */
 import VendorsPage from "../pages/vendors/VendorsPage";
 import VendorForm from "../pages/vendors/VendorForm";
@@ -52,72 +49,61 @@ import ProductDetail from "../pages/ProductDetail";
 export default function AppRoutes() {
   const { user } = useContext(AuthContext);
 
-// PrivateLayout inside AppRoutes.jsx
+  // PrivateLayout inside AppRoutes.jsx
+  const PrivateLayout = ({ children }) => {
+    const { user, logout } = useContext(AuthContext);
 
-const PrivateLayout = ({ children }) => {
-  const { user, logout } = useContext(AuthContext);
+    return (
+      <div className="flex h-screen bg-psr-sky overflow-hidden">
+        {/* Sidebar */}
+        <Sidebar />
 
-  return (
-    <div className="flex h-screen bg-psr-sky overflow-hidden">
+        {/* MAIN AREA */}
+        <main className="flex-1 flex flex-col">
+          <header
+            className="
+              w-full
+              bg-blue-50
+              border-b border-white/10
+              px-6
+              py-3.5
+              flex
+              justify-between
+              items-center
+              shadow-sm
+            "
+          >
+            {/* Center Title */}
+            <div className="flex-1 text-center">
+              <h1
+                className="text-xl font-bold text-gray-700 tracking-wide"
+                style={{ fontFamily: "Times New Roman, serif" }}
+              >
+                Inventory & Purchase Order Management Portal
+              </h1>
+            </div>
 
-      {/* Sidebar */}
-      <Sidebar />
+            {/* User + Logout */}
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-700 font-medium">
+                {user?.username} ({user?.role})
+              </span>
 
-      {/* MAIN AREA */}
-      <main className="flex-1 flex flex-col">
+              <button
+                onClick={logout}
+                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded shadow"
+              >
+                Logout
+              </button>
+            </div>
+          </header>
 
-        {/* 🔹 MATCHED HEADER — same border style as Sidebar header */}
-       <header
-  className="
-    w-full
-    bg-blue-50
-    border-b border-white/10
-    px-6
-    py-3.5
-    flex
-    justify-between
-    items-center
-    shadow-sm
-  "
->
- {/* Center Title */}
-<div className="flex-1 text-center">
-  <h1 
-    className="text-xl font-bold text-gray-700 tracking-wide"
-    style={{ fontFamily: "Times New Roman, serif" }}
-  >
-    Inventory & Purchase Order Management Portal
-  </h1>
-</div>
-
-
-  {/* User + Logout */}
-  <div className="flex items-center gap-4">
-    <span className="text-sm text-gray-700 font-medium">
-      {user?.username} ({user?.role})
-    </span>
-
-    <button
-      onClick={logout}
-      className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded shadow"
-    >
-      Logout
-    </button>
-  </div>
-</header>
-
-
-        {/* PAGE CONTENT */}
-      {/* PAGE CONTENT */}
-<div className="flex-1 pt-2 px-6 pb-6 overflow-y-auto">
-  {children}
-</div>
-
-      </main>
-    </div>
-  );
-};
-
+          {/* PAGE CONTENT */}
+          <div className="flex-1 pt-2 px-6 pb-6 overflow-y-auto">{children}</div>
+        </main>
+      </div>
+    );
+  };
 
   const Protected = (element) =>
     user ? element : <Navigate to="/login" replace />;
@@ -188,7 +174,6 @@ const PrivateLayout = ({ children }) => {
         )}
       />
 
-      {/* ✅ FIXED — WRAPPED SendRfqPage IN Protected + PrivateLayout */}
       <Route
         path="/purchase-orders/:id/send-rfq"
         element={Protected(
@@ -207,24 +192,24 @@ const PrivateLayout = ({ children }) => {
         )}
       />
 
-{/* ✅ Import routes MUST be above /purchase-orders/:id */}
-<Route
-  path="/purchase-orders/import-from-pdf"
-  element={Protected(
-    <PrivateLayout>
-      <PoImportFromPdfPage />
-    </PrivateLayout>
-  )}
-/>
+      {/* ✅ Import routes MUST be above /purchase-orders/:id */}
+      <Route
+        path="/purchase-orders/import-from-pdf"
+        element={Protected(
+          <PrivateLayout>
+            <PoImportFromPdfPage />
+          </PrivateLayout>
+        )}
+      />
 
-<Route
-  path="/purchase-orders/import-from-excel"
-  element={Protected(
-    <PrivateLayout>
-      <PoImportFromExcelPage />
-    </PrivateLayout>
-  )}
-/>
+      <Route
+        path="/purchase-orders/import-from-excel"
+        element={Protected(
+          <PrivateLayout>
+            <PoImportFromExcelPage />
+          </PrivateLayout>
+        )}
+      />
 
       <Route
         path="/purchase-orders/new"
@@ -293,103 +278,125 @@ const PrivateLayout = ({ children }) => {
         )}
       />
 
-      {/* Reports */}
+      {/* ==========================
+          ✅ Reports (ADMIN ONLY)
+         ========================== */}
       <Route
         path="/reports"
         element={Protected(
-          <PrivateLayout>
-            <ReportsIndex />
-          </PrivateLayout>
+          <AdminRoute>
+            <PrivateLayout>
+              <ReportsIndex />
+            </PrivateLayout>
+          </AdminRoute>
         )}
       />
       <Route
         path="/reports/low-stock"
         element={Protected(
-          <PrivateLayout>
-            <LowStockReport />
-          </PrivateLayout>
+          <AdminRoute>
+            <PrivateLayout>
+              <LowStockReport />
+            </PrivateLayout>
+          </AdminRoute>
         )}
       />
       <Route
         path="/reports/purchase-orders"
         element={Protected(
-          <PrivateLayout>
-            <PurchaseOrderReport />
-          </PrivateLayout>
+          <AdminRoute>
+            <PrivateLayout>
+              <PurchaseOrderReport />
+            </PrivateLayout>
+          </AdminRoute>
         )}
       />
       <Route
         path="/reports/vendor-summary"
         element={Protected(
-          <PrivateLayout>
-            <VendorPurchaseSummary />
-          </PrivateLayout>
+          <AdminRoute>
+            <PrivateLayout>
+              <VendorPurchaseSummary />
+            </PrivateLayout>
+          </AdminRoute>
         )}
       />
       <Route
         path="/reports/part-summary"
         element={Protected(
-          <PrivateLayout>
-            <PartPurchaseSummary />
-          </PrivateLayout>
+          <AdminRoute>
+            <PrivateLayout>
+              <PartPurchaseSummary />
+            </PrivateLayout>
+          </AdminRoute>
         )}
       />
       <Route
         path="/reports/stock-movement"
         element={Protected(
-          <PrivateLayout>
-            <StockMovementReport />
-          </PrivateLayout>
+          <AdminRoute>
+            <PrivateLayout>
+              <StockMovementReport />
+            </PrivateLayout>
+          </AdminRoute>
         )}
       />
 
-/* Settings */
-<Route
-  path="/settings"
-  element={Protected(
-    <PrivateLayout>
-      <SettingsIndex />
-    </PrivateLayout>
-  )}
-/>
+      {/* ==========================
+          ✅ Settings (ADMIN ONLY)
+         ========================== */}
+      <Route
+        path="/settings"
+        element={Protected(
+          <AdminRoute>
+            <PrivateLayout>
+              <SettingsIndex />
+            </PrivateLayout>
+          </AdminRoute>
+        )}
+      />
+      <Route
+        path="/settings/users"
+        element={Protected(
+          <AdminRoute>
+            <PrivateLayout>
+              <UserManagement />
+            </PrivateLayout>
+          </AdminRoute>
+        )}
+      />
+      <Route
+        path="/settings/roles"
+        element={Protected(
+          <AdminRoute>
+            <PrivateLayout>
+              <RolesManagement />
+            </PrivateLayout>
+          </AdminRoute>
+        )}
+      />
+      <Route
+        path="/settings/system"
+        element={Protected(
+          <AdminRoute>
+            <PrivateLayout>
+              <SystemPreferences />
+            </PrivateLayout>
+          </AdminRoute>
+        )}
+      />
 
-<Route
-  path="/settings/users"
-  element={Protected(
-    <PrivateLayout>
-      <UserManagement />
-    </PrivateLayout>
-  )}
-/>
-
-<Route
-  path="/settings/roles"
-  element={Protected(
-    <PrivateLayout>
-      <RolesManagement />
-    </PrivateLayout>
-  )}
-/>
-
-<Route
-  path="/settings/system"
-  element={Protected(
-    <PrivateLayout>
-      <SystemPreferences />
-    </PrivateLayout>
-  )}
-/>
-
-{/* ✅ PSR System Monitoring Dashboard (Under Settings) */}
-<Route
-  path="/settings/monitoring"
-  element={Protected(
-    <PrivateLayout>
-      <MonitoringPage />
-    </PrivateLayout>
-  )}
-/>
-
+      {/* Monitoring under settings => also admin only */}
+      <Route
+        path="/settings/monitoring"
+        element={Protected(
+          <AdminRoute>
+            <PrivateLayout>
+              <MonitoringPage />
+            </PrivateLayout>
+          </AdminRoute>
+        )}
+      />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />

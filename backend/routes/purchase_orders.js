@@ -238,25 +238,23 @@ router.get("/", async (_, res) => {
   res.json(rows);
 });
 
-//
 // =============================================
 //  NEXT PO NUMBER (AUTO-GENERATE PREVIEW)
 //  GET /api/purchase_orders/next-number
+//  Format: POMMDDYY-01
 // =============================================
-//
 router.get("/next-number", async (req, res) => {
   try {
-    // ✅ system date (server)
     const now = new Date();
-    const yyyy = now.getFullYear();
+
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const dd = String(now.getDate()).padStart(2, "0");
-    const yyyymmdd = `${yyyy}${mm}${dd}`;
+    const yy = String(now.getFullYear()).slice(-2); // last 2 digits
 
-    const prefix = `PO${yyyymmdd}-`;
+    const mmddyy = `${mm}${dd}${yy}`;
+    const prefix = `PO${mmddyy}-`; // PO021926-
 
-    // ✅ Find the highest sequence for TODAY
-    // psr_po_number format: PSR-YYYYMMDD-0001
+    // Find the highest sequence for TODAY (prefix match)
     const r = await db("purchase_orders")
       .where("psr_po_number", "like", `${prefix}%`)
       .max("psr_po_number as max")
@@ -266,18 +264,21 @@ router.get("/next-number", async (req, res) => {
 
     if (r?.max) {
       const last = String(r.max);
-      const lastSeqStr = last.split("-").pop(); // "0007"
+      const lastSeqStr = last.split("-").pop(); // "01"
       const lastSeq = Number(lastSeqStr);
-      if (!isNaN(lastSeq)) nextSeq = lastSeq + 1;
+      if (!Number.isNaN(lastSeq)) nextSeq = lastSeq + 1;
     }
 
-    const seqStr = String(nextSeq).padStart(4, "0");
+    // ✅ 2-digit sequence
+    const seqStr = String(nextSeq).padStart(2, "0");
     const nextNumber = `${prefix}${seqStr}`;
 
+    // Keep returning date for UI (your current behavior)
+    const yyyy = now.getFullYear();
     return res.json({
       success: 1,
       psr_po_number: nextNumber,
-      order_date: `${yyyy}-${mm}-${dd}`, // ✅ date input format
+      order_date: `${yyyy}-${mm}-${dd}`,
     });
   } catch (err) {
     console.error("❌ next-number error:", err);
@@ -286,6 +287,7 @@ router.get("/next-number", async (req, res) => {
       .json({ success: 0, message: "Failed to generate PO number" });
   }
 });
+
 
 //
 // =============================================
@@ -317,17 +319,15 @@ router.post("/reserve", async (req, res) => {
       });
     }
 
-    const vendorId =
-      body.vendor_id != null && body.vendor_id !== ""
-        ? Number(body.vendor_id)
-        : null;
+// ✅ vendor_id REQUIRED
+const vendorId = Number(body.vendor_id);
 
-    if (vendorId !== null && Number.isNaN(vendorId)) {
-      return res.status(400).json({
-        success: 0,
-        message: "vendor_id must be a number",
-      });
-    }
+if (!vendorId || Number.isNaN(vendorId)) {
+  return res.status(400).json({
+    success: 0,
+    message: "vendor_id is required",
+  });
+}
 
     // ✅ system date (same rule you use elsewhere)
     const orderDate = systemDateYmd();
@@ -740,7 +740,7 @@ router.delete("/:id", async (req, res) => {
 // ✅ GET PO DETAILS (includes items + files)
 // GET /api/purchase_orders/:id
 // =====================================================
-//
+//x`
 router.get("/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) {

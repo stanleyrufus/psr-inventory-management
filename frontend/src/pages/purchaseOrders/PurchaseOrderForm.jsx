@@ -149,6 +149,7 @@ const money = (v) => n(v).toFixed(2);
 
 export default function PurchaseOrderForm({
   initialPo,
+  existingFiles: existingFilesProp, // ✅ allow caller to pass existing files
   onSaved,
   onCancel,
   isModal = false,
@@ -163,17 +164,19 @@ export default function PurchaseOrderForm({
   const [vendors, setVendors] = useState([]);
   const [parts, setParts] = useState([]);
   const [attachments, setAttachments] = useState([]);
-const [staffList] = useState([
-  "Pam Ramnarain",
-  "Shiney Ramnarain",
-  "Brian Ramnarain",
-  "Dave Ramnarain",
-  "Chris Ramnarain",
-  "Anushka Ramnarain",
-]);
+  const [staffList] = useState([
+    "Pam Ramnarain",
+    "Shiney Ramnarain",
+    "Brian Ramnarain",
+    "Dave Ramnarain",
+    "Chris Ramnarain",
+    "Anushka Ramnarain",
+  ]);
+
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
-// ✅ Frontend validation (inline, instant UX)
+
+  // ✅ Frontend validation (inline, instant UX)
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState(""); // optional top banner message
 
@@ -182,12 +185,14 @@ const [staffList] = useState([
   const vendorRef = useRef(null);
   const firstPartRef = useRef(null);
 
-  const [existingFiles, setExistingFiles] = useState(initialPo?.files || []);
+  const [existingFiles, setExistingFiles] = useState(
+    existingFilesProp || initialPo?.files || []
+  );
   const [deletingFileIds, setDeletingFileIds] = useState([]);
 
   useEffect(() => {
-    setExistingFiles(initialPo?.files || []);
-  }, [initialPo]);
+    setExistingFiles(existingFilesProp || initialPo?.files || []);
+  }, [existingFilesProp, initialPo]);
 
   const [addingNewVendor, setAddingNewVendor] = useState(false);
   const [newVendor, setNewVendor] = useState({
@@ -213,10 +218,6 @@ const [staffList] = useState([
   const toDateOnly = (val) => (val ? String(val).slice(0, 10) : "");
 
   // ✅ Validation helpers (frontend UX)
-  const setFieldError = (key, msg) => {
-    setErrors((prev) => ({ ...prev, [key]: msg }));
-  };
-
   const clearFieldError = (key) => {
     setErrors((prev) => {
       if (!prev[key]) return prev;
@@ -269,7 +270,9 @@ const [staffList] = useState([
     }
 
     setErrors(errs);
-    setFormError(Object.keys(errs).length ? "Please fix the highlighted fields." : "");
+    setFormError(
+      Object.keys(errs).length ? "Please fix the highlighted fields." : ""
+    );
     if (Object.keys(errs).length) focusFirstError(errs);
 
     return Object.keys(errs).length === 0;
@@ -313,8 +316,8 @@ const [staffList] = useState([
           payment_terms: "",
           currency: "USD",
           remarks: "",
-	  received_by: "",
-	  received_on: "",
+          received_by: "",
+          received_on: "",
           tax_percent: 0,
           shipping_charges: 0,
           items: [],
@@ -325,45 +328,40 @@ const [staffList] = useState([
         }
   );
 
+  // =============================================
+  // ✅ AUTO-POPULATE PO NUMBER + ORDER DATE (NEW PO ONLY)
+  // =============================================
+  useEffect(() => {
+    // Only for "New PO" (not edit)
+    if (initialPo?.id) return;
 
-// =============================================
-// ✅ AUTO-POPULATE PO NUMBER + ORDER DATE (NEW PO ONLY)
-// =============================================
-useEffect(() => {
-  // Only for "New PO" (not edit)
-  if (initialPo?.id) return;
+    // If already populated, do nothing (prevents refetch)
+    if (po.psr_po_number && po.psr_po_number.trim() !== "") return;
 
-  // If already populated, do nothing (prevents refetch)
-  if (po.psr_po_number && po.psr_po_number.trim() !== "") return;
+    let cancelled = false;
 
-  let cancelled = false;
+    axios
+      .get(`${BASE}/api/purchase_orders/next-number`)
+      .then((res) => {
+        if (cancelled) return;
 
-  axios
-    .get(`${BASE}/api/purchase_orders/next-number`)
-    .then((res) => {
-      if (cancelled) return;
+        const next = res.data?.psr_po_number;
+        const od = res.data?.order_date;
 
-      const next = res.data?.psr_po_number;
-      const od = res.data?.order_date;
+        setPo((prev) => ({
+          ...prev,
+          psr_po_number: next || prev.psr_po_number,
+          order_date: od || prev.order_date,
+        }));
+      })
+      .catch((err) => {
+        console.error("❌ Failed to auto-generate PO number:", err);
+      });
 
-      setPo((prev) => ({
-        ...prev,
-        psr_po_number: next || prev.psr_po_number,
-        // ✅ keep system date same as order_date
-        order_date: od || prev.order_date,
-      }));
-    })
-    .catch((err) => {
-      console.error("❌ Failed to auto-generate PO number:", err);
-      // Optional: show message but do not block user
-    });
-
-  return () => {
-    cancelled = true;
-  };
-}, [initialPo?.id, po.psr_po_number]);
-
-
+    return () => {
+      cancelled = true;
+    };
+  }, [initialPo?.id, po.psr_po_number]);
 
   // Load vendors + parts
   useEffect(() => {
@@ -387,6 +385,7 @@ useEffect(() => {
       })
       .catch(() => setParts([]));
   }, []);
+
   const nNum = (v) =>
     v === "" || v === null || v === undefined ? 0 : Number(v);
 
@@ -508,10 +507,8 @@ useEffect(() => {
     }
 
     const selected = parts.find(
-      (p) =>
-        String(p.part_id) === String(value) || String(p.id) === String(value)
+      (p) => String(p.part_id) === String(value) || String(p.id) === String(value)
     );
-
     if (!selected) return;
 
     const updatedItems = [...po.items];
@@ -537,8 +534,7 @@ useEffect(() => {
     updatedItems[index][field] = value;
     if (field === "quantity" || field === "unitPrice") {
       updatedItems[index].totalPrice =
-        nNum(updatedItems[index].quantity) *
-        nNum(updatedItems[index].unitPrice);
+        nNum(updatedItems[index].quantity) * nNum(updatedItems[index].unitPrice);
     }
     setPo({ ...po, items: updatedItems });
     recalcTotals(updatedItems);
@@ -642,9 +638,7 @@ useEffect(() => {
 
     try {
       setDeletingFileIds((prev) => [...prev, fileId]);
-      await axios.delete(
-        `${BASE}/api/purchase_orders/${initialPo.id}/file/${fileId}`
-      );
+      await axios.delete(`${BASE}/api/purchase_orders/${initialPo.id}/file/${fileId}`);
       setExistingFiles((prev) => prev.filter((f) => f.id !== fileId));
     } catch (err) {
       console.error("❌ File delete error:", err);
@@ -653,10 +647,11 @@ useEffect(() => {
       setDeletingFileIds((prev) => prev.filter((id) => id !== fileId));
     }
   };
+
   const handleSaveDraft = async () => {
-// ✅ frontend validation for FIRST SAVE
-  // requireItems=true because backend requires at least one part even for Draft
-  if (!validatePO({ requireItems: true })) return;
+    // ✅ frontend validation for FIRST SAVE
+    if (!validatePO({ requireItems: true })) return;
+
     if (!po.psr_po_number.trim()) {
       alert("PO Number is required to save a draft.");
       return;
@@ -668,9 +663,8 @@ useEffect(() => {
       const res = await axios.post(`${BASE}/api/purchase_orders`, {
         ...po,
         status: "Draft",
- // ✅ force include
-  received_by: po.received_by || "",
-  received_on: po.received_on || "",
+        received_by: po.received_by || "",
+        received_on: po.received_on || "",
         items: po.items.map((i, index) => ({
           id: null,
           part_id: Number(i.partId),
@@ -707,20 +701,19 @@ useEffect(() => {
 
       alert("Draft saved successfully.");
       navigate("/purchase-orders");
-   } catch (err) {
-  console.error("❌ Draft save failed:", err);
+    } catch (err) {
+      console.error("❌ Draft save failed:", err);
 
-  const data = err?.response?.data;
-  if (data?.field) {
-    setErrors((prev) => ({ ...prev, [data.field]: data.message || "Invalid" }));
-    setFormError(data?.message || "Please fix the highlighted fields.");
-    focusFirstError({ [data.field]: data.message || "Invalid" });
-    return;
-  }
+      const data = err?.response?.data;
+      if (data?.field) {
+        setErrors((prev) => ({ ...prev, [data.field]: data.message || "Invalid" }));
+        setFormError(data?.message || "Please fix the highlighted fields.");
+        focusFirstError({ [data.field]: data.message || "Invalid" });
+        return;
+      }
 
-  alert(data?.message || "Failed to save draft.");
-} finally {
-
+      alert(data?.message || "Failed to save draft.");
+    } finally {
       setSubmitting(false);
     }
   };
@@ -731,46 +724,26 @@ useEffect(() => {
 
     setSubmitting(true);
 
-// ✅ use the new frontend validation + inline errors
-if (!validatePO({ requireItems: true })) {
-  setSubmitting(false);
-  return;
-}
-
-    recalcTotals(po.items);
-  
-
-    let sendRevised = false;
-
-    if (
-      initialPo?.id &&
-      (initialPo.status === "Sent RFQ" ||
-        initialPo.status === "Sent Revised RFQ")
-    ) {
-      const originalNorm = normalizePo(initialPo);
-      const userEditedSomething =
-        originalNorm && JSON.stringify(originalNorm) !== JSON.stringify(po);
-
-      if (userEditedSomething) {
-        const wantRevised = window.confirm(
-          "This PO was already sent.\nSend revised RFQ now?"
-        );
-        sendRevised = wantRevised;
-      }
+    // ✅ use the new frontend validation + inline errors
+    if (!validatePO({ requireItems: true })) {
+      setSubmitting(false);
+      return;
     }
 
-let finalStatus = po.status;
+    recalcTotals(po.items);
 
-// New PO always starts as Draft
-if (!initialPo?.id) {
-  finalStatus = "Draft";
-}
+    // ✅ Status rules
+    let finalStatus = po.status;
 
-// ✅ If editing a Reserved placeholder and user saves, convert to Draft
-if (initialPo?.id && po.status === "Reserved") {
-  finalStatus = "Draft";
-}
+    // New PO always starts as Draft
+    if (!initialPo?.id) {
+      finalStatus = "Draft";
+    }
 
+    // ✅ If editing a Reserved placeholder and user saves, convert to Draft
+    if (initialPo?.id && po.status === "Reserved") {
+      finalStatus = "Draft";
+    }
 
     const payload = {
       psr_po_number: po.psr_po_number,
@@ -778,9 +751,8 @@ if (initialPo?.id && po.status === "Reserved") {
       expected_delivery_date: po.expected_delivery_date,
       created_by: po.created_by,
       vendor_id: po.vendor_id,
-// ✅ ADD THESE (so backend actually receives them)
-  received_by: po.received_by || "",
-  received_on: po.received_on || "",
+      received_by: po.received_by || "",
+      received_on: po.received_on || "",
       payment_terms: po.payment_terms,
       currency: po.currency,
       remarks: po.remarks,
@@ -803,46 +775,24 @@ if (initialPo?.id && po.status === "Reserved") {
 
     try {
       if (initialPo?.id) {
-        await axios.put(
-          `${BASE}/api/purchase_orders/${initialPo.id}`,
-          payload
-        );
+        await axios.put(`${BASE}/api/purchase_orders/${initialPo.id}`, payload);
 
         if (attachments.length > 0) {
           const fd = new FormData();
           attachments.forEach((f) => fd.append("files", f));
-          await axios.post(
-            `${BASE}/api/purchase_orders/${initialPo.id}/upload`,
-            fd
-          );
-        }
-
-        if (sendRevised) {
-          if (!validateBeforeRFQ()) {
-            setSubmitting(false);
-            return;
-          }
-
-          navigate(`/purchase-orders/${initialPo.id}/send-rfq?revised=1`);
-          return;
+          await axios.post(`${BASE}/api/purchase_orders/${initialPo.id}/upload`, fd);
         }
 
         alert("PO updated successfully.");
       } else {
-        const res = await axios.post(
-          `${BASE}/api/purchase_orders`,
-          payload
-        );
+        const res = await axios.post(`${BASE}/api/purchase_orders`, payload);
 
         const poId = res.data?.po_id;
 
         if (poId && attachments.length) {
           const fd = new FormData();
           attachments.forEach((f) => fd.append("files", f));
-          await axios.post(
-            `${BASE}/api/purchase_orders/${poId}/upload`,
-            fd
-          );
+          await axios.post(`${BASE}/api/purchase_orders/${poId}/upload`, fd);
         }
 
         alert("PO created successfully.");
@@ -862,55 +812,17 @@ if (initialPo?.id && po.status === "Reserved") {
 
   const status = po.status;
 
-  const validateBeforeRFQ = () => {
-    if (!po.vendor_id) {
-      alert("Select vendor before sending.");
-      return false;
-    }
-    if (!po.created_by) {
-      alert("Select who created.");
-      return false;
-    }
-    if (!po.items || po.items.length === 0) {
-      alert("Add at least one item.");
-      return false;
-    }
-    for (const i of po.items) {
-      if (!i.partId) {
-        alert("Each item must have a Part.");
-        return false;
-      }
-      if (!i.quantity || Number(i.quantity) <= 0) {
-        alert("Quantity must be > 0.");
-        return false;
-      }
-      if (!i.unitPrice || Number(i.unitPrice) <= 0) {
-        alert("Unit Price must be > 0.");
-        return false;
-      }
-    }
-    return true;
-  };
-
-  const goToSendRFQ = () => {
-    if (!initialPo?.id) {
-      alert("Save draft first.");
-      return;
-    }
-    if (!validateBeforeRFQ()) return;
-    navigate(`/purchase-orders/${initialPo.id}/send-rfq`);
-  };
-
-  const markOrdered = async () => {
+  // ✅ OPTIONAL ACTIONS (no RFQ)
+  const markPlaced = async () => {
     if (!initialPo?.id) return;
 
     await axios.put(`${BASE}/api/purchase_orders/${initialPo.id}`, {
       ...po,
-      status: "Ordered",
+      status: "Placed",
     });
 
-    setPo((p) => ({ ...p, status: "Ordered" }));
-    alert("PO Marked Ordered");
+    setPo((p) => ({ ...p, status: "Placed" }));
+    alert("PO Marked Placed");
   };
 
   const markReceived = async () => {
@@ -945,12 +857,12 @@ if (initialPo?.id && po.status === "Reserved") {
       onSubmit={handleSubmit}
       className={`bg-white p-6 rounded shadow ${formScrollClasses}`}
     >
-  {/* ✅ Top validation banner */}
-  {formError && (
-    <div className="mb-4 rounded border border-red-300 bg-red-50 text-red-800 px-3 py-2 text-sm">
-      {formError}
-    </div>
-  )}
+      {/* ✅ Top validation banner */}
+      {formError && (
+        <div className="mb-4 rounded border border-red-300 bg-red-50 text-red-800 px-3 py-2 text-sm">
+          {formError}
+        </div>
+      )}
 
       {/* HEADER */}
       <div className="relative flex items-start justify-between mb-4">
@@ -974,15 +886,14 @@ if (initialPo?.id && po.status === "Reserved") {
       {/* --- Basic Details --- */}
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
-        <label className="font-semibold">PSR PO Number</label>
-<input
-  type="text"
-  className="border p-2 rounded w-full bg-gray-100"
-  value={po.psr_po_number || ""}
-  readOnly
-  disabled={submitting || saved}
-/>
-
+          <label className="font-semibold">PSR PO Number</label>
+          <input
+            type="text"
+            className="border p-2 rounded w-full bg-gray-100"
+            value={po.psr_po_number || ""}
+            readOnly
+            disabled={submitting || saved}
+          />
         </div>
 
         <div>
@@ -994,10 +905,11 @@ if (initialPo?.id && po.status === "Reserved") {
             disabled={submitting || saved}
           >
             <option value="Draft">Draft</option>
-<option value="Reserved" disabled>Reserved</option>
+            <option value="Reserved" disabled>
+              Reserved
+            </option>
 
-            <option value="Sent RFQ">Sent RFQ</option>
-            <option value="Sent Revised RFQ">Sent Revised RFQ</option>
+            {/* ✅ RFQ statuses removed */}
             <option value="Placed">Placed</option>
             <option value="Received">Received</option>
             <option value="Paid">Paid</option>
@@ -1020,27 +932,27 @@ if (initialPo?.id && po.status === "Reserved") {
 
         <div>
           <label className="font-semibold">Ordered By *</label>
-            <select
-    ref={createdByRef}
-    className={`border p-2 rounded w-full ${errors.created_by ? "border-red-500" : ""}`}
-    value={po.created_by || ""}
-    onChange={(e) => {
-      setPo({ ...po, created_by: e.target.value });
-      clearFieldError("created_by");
-    }}
-    required
-    disabled={submitting || saved}
-  >
-
+          <select
+            ref={createdByRef}
+            className={`border p-2 rounded w-full ${
+              errors.created_by ? "border-red-500" : ""
+            }`}
+            value={po.created_by || ""}
+            onChange={(e) => {
+              setPo({ ...po, created_by: e.target.value });
+              clearFieldError("created_by");
+            }}
+            required
+            disabled={submitting || saved}
+          >
             <option value="">Select</option>
             {staffList.map((s) => (
               <option key={s}>{s}</option>
             ))}
           </select>
-  {errors.created_by && (
-    <div className="text-xs text-red-600 mt-1">{errors.created_by}</div>
-  )}
-
+          {errors.created_by && (
+            <div className="text-xs text-red-600 mt-1">{errors.created_by}</div>
+          )}
         </div>
       </div>
 
@@ -1058,46 +970,46 @@ if (initialPo?.id && po.status === "Reserved") {
           </button>
         </div>
 
-{!addingNewVendor ? (
-  <div className="space-y-2">
-    {/* Vendor selector wrapper (for red border + focus) */}
-    <div
-      ref={vendorRef}
-      className={errors.vendor_id ? "rounded border border-red-500" : ""}
-    >
-      <SearchSelect
-        items={vendors.map((v) => {
-          const id = v.vendor_id || v.id;
-          const name = v.vendor_name || v.name || "Unnamed Vendor";
-          const city = v.city || "";
-          const region = v.state || v.country || "";
-          const location = [city, region].filter(Boolean).join(", ");
-          return { id, name, location };
-        })}
-        value={po.vendor_id}
-        onChange={(id) => {
-          setPo((prev) => ({ ...prev, vendor_id: id }));
-          clearFieldError("vendor_id");
-        }}
-        display={(v) => (v.location ? `${v.name} — ${v.location}` : v.name)}
-        placeholder="Search vendor..."
-        disabled={submitting || saved}
-      />
-    </div>
+        {!addingNewVendor ? (
+          <div className="space-y-2">
+            {/* Vendor selector wrapper (for red border + focus) */}
+            <div
+              ref={vendorRef}
+              className={errors.vendor_id ? "rounded border border-red-500" : ""}
+            >
+              <SearchSelect
+                items={vendors.map((v) => {
+                  const id = v.vendor_id || v.id;
+                  const name = v.vendor_name || v.name || "Unnamed Vendor";
+                  const city = v.city || "";
+                  const region = v.state || v.country || "";
+                  const location = [city, region].filter(Boolean).join(", ");
+                  return { id, name, location };
+                })}
+                value={po.vendor_id}
+                onChange={(id) => {
+                  setPo((prev) => ({ ...prev, vendor_id: id }));
+                  clearFieldError("vendor_id");
+                }}
+                display={(v) => (v.location ? `${v.name} — ${v.location}` : v.name)}
+                placeholder="Search vendor..."
+                disabled={submitting || saved}
+              />
+            </div>
 
-    {/* Inline error message */}
-    {errors.vendor_id && (
-      <div className="text-xs text-red-600">{errors.vendor_id}</div>
-    )}
+            {/* Inline error message */}
+            {errors.vendor_id && (
+              <div className="text-xs text-red-600">{errors.vendor_id}</div>
+            )}
 
-    {/* Optional helper */}
-    {po.vendor_id && (
-      <div className="text-xs text-gray-600">
-        Selected vendor ID: {po.vendor_id}
-      </div>
-    )}
-  </div>
-) : (
+            {/* Optional helper */}
+            {po.vendor_id && (
+              <div className="text-xs text-gray-600">
+                Selected vendor ID: {po.vendor_id}
+              </div>
+            )}
+          </div>
+        ) : (
           <div className="border p-3 bg-gray-50 rounded space-y-2">
             <input
               placeholder="Vendor Name *"
@@ -1143,9 +1055,7 @@ if (initialPo?.id && po.status === "Reserved") {
                 placeholder="City"
                 className="border p-2 rounded w-full"
                 value={newVendor.city}
-                onChange={(e) =>
-                  setNewVendor({ ...newVendor, city: e.target.value })
-                }
+                onChange={(e) => setNewVendor({ ...newVendor, city: e.target.value })}
                 disabled={submitting || saved}
               />
               <input
@@ -1271,12 +1181,10 @@ if (initialPo?.id && po.status === "Reserved") {
         )}
       </div>
 
-      {/* --- Items Table --- */}
       {/* ✅ Items validation message */}
-      {errors.items && (
-        <div className="mb-2 text-sm text-red-600">{errors.items}</div>
-      )}
+      {errors.items && <div className="mb-2 text-sm text-red-600">{errors.items}</div>}
 
+      {/* --- Items Table --- */}
       <table className="w-full border mb-4 text-sm">
         <thead className="bg-gray-100">
           <tr>
@@ -1294,8 +1202,7 @@ if (initialPo?.id && po.status === "Reserved") {
             const selectedPart =
               parts.find(
                 (p) =>
-                  String(p.part_id || p.id) ===
-                  String(item.partId || item.part_id)
+                  String(p.part_id || p.id) === String(item.partId || item.part_id)
               ) || null;
 
             return (
@@ -1303,181 +1210,176 @@ if (initialPo?.id && po.status === "Reserved") {
                 <td className="border p-2">{i + 1}</td>
 
                 <td className="border p-2 align-top">
-  {!addingNewPartRow[i] ? (
-    <div className="space-y-1">
-      {/* Part selector wrapper (border + first-row focus) */}
-      <div
-        ref={i === 0 ? firstPartRef : null}
-        className={
-          errors[`items[${i}].partId`] ? "rounded border border-red-500" : ""
-        }
-      >
-        <SearchSelect
-          items={parts.map((p) => ({
-            id: p.part_id || p.id,
-            part_number: p.part_number,
-            description: p.description || "",
-          }))}
-          value={item.partId || item.part_id || ""}
-          onChange={(id) => {
-            handlePartSelect(i, id);
-            clearFieldError(`items[${i}].partId`);
-          }}
-          display={(p) =>
-            `${p.part_number || "No Part #"} — ${p.description || "No description"}`
-          }
-          placeholder="Search part..."
-          disabled={submitting || saved}
-        />
-      </div>
+                  {!addingNewPartRow[i] ? (
+                    <div className="space-y-1">
+                      <div
+                        ref={i === 0 ? firstPartRef : null}
+                        className={
+                          errors[`items[${i}].partId`]
+                            ? "rounded border border-red-500"
+                            : ""
+                        }
+                      >
+                        <SearchSelect
+                          items={parts.map((p) => ({
+                            id: p.part_id || p.id,
+                            part_number: p.part_number,
+                            description: p.description || "",
+                          }))}
+                          value={item.partId || item.part_id || ""}
+                          onChange={(id) => {
+                            handlePartSelect(i, id);
+                            clearFieldError(`items[${i}].partId`);
+                          }}
+                          display={(p) =>
+                            `${p.part_number || "No Part #"} — ${
+                              p.description || "No description"
+                            }`
+                          }
+                          placeholder="Search part..."
+                          disabled={submitting || saved}
+                        />
+                      </div>
 
-      {/* Inline error message */}
-      {errors[`items[${i}].partId`] && (
-        <div className="text-xs text-red-600">
-          {errors[`items[${i}].partId`]}
-        </div>
-      )}
+                      {errors[`items[${i}].partId`] && (
+                        <div className="text-xs text-red-600">
+                          {errors[`items[${i}].partId`]}
+                        </div>
+                      )}
 
-      {selectedPart && (
-        <div className="text-[11px] text-gray-500 mt-1">
-          {selectedPart.description}
-        </div>
-      )}
-    </div>
-  ) : (
-    <div className="bg-gray-50 border rounded p-2 space-y-1">
-      <input
-        placeholder="Part Number *"
-        className="border p-1 rounded w-full"
-        value={newPartDraft[i]?.part_number || ""}
-        onChange={(e) =>
-          setNewPartDraft({
-            ...newPartDraft,
-            [i]: {
-              ...newPartDraft[i],
-              part_number: e.target.value,
-            },
-          })
-        }
-        disabled={submitting || saved}
-      />
-      <input
-        placeholder="Part Name"
-        className="border p-1 rounded w-full"
-        value={newPartDraft[i]?.part_name || ""}
-        onChange={(e) =>
-          setNewPartDraft({
-            ...newPartDraft,
-            [i]: {
-              ...newPartDraft[i],
-              part_name: e.target.value,
-            },
-          })
-        }
-        disabled={submitting || saved}
-      />
-      <input
-        placeholder="Description"
-        className="border p-1 rounded w-full"
-        value={newPartDraft[i]?.description || ""}
-        onChange={(e) =>
-          setNewPartDraft({
-            ...newPartDraft,
-            [i]: {
-              ...newPartDraft[i],
-              description: e.target.value,
-            },
-          })
-        }
-        disabled={submitting || saved}
-      />
-      <input
-        type="number"
-        placeholder="Unit Price"
-        className="border p-1 rounded w-full"
-        value={newPartDraft[i]?.current_unit_price || ""}
-        onChange={(e) =>
-          setNewPartDraft({
-            ...newPartDraft,
-            [i]: {
-              ...newPartDraft[i],
-              current_unit_price: e.target.value,
-            },
-          })
-        }
-        disabled={submitting || saved}
-      />
+                      {selectedPart && (
+                        <div className="text-[11px] text-gray-500 mt-1">
+                          {selectedPart.description}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 border rounded p-2 space-y-1">
+                      <input
+                        placeholder="Part Number *"
+                        className="border p-1 rounded w-full"
+                        value={newPartDraft[i]?.part_number || ""}
+                        onChange={(e) =>
+                          setNewPartDraft({
+                            ...newPartDraft,
+                            [i]: {
+                              ...newPartDraft[i],
+                              part_number: e.target.value,
+                            },
+                          })
+                        }
+                        disabled={submitting || saved}
+                      />
+                      <input
+                        placeholder="Part Name"
+                        className="border p-1 rounded w-full"
+                        value={newPartDraft[i]?.part_name || ""}
+                        onChange={(e) =>
+                          setNewPartDraft({
+                            ...newPartDraft,
+                            [i]: {
+                              ...newPartDraft[i],
+                              part_name: e.target.value,
+                            },
+                          })
+                        }
+                        disabled={submitting || saved}
+                      />
+                      <input
+                        placeholder="Description"
+                        className="border p-1 rounded w-full"
+                        value={newPartDraft[i]?.description || ""}
+                        onChange={(e) =>
+                          setNewPartDraft({
+                            ...newPartDraft,
+                            [i]: {
+                              ...newPartDraft[i],
+                              description: e.target.value,
+                            },
+                          })
+                        }
+                        disabled={submitting || saved}
+                      />
+                      <input
+                        type="number"
+                        placeholder="Unit Price"
+                        className="border p-1 rounded w-full"
+                        value={newPartDraft[i]?.current_unit_price || ""}
+                        onChange={(e) =>
+                          setNewPartDraft({
+                            ...newPartDraft,
+                            [i]: {
+                              ...newPartDraft[i],
+                              current_unit_price: e.target.value,
+                            },
+                          })
+                        }
+                        disabled={submitting || saved}
+                      />
 
-      <div className="flex justify-end gap-2 mt-2">
-        <button
-          type="button"
-          className="px-2 py-1 bg-gray-200 rounded"
-          onClick={() => cancelNewPartForRow(i)}
-          disabled={submitting || saved}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          className="px-2 py-1 bg-blue-600 text-white rounded"
-          onClick={() => saveNewPartForRow(i)}
-          disabled={submitting || saved}
-        >
-          Save Part
-        </button>
-      </div>
-    </div>
-  )}
-</td>
-
-
-                <td className="border p-2">
-                 <input
-  type="number"
-  value={item.quantity}
-  className={`border p-1 rounded w-full ${
-    errors[`items[${i}].quantity`] ? "border-red-500" : ""
-  }`}
-  onChange={(e) => {
-    updateItem(i, "quantity", e.target.value);
-    clearFieldError(`items[${i}].quantity`);
-  }}
-  disabled={submitting || saved}
-/>
-
-{errors[`items[${i}].quantity`] && (
-  <div className="text-xs text-red-600 mt-1">
-    {errors[`items[${i}].quantity`]}
-  </div>
-)}
-
+                      <div className="flex justify-end gap-2 mt-2">
+                        <button
+                          type="button"
+                          className="px-2 py-1 bg-gray-200 rounded"
+                          onClick={() => cancelNewPartForRow(i)}
+                          disabled={submitting || saved}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="px-2 py-1 bg-blue-600 text-white rounded"
+                          onClick={() => saveNewPartForRow(i)}
+                          disabled={submitting || saved}
+                        >
+                          Save Part
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </td>
 
                 <td className="border p-2">
-                <input
-  type="number"
-  value={item.unitPrice}
-  className={`border p-1 rounded w-full ${
-    errors[`items[${i}].unitPrice`] ? "border-red-500" : ""
-  }`}
-  onChange={(e) => {
-    updateItem(i, "unitPrice", e.target.value);
-    clearFieldError(`items[${i}].unitPrice`);
-  }}
-  disabled={submitting || saved}
-/>
-
-{errors[`items[${i}].unitPrice`] && (
-  <div className="text-xs text-red-600 mt-1">
-    {errors[`items[${i}].unitPrice`]}
-  </div>
-)}
-
+                  <input
+                    type="number"
+                    value={item.quantity}
+                    className={`border p-1 rounded w-full ${
+                      errors[`items[${i}].quantity`] ? "border-red-500" : ""
+                    }`}
+                    onChange={(e) => {
+                      updateItem(i, "quantity", e.target.value);
+                      clearFieldError(`items[${i}].quantity`);
+                    }}
+                    disabled={submitting || saved}
+                  />
+                  {errors[`items[${i}].quantity`] && (
+                    <div className="text-xs text-red-600 mt-1">
+                      {errors[`items[${i}].quantity`]}
+                    </div>
+                  )}
                 </td>
 
-                <td className="border p-2 text-right">
-                  ${money(item.totalPrice)}
+                <td className="border p-2">
+                  <input
+                    type="number"
+                    value={item.unitPrice}
+                    className={`border p-1 rounded w-full ${
+                      errors[`items[${i}].unitPrice`] ? "border-red-500" : ""
+                    }`}
+                    onChange={(e) => {
+                      updateItem(i, "unitPrice", e.target.value);
+                      clearFieldError(`items[${i}].unitPrice`);
+                    }}
+                    disabled={submitting || saved}
+                  />
+                  {errors[`items[${i}].unitPrice`] && (
+                    <div className="text-xs text-red-600 mt-1">
+                      {errors[`items[${i}].unitPrice`]}
+                    </div>
+                  )}
                 </td>
+
+                <td className="border p-2 text-right">${money(item.totalPrice)}</td>
 
                 <td className="border p-2 text-center">
                   <button
@@ -1522,9 +1424,7 @@ if (initialPo?.id && po.status === "Reserved") {
           />
         </div>
 
-        <div className="font-bold mt-2">
-          Grand Total: ${money(po.grand_total)}
-        </div>
+        <div className="font-bold mt-2">Grand Total: ${money(po.grand_total)}</div>
       </div>
 
       {/* --- Upload New Attachments --- */}
@@ -1542,20 +1442,14 @@ if (initialPo?.id && po.status === "Reserved") {
       {/* --- Existing Attachments --- */}
       {existingFiles.length > 0 && (
         <div className="mt-4 border p-3 bg-gray-50 rounded">
-          <p className="font-semibold mb-1 text-gray-700">
-            Existing Attachments:
-          </p>
+          <p className="font-semibold mb-1 text-gray-700">Existing Attachments:</p>
 
           <ul className="list-disc pl-6 text-sm space-y-1">
             {existingFiles.map((f) => {
-              const safePath =
-                "/" + (f.filepath || "").replace(/^\/+/, "");
+              const safePath = "/" + (f.filepath || "").replace(/^\/+/, "");
 
               return (
-                <li
-                  key={f.id}
-                  className="flex items-center gap-3"
-                >
+                <li key={f.id} className="flex items-center gap-3">
                   <a
                     href={`${FILE_BASE}${safePath}`}
                     target="_blank"
@@ -1570,15 +1464,10 @@ if (initialPo?.id && po.status === "Reserved") {
                     <button
                       type="button"
                       onClick={() => handleDeleteFile(f.id)}
-                      disabled={
-                        submitting ||
-                        deletingFileIds.includes(f.id)
-                      }
+                      disabled={submitting || deletingFileIds.includes(f.id)}
                       className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200"
                     >
-                      {deletingFileIds.includes(f.id)
-                        ? "Deleting..."
-                        : "Delete"}
+                      {deletingFileIds.includes(f.id) ? "Deleting..." : "Delete"}
                     </button>
                   )}
                 </li>
@@ -1595,53 +1484,45 @@ if (initialPo?.id && po.status === "Reserved") {
           className="border p-2 rounded w-full"
           rows="3"
           value={po.remarks || ""}
-          onChange={(e) =>
-            setPo({ ...po, remarks: e.target.value })
-          }
+          onChange={(e) => setPo({ ...po, remarks: e.target.value })}
           placeholder="Special instructions or comments"
           disabled={submitting || saved}
         />
       </div>
 
-{/* RECEIVED SECTION */}
-<div className="mt-4 grid grid-cols-2 gap-4">
-  <div>
-    <label className="font-semibold">Received By</label>
-    <select
-      className="border p-2 rounded w-full"
-      value={po.received_by || ""}
-      onChange={(e) =>
-        setPo({ ...po, received_by: e.target.value })
-      }
-      disabled={submitting || saved}
-    >
-      <option value="">Select</option>
-      <option value="Shiney">Shiney</option>
-      <option value="Brian">Brian</option>
-      <option value="Pam">Pam</option>
-      <option value="Dave">Dave</option>
-      <option value="Chris">Chris</option>
-      <option value="Anushka">Anushka</option>
-    </select>
-  </div>
+      {/* RECEIVED SECTION */}
+      <div className="mt-4 grid grid-cols-2 gap-4">
+        <div>
+          <label className="font-semibold">Received By</label>
+          <select
+            className="border p-2 rounded w-full"
+            value={po.received_by || ""}
+            onChange={(e) => setPo({ ...po, received_by: e.target.value })}
+            disabled={submitting || saved}
+          >
+            <option value="">Select</option>
+            <option value="Shiney">Shiney</option>
+            <option value="Brian">Brian</option>
+            <option value="Pam">Pam</option>
+            <option value="Dave">Dave</option>
+            <option value="Chris">Chris</option>
+            <option value="Anushka">Anushka</option>
+          </select>
+        </div>
 
-  <div>
-    <label className="font-semibold">Received On (Date)</label>
-    <input
-      type="date"
-      className="border p-2 rounded w-full"
-      value={po.received_on || ""}
-      onChange={(e) =>
-        setPo({ ...po, received_on: e.target.value })
-      }
-      disabled={submitting || saved}
-    />
-  </div>
-</div>
+        <div>
+          <label className="font-semibold">Received On (Date)</label>
+          <input
+            type="date"
+            className="border p-2 rounded w-full"
+            value={po.received_on || ""}
+            onChange={(e) => setPo({ ...po, received_on: e.target.value })}
+            disabled={submitting || saved}
+          />
+        </div>
+      </div>
 
-      {/* ================================
-          PAID STAMP (optional display)
-      ================================= */}
+      {/* PAID STAMP */}
       {po.status === "Paid" && <PaidStamp />}
 
       {/* --- Buttons --- */}
@@ -1655,6 +1536,7 @@ if (initialPo?.id && po.status === "Reserved") {
           Cancel
         </button>
 
+        {/* New PO: Save as Draft */}
         {!initialPo?.id && status === "Draft" && (
           <button
             type="button"
@@ -1666,93 +1548,50 @@ if (initialPo?.id && po.status === "Reserved") {
           </button>
         )}
 
+        {/* ✅ EDIT MODE: Save Changes ALWAYS visible regardless of status */}
+        {initialPo?.id && (
+          <button
+            type="submit"
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
+            disabled={submitting}
+          >
+            Save Changes
+          </button>
+        )}
+
+        {/* Optional non-RFQ actions (keep or remove as you like) */}
         {initialPo?.id && status === "Draft" && (
-          <>
-            <button
-              type="submit"
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
-              disabled={submitting}
-            >
-              Save Changes
-            </button>
-
-            <button
-              type="button"
-              onClick={goToSendRFQ}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow"
-              disabled={submitting}
-            >
-              Send RFQ
-            </button>
-          </>
+          <button
+            type="button"
+            onClick={markPlaced}
+            className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded shadow"
+            disabled={submitting}
+          >
+            Mark As Placed
+          </button>
         )}
 
-{initialPo?.id && status === "Reserved" && (
-  <button
-    type="submit"
-    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
-    disabled={submitting}
-  >
-    Save Changes
-  </button>
-)}
-
-
-        {initialPo?.id &&
-          (status === "Sent RFQ" ||
-            status === "Sent Revised RFQ") && (
-            <>
-              <button
-                type="button"
-                onClick={markOrdered}
-                className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded shadow"
-                disabled={submitting}
-              >
-                Mark As Ordered
-              </button>
-
-              <button
-                type="submit"
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
-                disabled={submitting}
-              >
-                Save Changes
-              </button>
-            </>
-          )}
-
-        {initialPo?.id && status === "Ordered" && (
-          <>
-            <button
-              type="button"
-              onClick={markReceived}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
-              disabled={submitting}
-            >
-              Mark As Received
-            </button>
-
-            <button
-              type="submit"
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
-              disabled={submitting}
-            >
-              Save Changes
-            </button>
-          </>
+        {initialPo?.id && status === "Placed" && (
+          <button
+            type="button"
+            onClick={markReceived}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
+            disabled={submitting}
+          >
+            Mark As Received
+          </button>
         )}
 
-        {initialPo?.id &&
-          (status === "Received" ||
-            status === "Cancelled") && (
-            <button
-              type="submit"
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
-              disabled={submitting}
-            >
-              Save Changes
-            </button>
-          )}
+        {initialPo?.id && status !== "Cancelled" && (
+          <button
+            type="button"
+            onClick={cancelPO}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded shadow"
+            disabled={submitting}
+          >
+            Cancel PO
+          </button>
+        )}
       </div>
     </form>
   );

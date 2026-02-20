@@ -8,7 +8,6 @@ import VendorBulkUpload from "./VendorBulkUpload";
 
 import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
-// import "ag-grid-community/styles/ag-theme-quartz.css"; // optional if you use quartz css
 
 export default function VendorsPage() {
   const [vendors, setVendors] = useState([]);
@@ -23,7 +22,7 @@ export default function VendorsPage() {
   const [viewingVendor, setViewingVendor] = useState(null);
   const [editingVendor, setEditingVendor] = useState(null);
 
-  const loadVendors = async () => {
+  const loadVendors = useCallback(async () => {
     try {
       const data = await fetchVendors();
       setVendors(Array.isArray(data) ? data : []);
@@ -31,15 +30,16 @@ export default function VendorsPage() {
       console.error("❌ Error loading vendors:", err);
       setVendors([]);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadVendors();
-  }, []);
+  }, [loadVendors]);
 
   /* ---------------- Filtering ---------------- */
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
+
     return vendors.filter((v) => {
       const matchSearch =
         !q ||
@@ -70,7 +70,10 @@ export default function VendorsPage() {
   }, [vendors, search, statusFilter]);
 
   /* ---------------- Pagination ---------------- */
-  const totalPages = Math.max(1, Math.ceil(filtered.length / Number(itemsPerPage)));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filtered.length / Number(itemsPerPage))
+  );
 
   const pageData = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -81,43 +84,33 @@ export default function VendorsPage() {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
 
-  /* ---------------- Cell handlers ---------------- */
+  /* ---------------- Handlers ---------------- */
   const onView = useCallback((vendor) => setViewingVendor(vendor), []);
   const onEdit = useCallback((vendor) => {
     setEditingVendor(vendor);
     setShowForm(true);
   }, []);
-  const onDelete = useCallback(
+
+  const onDeleteFromGrid = useCallback(
     async (vendor) => {
       if (!window.confirm(`Delete vendor "${vendor.vendor_name}"?`)) return;
+
       try {
         await deleteVendor(vendor.vendor_id);
-        await loadVendors();
+
+        // ✅ Optimistic remove so user immediately sees change
+        setVendors((prev) =>
+          prev.filter((v) => String(v.vendor_id) !== String(vendor.vendor_id))
+        );
+
+        alert("Vendor deleted successfully.");
       } catch (e) {
         console.error("Delete vendor failed:", e);
-        alert("Failed to delete vendor.");
+        alert(e?.response?.data?.message || "Failed to delete vendor.");
       }
     },
-    [] // keep stable
+    []
   );
-
-  // Allow VendorDetails modal to trigger Edit/Delete
-  window.__openVendorEdit = (vendor) => {
-    setEditingVendor(vendor);
-    setShowForm(true);
-  };
-
-  window.__deleteVendor = async (id, name) => {
-    if (!window.confirm(`Delete vendor "${name}" permanently?`)) return;
-    try {
-      await deleteVendor(id);
-      alert("Vendor deleted");
-      loadVendors();
-    } catch (err) {
-      console.error(err);
-      alert("Delete failed");
-    }
-  };
 
   /* ---------------- AG Grid columns ---------------- */
   const columnDefs = useMemo(
@@ -143,8 +136,9 @@ export default function VendorsPage() {
         headerName: "Location",
         flex: 1.2,
         valueGetter: (p) =>
-          [p.data.city, p.data.state, p.data.country].filter(Boolean).join(", ") ||
-          "—",
+          [p.data.city, p.data.state, p.data.country]
+            .filter(Boolean)
+            .join(", ") || "—",
       },
       {
         headerName: "Status",
@@ -161,7 +155,9 @@ export default function VendorsPage() {
           return (
             <span
               className={`px-2 py-1 rounded-full text-xs font-medium ${
-                active ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"
+                active
+                  ? "bg-green-100 text-green-700"
+                  : "bg-gray-200 text-gray-600"
               }`}
             >
               {active ? "Active" : "Inactive"}
@@ -169,13 +165,38 @@ export default function VendorsPage() {
           );
         },
       },
+      {
+        headerName: "Actions",
+        flex: 1,
+        cellRenderer: (params) => (
+          <div className="flex gap-2">
+            <button
+              className="bg-gray-200 hover:bg-gray-300 px-2 py-1 text-xs rounded"
+              onClick={() => onView(params.data)}
+            >
+              View
+            </button>
+            <button
+              className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 text-xs rounded"
+              onClick={() => onEdit(params.data)}
+            >
+              Edit
+            </button>
+            <button
+              className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 text-xs rounded"
+              onClick={() => onDeleteFromGrid(params.data)}
+            >
+              Delete
+            </button>
+          </div>
+        ),
+      },
     ],
-    [onView, onEdit, onDelete]
+    [onView, onEdit, onDeleteFromGrid]
   );
 
   return (
     <div className="p-6">
-      {/* make AG Grid Quartz headers bold only */}
       <style>{`.ag-theme-quartz .ag-header-cell-text{font-weight:600;}`}</style>
 
       {/* Header */}
@@ -187,7 +208,6 @@ export default function VendorsPage() {
           </p>
         </div>
 
-        {/* ✅ PO Dashboard button sizing/colors */}
         <div className="flex gap-2">
           <button
             onClick={() => setShowBulk(true)}
@@ -249,7 +269,7 @@ export default function VendorsPage() {
         </select>
       </div>
 
-      {/* ✅ AG GRID */}
+      {/* AG GRID */}
       <div className="ag-theme-quartz" style={{ width: "100%" }}>
         <AgGridReact
           rowData={pageData}
@@ -306,7 +326,23 @@ export default function VendorsPage() {
 
       {/* View Vendor Modal */}
       {viewingVendor && (
-        <VendorDetails vendor={viewingVendor} onClose={() => setViewingVendor(null)} />
+        <VendorDetails
+          vendor={viewingVendor}
+          onClose={() => setViewingVendor(null)}
+          onEdit={(v) => {
+            setViewingVendor(null);
+            setEditingVendor(v);
+            setShowForm(true);
+          }}
+          onDeleted={(deletedId) => {
+            setViewingVendor(null);
+            // ✅ remove from list immediately
+            setVendors((prev) =>
+              prev.filter((x) => String(x.vendor_id) !== String(deletedId))
+            );
+            alert("Vendor deleted successfully.");
+          }}
+        />
       )}
 
       {/* Bulk Upload Modal */}

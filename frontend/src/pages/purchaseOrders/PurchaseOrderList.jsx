@@ -33,7 +33,7 @@ export default function PurchaseOrderList() {
   const [reserveErr, setReserveErr] = useState("");
   const [reserveForm, setReserveForm] = useState({
     vendor_id: "",
-    created_by: "Stanley", // TODO: replace later with logged-in user
+    created_by: "", // TODO: replace later with logged-in user
     remarks: "",
   });
 
@@ -214,52 +214,60 @@ export default function PurchaseOrderList() {
     }
   };
 
-  // ✅ Reserve PO submit
-  const submitReserve = async () => {
-    setReserveErr("");
+// ✅ Reserve PO submit
+const submitReserve = async () => {
+  setReserveErr("");
 
-    const poNumber = reservePreview.psr_po_number || "";
-    if (!poNumber) {
-      setReserveErr("PO number not generated. Close and reopen the modal.");
-      return;
-    }
+  const poNumber = reservePreview.psr_po_number || "";
+  if (!poNumber) {
+    setReserveErr("PO number not generated. Close and reopen the modal.");
+    return;
+  }
 
-    if (!reserveForm.created_by.trim()) {
-      setReserveErr("Reserved By is required.");
-      return;
-    }
+  const reservedBy = (reserveForm.created_by || "").trim();
+  if (!reservedBy) {
+    setReserveErr("Reserved By is required.");
+    return;
+  }
 
-    try {
-      setReserveSubmitting(true);
+  // ✅ Vendor required (frontend validation)
+  if (!reserveForm.vendor_id) {
+    setReserveErr("Vendor is required.");
+    return;
+  }
 
-      const payload = {
-        psr_po_number: poNumber,
-        created_by: reserveForm.created_by.trim(),
-        remarks: reserveForm.remarks || "",
-        ...(reserveForm.vendor_id ? { vendor_id: Number(reserveForm.vendor_id) } : {}),
-      };
-
-      const res = await axios.post(`${BASE}/api/purchase_orders/reserve`, payload);
-
-      const newId = res.data?.data?.id;
-
-      setShowReserve(false);
-      setReserveForm((p) => ({
-        vendor_id: "",
-        created_by: p.created_by,
-        remarks: "",
-      }));
-
-      await loadOrders();
-
-      if (newId) navigate(`/purchase-orders/${newId}`);
-    } catch (err) {
-      setReserveErr(err?.response?.data?.message || "Failed to reserve PO.");
-    } finally {
-      setReserveSubmitting(false);
-    }
+  // ✅ Always include vendor_id (no spread)
+  const payload = {
+    psr_po_number: poNumber,
+    created_by: reservedBy,
+    vendor_id: Number(reserveForm.vendor_id),
+    remarks: reserveForm.remarks || "",
   };
 
+  try {
+    setReserveSubmitting(true);
+
+    const res = await axios.post(`${BASE}/api/purchase_orders/reserve`, payload);
+    const newId = res.data?.data?.id;
+
+    setShowReserve(false);
+
+    // reset form but keep last selected reservedBy (optional)
+    setReserveForm((p) => ({
+      vendor_id: "",
+      created_by: p.created_by,
+      remarks: "",
+    }));
+
+    await loadOrders();
+
+    if (newId) navigate(`/purchase-orders/${newId}`);
+  } catch (err) {
+    setReserveErr(err?.response?.data?.message || "Failed to reserve PO.");
+  } finally {
+    setReserveSubmitting(false);
+  }
+};
   // -------------------------------------------------------------
   // Column Definitions
   // -------------------------------------------------------------
@@ -558,14 +566,14 @@ export default function PurchaseOrderList() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold mb-1">Vendor (optional)</label>
+<label className="block text-sm font-semibold mb-1">Vendor *</label>
                 <select
                   value={reserveForm.vendor_id}
                   onChange={(e) => setReserveForm((p) => ({ ...p, vendor_id: e.target.value }))}
                   className="border rounded px-3 py-2 w-full text-sm"
                   disabled={reserveSubmitting}
                 >
-                  <option value="">— None —</option>
+<option value="">— Select Vendor —</option>
                   {vendors.map((v) => (
                     <option key={v.vendor_id} value={v.vendor_id}>
                       {v.vendor_name}
