@@ -160,7 +160,7 @@ export default function Login() {
           animate={{ opacity: 1 }}
           transition={{ delay: 1.6, duration: 1 }}
         >
-          © {new Date().getFullYear()} PSR Automation Inc • Bottling • Capping • Labeling • Filling
+          © {new Date().getFullYear()} PSR Automation Inc • Filling & Capping Machines
         </motion.div>
       </div>
     </div>
