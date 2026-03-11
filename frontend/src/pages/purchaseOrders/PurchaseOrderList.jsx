@@ -18,7 +18,7 @@ export default function PurchaseOrderList() {
   const gridRef = useRef();
 
   const [orders, setOrders] = useState([]);
-  const [rfqStatusMap, setRfqStatusMap] = useState({}); // keeping (existing)
+  const [rfqStatusMap, setRfqStatusMap] = useState({}); // kept (existing)
   const [search, setSearch] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -31,9 +31,21 @@ export default function PurchaseOrderList() {
   const [vendors, setVendors] = useState([]);
   const [reserveSubmitting, setReserveSubmitting] = useState(false);
   const [reserveErr, setReserveErr] = useState("");
+
+  // ✅ NEW: Add New Vendor inside Reserve modal
+  const [addingNewVendor, setAddingNewVendor] = useState(false);
+  const [newVendor, setNewVendor] = useState({
+    vendor_name: "",
+    contact_name: "",
+    email: "",
+    phone: "",
+    city: "",
+    country: "",
+  });
+
   const [reserveForm, setReserveForm] = useState({
     vendor_id: "",
-    created_by: "", // TODO: replace later with logged-in user
+    created_by: "", // ✅ don’t default to Stanley
     remarks: "",
   });
 
@@ -82,11 +94,18 @@ export default function PurchaseOrderList() {
   }, []);
 
   // ✅ Load vendors for Reserve modal
+  const loadVendors = async () => {
+    try {
+      const res = await axios.get(`${BASE}/api/vendors`);
+      const raw = res.data?.data || res.data || [];
+      setVendors(Array.isArray(raw) ? raw : []);
+    } catch {
+      setVendors([]);
+    }
+  };
+
   useEffect(() => {
-    axios
-      .get(`${BASE}/api/vendors`)
-      .then((res) => setVendors(res.data?.data || res.data || []))
-      .catch(() => setVendors([]));
+    loadVendors();
   }, []);
 
   // ✅ Fetch preview PO number when modal opens
@@ -111,6 +130,17 @@ export default function PurchaseOrderList() {
         setReserveLoading(false);
       }
     };
+
+    // reset modal local states
+    setAddingNewVendor(false);
+    setNewVendor({
+      vendor_name: "",
+      contact_name: "",
+      email: "",
+      phone: "",
+      city: "",
+      country: "",
+    });
 
     fetchReservePreview();
     setCopied(false);
@@ -214,60 +244,107 @@ export default function PurchaseOrderList() {
     }
   };
 
-// ✅ Reserve PO submit
-const submitReserve = async () => {
-  setReserveErr("");
+  // ✅ NEW: Save vendor from Reserve modal
+  const saveNewVendorFromReserve = async () => {
+    if (!newVendor.vendor_name.trim()) {
+      setReserveErr("Vendor name is required.");
+      return;
+    }
 
-  const poNumber = reservePreview.psr_po_number || "";
-  if (!poNumber) {
-    setReserveErr("PO number not generated. Close and reopen the modal.");
-    return;
-  }
+    try {
+      setReserveErr("");
+      setReserveSubmitting(true);
 
-  const reservedBy = (reserveForm.created_by || "").trim();
-  if (!reservedBy) {
-    setReserveErr("Reserved By is required.");
-    return;
-  }
+      const res = await axios.post(`${BASE}/api/vendors`, {
+        ...newVendor,
+        is_active: true,
+      });
 
-  // ✅ Vendor required (frontend validation)
-  if (!reserveForm.vendor_id) {
-    setReserveErr("Vendor is required.");
-    return;
-  }
+      const added = res.data?.data || res.data; // handle either response shape
+      const addedId = added?.vendor_id || added?.id;
 
-  // ✅ Always include vendor_id (no spread)
-  const payload = {
-    psr_po_number: poNumber,
-    created_by: reservedBy,
-    vendor_id: Number(reserveForm.vendor_id),
-    remarks: reserveForm.remarks || "",
+      if (!addedId) {
+        setReserveErr(res.data?.message || "Error saving vendor.");
+        return;
+      }
+
+      // refresh vendor list + select newly added
+      await loadVendors();
+      setReserveForm((p) => ({ ...p, vendor_id: String(addedId) }));
+
+      // close add vendor panel
+      setAddingNewVendor(false);
+      setNewVendor({
+        vendor_name: "",
+        contact_name: "",
+        email: "",
+        phone: "",
+        city: "",
+        country: "",
+      });
+    } catch (err) {
+      console.error("❌ Add vendor (reserve modal) failed:", err);
+      setReserveErr(err?.response?.data?.message || "Error adding vendor.");
+    } finally {
+      setReserveSubmitting(false);
+    }
   };
 
-  try {
-    setReserveSubmitting(true);
+  // ✅ Reserve PO submit
+  const submitReserve = async () => {
+    setReserveErr("");
 
-    const res = await axios.post(`${BASE}/api/purchase_orders/reserve`, payload);
-    const newId = res.data?.data?.id;
+    const poNumber = reservePreview.psr_po_number || "";
+    if (!poNumber) {
+      setReserveErr("PO number not generated. Close and reopen the modal.");
+      return;
+    }
 
-    setShowReserve(false);
+    // required: created_by
+    if (!reserveForm.created_by.trim()) {
+      setReserveErr("Reserved By is required.");
+      return;
+    }
 
-    // reset form but keep last selected reservedBy (optional)
-    setReserveForm((p) => ({
-      vendor_id: "",
-      created_by: p.created_by,
-      remarks: "",
-    }));
+    // ✅ required: vendor_id
+    if (!reserveForm.vendor_id) {
+      setReserveErr("Vendor is required.");
+      return;
+    }
 
-    await loadOrders();
+    try {
+      setReserveSubmitting(true);
 
-    if (newId) navigate(`/purchase-orders/${newId}`);
-  } catch (err) {
-    setReserveErr(err?.response?.data?.message || "Failed to reserve PO.");
-  } finally {
-    setReserveSubmitting(false);
-  }
-};
+      // ✅ IMPORTANT: payload must be declared like this (inside function),
+      // not inserted into JSX or object literal in the wrong spot.
+      const payload = {
+        psr_po_number: poNumber,
+        created_by: reserveForm.created_by.trim(),
+        vendor_id: Number(reserveForm.vendor_id), // ✅ required now
+        remarks: reserveForm.remarks || "",
+      };
+
+      const res = await axios.post(`${BASE}/api/purchase_orders/reserve`, payload);
+
+      const newId = res.data?.data?.id;
+
+      setShowReserve(false);
+      setReserveForm({
+        vendor_id: "",
+        created_by: "",
+        remarks: "",
+      });
+
+      await loadOrders();
+
+      if (newId) navigate(`/purchase-orders/${newId}`);
+    } catch (err) {
+      setReserveErr(err?.response?.data?.message || "Failed to reserve PO.");
+    } finally {
+      setReserveSubmitting(false);
+    }
+  };
+
   // -------------------------------------------------------------
   // Column Definitions
   // -------------------------------------------------------------
@@ -319,21 +396,24 @@ const submitReserve = async () => {
       field: "status",
       width: 130,
       cellRenderer: (params) => {
-        const s = params.value;
+        // normalize label: show "Ordered" instead of "Placed" if old data exists
+        const raw = params.value;
+        const s = raw === "Placed" ? "Ordered" : raw;
 
+        // ✅ Color code as per your sticky note
         const color =
-          s === "Draft"
-            ? "bg-yellow-100 text-yellow-800"
-            : s === "Sent RFQ"
-            ? "bg-blue-100 text-blue-800"
+          s === "Reserved"
+            ? "bg-orange-100 text-orange-800"
             : s === "Ordered"
-            ? "bg-purple-100 text-purple-800"
+            ? "bg-blue-100 text-blue-800"
             : s === "Received"
             ? "bg-green-100 text-green-800"
-            : s === "Cancelled"
+            : s === "Paid"
             ? "bg-red-100 text-red-800"
-            : s === "Reserved"
-            ? "bg-indigo-100 text-indigo-800"
+            : s === "Cancelled"
+            ? "bg-pink-100 text-pink-800"
+            : s === "Draft"
+            ? "bg-yellow-100 text-yellow-800"
             : "bg-gray-100 text-gray-800";
 
         return (
@@ -398,7 +478,6 @@ const submitReserve = async () => {
             📄 Import PDF
           </button>
 
-          {/* ✅ NEW: Import Excel (only addition) */}
           <button
             onClick={() => navigate("/purchase-orders/import-from-excel")}
             className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 text-sm rounded shadow"
@@ -506,7 +585,7 @@ const submitReserve = async () => {
       {/* ✅ Reserve PO Modal */}
       {showReserve && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-[560px] max-w-[95vw] rounded-lg bg-white shadow-lg">
+          <div className="w-[600px] max-w-[95vw] rounded-lg bg-white shadow-lg">
             <div className="flex items-center justify-between px-4 py-3 border-b">
               <h3 className="text-base font-semibold">Reserve PO Number</h3>
               <button
@@ -565,30 +644,127 @@ const submitReserve = async () => {
                 </div>
               </div>
 
+              {/* Vendor required + Add New Vendor (same pattern as PO Form) */}
               <div>
-<label className="block text-sm font-semibold mb-1">Vendor *</label>
-                <select
-                  value={reserveForm.vendor_id}
-                  onChange={(e) => setReserveForm((p) => ({ ...p, vendor_id: e.target.value }))}
-                  className="border rounded px-3 py-2 w-full text-sm"
-                  disabled={reserveSubmitting}
-                >
-<option value="">— Select Vendor —</option>
-                  {vendors.map((v) => (
-                    <option key={v.vendor_id} value={v.vendor_id}>
-                      {v.vendor_name}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-semibold">Vendor *</label>
+                  <button
+                    type="button"
+                    className="text-sm text-blue-700 hover:underline"
+                    onClick={() => {
+                      setReserveErr("");
+                      setAddingNewVendor(true);
+                    }}
+                    disabled={reserveSubmitting || reserveLoading}
+                  >
+                    + Add New Vendor
+                  </button>
+                </div>
+
+                {!addingNewVendor ? (
+                  <select
+                    value={reserveForm.vendor_id}
+                    onChange={(e) =>
+                      setReserveForm((p) => ({ ...p, vendor_id: e.target.value }))
+                    }
+                    className="border rounded px-3 py-2 w-full text-sm"
+                    disabled={reserveSubmitting || reserveLoading}
+                  >
+                    <option value="">— Select Vendor —</option>
+                    {vendors.map((v) => {
+                      const id = v.vendor_id ?? v.id;
+                      const name = v.vendor_name ?? v.name ?? "Unnamed Vendor";
+                      return (
+                        <option key={id} value={id}>
+                          {name}
+                        </option>
+                      );
+                    })}
+                  </select>
+                ) : (
+                  <div className="border p-3 bg-gray-50 rounded space-y-2">
+                    <input
+                      placeholder="Vendor Name *"
+                      className="border p-2 rounded w-full"
+                      value={newVendor.vendor_name}
+                      onChange={(e) =>
+                        setNewVendor((p) => ({ ...p, vendor_name: e.target.value }))
+                      }
+                      disabled={reserveSubmitting || reserveLoading}
+                    />
+                    <input
+                      placeholder="Contact Name"
+                      className="border p-2 rounded w-full"
+                      value={newVendor.contact_name}
+                      onChange={(e) =>
+                        setNewVendor((p) => ({ ...p, contact_name: e.target.value }))
+                      }
+                      disabled={reserveSubmitting || reserveLoading}
+                    />
+                    <input
+                      placeholder="Email"
+                      className="border p-2 rounded w-full"
+                      value={newVendor.email}
+                      onChange={(e) => setNewVendor((p) => ({ ...p, email: e.target.value }))}
+                      disabled={reserveSubmitting || reserveLoading}
+                    />
+                    <input
+                      placeholder="Phone"
+                      className="border p-2 rounded w-full"
+                      value={newVendor.phone}
+                      onChange={(e) => setNewVendor((p) => ({ ...p, phone: e.target.value }))}
+                      disabled={reserveSubmitting || reserveLoading}
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        placeholder="City"
+                        className="border p-2 rounded w-full"
+                        value={newVendor.city}
+                        onChange={(e) => setNewVendor((p) => ({ ...p, city: e.target.value }))}
+                        disabled={reserveSubmitting || reserveLoading}
+                      />
+                      <input
+                        placeholder="Country"
+                        className="border p-2 rounded w-full"
+                        value={newVendor.country}
+                        onChange={(e) =>
+                          setNewVendor((p) => ({ ...p, country: e.target.value }))
+                        }
+                        disabled={reserveSubmitting || reserveLoading}
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        className="px-3 py-1 bg-gray-200 rounded"
+                        onClick={() => setAddingNewVendor(false)}
+                        disabled={reserveSubmitting || reserveLoading}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="px-3 py-1 bg-blue-600 text-white rounded"
+                        onClick={saveNewVendorFromReserve}
+                        disabled={reserveSubmitting || reserveLoading}
+                      >
+                        Save Vendor
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
                 <label className="block text-sm font-semibold mb-1">Reserved By *</label>
                 <select
                   value={reserveForm.created_by}
-                  onChange={(e) => setReserveForm((p) => ({ ...p, created_by: e.target.value }))}
+                  onChange={(e) =>
+                    setReserveForm((p) => ({ ...p, created_by: e.target.value }))
+                  }
                   className="border rounded px-3 py-2 w-full text-sm"
-                  disabled={reserveSubmitting}
+                  disabled={reserveSubmitting || reserveLoading}
                 >
                   <option value="">— Select —</option>
                   <option value="Pam Ramnarain">Pam</option>
@@ -604,10 +780,12 @@ const submitReserve = async () => {
                 <label className="block text-sm font-semibold mb-1">Remarks (optional)</label>
                 <textarea
                   value={reserveForm.remarks}
-                  onChange={(e) => setReserveForm((p) => ({ ...p, remarks: e.target.value }))}
+                  onChange={(e) =>
+                    setReserveForm((p) => ({ ...p, remarks: e.target.value }))
+                  }
                   className="border rounded px-3 py-2 w-full text-sm"
                   rows={3}
-                  disabled={reserveSubmitting}
+                  disabled={reserveSubmitting || reserveLoading}
                   placeholder="Why are you reserving this PO?"
                 />
               </div>
@@ -625,7 +803,11 @@ const submitReserve = async () => {
               <button
                 onClick={submitReserve}
                 className="px-3 py-1.5 text-sm rounded bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50"
-                disabled={reserveSubmitting || reserveLoading || !reservePreview.psr_po_number}
+                disabled={
+                  reserveSubmitting ||
+                  reserveLoading ||
+                  !reservePreview.psr_po_number
+                }
               >
                 {reserveSubmitting ? "Reserving..." : "Reserve"}
               </button>

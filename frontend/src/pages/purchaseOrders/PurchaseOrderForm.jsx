@@ -910,7 +910,7 @@ export default function PurchaseOrderForm({
             </option>
 
             {/* ✅ RFQ statuses removed */}
-            <option value="Placed">Placed</option>
+            <option value="Ordered">Ordered</option>
             <option value="Received">Received</option>
             <option value="Paid">Paid</option>
             <option value="Cancelled">Cancelled</option>

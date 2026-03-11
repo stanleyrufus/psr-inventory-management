@@ -496,7 +496,6 @@ if (!vendorId || Number.isNaN(vendorId)) {
     message: "vendor_id is required",
   });
 }
-
     // ✅ system date (same rule you use elsewhere)
     const orderDate = systemDateYmd();
 

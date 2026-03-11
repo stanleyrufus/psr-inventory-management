@@ -238,9 +238,13 @@ if (!id || isNaN(Number(id))) {
 
   {/* RIGHT: PO INFO — SAME FONT SIZE AS ADDRESS */}
   <div className="text-right text-xs leading-tight">
-    <div className="font-bold text-lg tracking-wide">
-      PURCHASE ORDER
-    </div>
+    <div className="w-full flex justify-end">
+  {po.status === "Paid" && (
+    <div className="w-36 text-center py-1 bg-red-700 text-white border-2 border-red-200 font-extrabold text-sm tracking-wider rounded">
+  PAID
+</div>
+  )}
+</div>
 
     <div className="mt-1">
       PO NUMBER: {po.psr_po_number || "-"}
@@ -481,13 +485,7 @@ if (!id || isNaN(Number(id))) {
             TOTALS (Tax forced to 0)
            ======================================================= */}
         <div className="mt-4 flex justify-end relative">
-          {po.status === "Paid" && (
-            <div className="absolute top-1/2 -translate-y-1/2 right-[18rem] rotate-[-12deg] opacity-70 pointer-events-none">
-              <span className="inline-block px-5 py-2 text-red-700 border-4 border-red-700 font-extrabold text-3xl tracking-wider rounded-lg">
-                PAID
-              </span>
-            </div>
-          )}
+          
 
           <div className="border border-gray-300 rounded-md bg-gray-50 px-4 py-3 text-sm w-64">
             <div className="flex justify-between mb-1">
