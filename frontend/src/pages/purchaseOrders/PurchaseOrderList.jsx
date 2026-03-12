@@ -1,4 +1,3 @@
-// src/pages/purchaseOrders/PurchaseOrderList.jsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
@@ -11,19 +10,31 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 import "ag-grid-community/styles/ag-grid.css";
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const PO_LIST_STATE_KEY = "purchaseOrderListState";
+
+const getSavedPOListState = () => {
+  try {
+    const raw = sessionStorage.getItem(PO_LIST_STATE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
 
 export default function PurchaseOrderList() {
   const navigate = useNavigate();
   const location = useLocation();
   const gridRef = useRef();
 
+  const savedState = getSavedPOListState();
+
   const [orders, setOrders] = useState([]);
   const [rfqStatusMap, setRfqStatusMap] = useState({}); // kept (existing)
-  const [search, setSearch] = useState("");
-  const [supplierFilter, setSupplierFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [search, setSearch] = useState(savedState.search || "");
+  const [supplierFilter, setSupplierFilter] = useState(savedState.supplierFilter || "");
+  const [statusFilter, setStatusFilter] = useState(savedState.statusFilter || "");
+  const [currentPage, setCurrentPage] = useState(savedState.currentPage || 1);
+  const [itemsPerPage, setItemsPerPage] = useState(savedState.itemsPerPage || 10);
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
 
   // ✅ Reserve PO modal state
@@ -68,6 +79,26 @@ export default function PurchaseOrderList() {
       console.error("❌ Failed to load POs:", err);
     }
   };
+
+  // -------------------------------------------------------------
+  // SAVE FILTER / PAGE STATE
+  // -------------------------------------------------------------
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        PO_LIST_STATE_KEY,
+        JSON.stringify({
+          search,
+          supplierFilter,
+          statusFilter,
+          currentPage,
+          itemsPerPage,
+        })
+      );
+    } catch (err) {
+      console.error("❌ Failed to save PO list state:", err);
+    }
+  }, [search, supplierFilter, statusFilter, currentPage, itemsPerPage]);
 
   // -------------------------------------------------------------
   // INITIAL LOAD
@@ -200,6 +231,23 @@ export default function PurchaseOrderList() {
 
   const goToPage = (p) => {
     if (p >= 1 && p <= totalPages) setCurrentPage(p);
+  };
+
+  const clearFilters = () => {
+    setSearch("");
+    setSupplierFilter("");
+    setStatusFilter("");
+    setCurrentPage(1);
+    sessionStorage.setItem(
+      PO_LIST_STATE_KEY,
+      JSON.stringify({
+        search: "",
+        supplierFilter: "",
+        statusFilter: "",
+        currentPage: 1,
+        itemsPerPage,
+      })
+    );
   };
 
   // ✅ Copy PO number (modal)
@@ -357,21 +405,29 @@ export default function PurchaseOrderList() {
       flex: 0,
       tooltipField: "psr_po_number",
       cellClass: "whitespace-nowrap",
-      cellRenderer: (params) => (
-        <button
-          type="button"
-          className="text-blue-600 underline cursor-pointer whitespace-nowrap bg-transparent border-0 p-0"
-          title={params.value || ""}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const id = params?.data?.id;
-            if (id) navigate(`/purchase-orders/${id}`);
-          }}
-        >
-          {params.value}
-        </button>
-      ),
+      cellRenderer: (params) => {
+        const id = params?.data?.id;
+        const href = id ? `/purchase-orders/${id}` : "#";
+
+        return (
+          <a
+            href={href}
+            className="text-blue-600 underline cursor-pointer whitespace-nowrap bg-transparent border-0 p-0"
+            title={params.value || ""}
+            onClick={(e) => {
+              if (!id) {
+                e.preventDefault();
+                return;
+              }
+              e.preventDefault();
+              e.stopPropagation();
+              navigate(`/purchase-orders/${id}`);
+            }}
+          >
+            {params.value}
+          </a>
+        );
+      },
     },
     {
       headerName: "Vendor",
@@ -545,6 +601,14 @@ export default function PurchaseOrderList() {
             </option>
           ))}
         </select>
+
+        <button
+          type="button"
+          onClick={clearFilters}
+          className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-2 rounded text-sm shadow"
+        >
+          Clear Filters
+        </button>
       </div>
 
       {/* AG Grid Table */}

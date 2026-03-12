@@ -18,7 +18,8 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     allowedHosts: [
-      "sueann-unextricable-yuette.ngrok-free.dev"
-    ]
+  "psrinventory.lan",
+  "sueann-unextricable-yuette.ngrok-free.dev"
+]
   },
 });
