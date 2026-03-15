@@ -1,4 +1,3 @@
-// backend/routes/products.js
 import express from "express";
 import { db } from "../db.js";
 
@@ -30,6 +29,104 @@ router.get("/", async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Error fetching products", data: [] });
+  }
+});
+
+/**
+ * GET /api/products/:id/bom
+ */
+router.get("/:id/bom", async (req, res) => {
+  try {
+    const productId = Number(req.params.id);
+
+    const product = await db("products").where({ id: productId }).first();
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+        data: null,
+      });
+    }
+
+    const rows = await db("product_parts as pp")
+      .join("inventory as i", "pp.part_id", "i.part_id")
+      .where("pp.product_id", productId)
+      .select(
+        "pp.id",
+        "pp.product_id",
+        "pp.part_id",
+        "pp.section",
+        "pp.qty_required",
+        "pp.source_part_number",
+        "pp.source_description",
+        "pp.notes",
+        "i.part_number",
+        "i.part_name",
+        "i.description",
+        "i.current_unit_price",
+        "i.last_unit_price",
+        "i.quantity_on_hand",
+        "i.minimum_stock_level",
+        "i.uom",
+        "i.status",
+        "i.last_vendor_name",
+        "i.image_url"
+      )
+      .orderBy("pp.section", "asc")
+      .orderBy("i.part_number", "asc");
+
+    const items = rows.map((row) => {
+      const unitPrice = Number(row.current_unit_price || row.last_unit_price || 0);
+      const qtyRequired = Number(row.qty_required || 0);
+      const extendedCost = Number((unitPrice * qtyRequired).toFixed(2));
+
+      return {
+        ...row,
+        unit_price_for_budget: unitPrice,
+        extended_cost: extendedCost,
+      };
+    });
+
+    const grouped = {
+      mechanical: items.filter((x) => (x.section || "").toLowerCase() === "mechanical"),
+      electrical: items.filter((x) => (x.section || "").toLowerCase() === "electrical"),
+      other: items.filter(
+        (x) =>
+          !["mechanical", "electrical"].includes((x.section || "").toLowerCase())
+      ),
+    };
+
+    const mechanicalTotal = Number(
+      grouped.mechanical.reduce((sum, x) => sum + Number(x.extended_cost || 0), 0).toFixed(2)
+    );
+    const electricalTotal = Number(
+      grouped.electrical.reduce((sum, x) => sum + Number(x.extended_cost || 0), 0).toFixed(2)
+    );
+    const otherTotal = Number(
+      grouped.other.reduce((sum, x) => sum + Number(x.extended_cost || 0), 0).toFixed(2)
+    );
+    const grandTotal = Number((mechanicalTotal + electricalTotal + otherTotal).toFixed(2));
+
+    return res.json({
+      success: true,
+      data: {
+        product_id: productId,
+        grouped,
+        totals: {
+          mechanical: mechanicalTotal,
+          electrical: electricalTotal,
+          other: otherTotal,
+          grand: grandTotal,
+        },
+      },
+    });
+  } catch (err) {
+    console.error("❌ Error fetching product BOM:", err);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching product BOM",
+      data: null,
+    });
   }
 });
 
@@ -78,7 +175,6 @@ router.post("/", async (req, res) => {
       status,
     } = req.body;
 
-    // ✅ Basic validation
     if (!product_name || !product_code || !category) {
       return res.status(400).json({
         success: false,
@@ -86,7 +182,6 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // ✅ Duplicate check
     const existing = await db("products")
       .where({ product_code })
       .first();
@@ -94,12 +189,11 @@ router.post("/", async (req, res) => {
     if (existing) {
       return res.status(409).json({
         success: false,
-        field: "product_code", // 🔹 So frontend knows which field caused it
+        field: "product_code",
         message: `Product code '${product_code}' already exists.`,
       });
     }
 
-    // ✅ Insert record
     const [created] = await db("products")
       .insert({
         category,

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import CategoryTabs from "../components/CategoryTabs";
 import ProductsList from "../components/ProductsList";
-import productData from "../data/products.json"; // ✅ Local data import
+import productData from "../data/products.json";
 
 export default function ProductsPage() {
   const navigate = useNavigate();
@@ -10,7 +10,6 @@ export default function ProductsPage() {
   const [selectedCategory, setSelectedCategory] = useState("");
 
   useEffect(() => {
-    // Load static product data instead of API
     setProducts(productData);
   }, []);
 
@@ -23,7 +22,6 @@ export default function ProductsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 font-['Rajdhani']">
-      {/* 🏭 Hero Section */}
       <section className="relative h-[50vh] flex flex-col justify-center items-center text-center overflow-hidden bg-gradient-to-r from-gray-900 via-blue-900 to-gray-800 text-white">
         <div className="absolute inset-0">
           <div className="hero-bg-container">
@@ -54,7 +52,6 @@ export default function ProductsPage() {
         </div>
       </section>
 
-      {/* 🔹 Catalog Section */}
       <section id="product-grid" className="p-8">
         <div className="text-center mb-8">
           <h2 className="text-3xl font-semibold text-gray-800 mb-2">
@@ -65,13 +62,11 @@ export default function ProductsPage() {
           </p>
         </div>
 
-        {/* Category Tabs */}
         <CategoryTabs
           selectedCategory={selectedCategory}
           onSelect={(cat) => setSelectedCategory(cat)}
         />
 
-        {/* Product Grid */}
         <ProductsList
           products={filtered}
           onView={(p) => navigate(`/products/${p.id}`, { state: { product: p } })}
