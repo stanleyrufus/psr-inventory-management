@@ -415,12 +415,12 @@ router.get("/next-number", async (req, res) => {
   try {
     const now = new Date();
 
+    const yy = String(now.getFullYear()).slice(-2);
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const dd = String(now.getDate()).padStart(2, "0");
-    const yy = String(now.getFullYear()).slice(-2); // last 2 digits
 
-    const mmddyy = `${mm}${dd}${yy}`;
-    const prefix = `PO${mmddyy}-`; // PO021926-
+    const yymmdd = `${yy}${mm}${dd}`;
+    const prefix = `PO${yymmdd}-`; // PO260315-
 
     // Find the highest sequence for TODAY (prefix match)
     const r = await db("purchase_orders")
@@ -432,16 +432,14 @@ router.get("/next-number", async (req, res) => {
 
     if (r?.max) {
       const last = String(r.max);
-      const lastSeqStr = last.split("-").pop(); // "01"
+      const lastSeqStr = last.split("-").pop();
       const lastSeq = Number(lastSeqStr);
       if (!Number.isNaN(lastSeq)) nextSeq = lastSeq + 1;
     }
 
-    // ✅ 2-digit sequence
     const seqStr = String(nextSeq).padStart(2, "0");
     const nextNumber = `${prefix}${seqStr}`;
 
-    // Keep returning date for UI (your current behavior)
     const yyyy = now.getFullYear();
     return res.json({
       success: 1,
