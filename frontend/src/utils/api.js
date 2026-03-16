@@ -1,11 +1,12 @@
 // frontend/src/utils/api.js
 import axios from "axios";
 
-// ✅ VITE_API_URL should be "http://localhost:5000" (no /api)
-const BASE_URL = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
+// ✅ For Ubuntu/prod/pre-prod use VITE_API_URL=/api
+// ✅ For local dev you can still override via .env.local if needed
+const BASE_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
 const apiClient = axios.create({
-  baseURL: BASE_URL + "/api",
+  baseURL: BASE_URL,
   headers: { "Content-Type": "application/json" },
 });
 
