@@ -47,7 +47,7 @@ export default function PartsList({ parts, onEdit, onView, onDeleted }) {
               </td>
               <td className="py-2 px-3 border text-right">
                 {p.current_unit_price
-                  ? `$${Number(p.current_unit_price).toFixed(2)}`
+                  ? "$" + Number(p.current_unit_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                   : "-"}
               </td>
               <td className="py-2 px-3 border text-center flex justify-center gap-2">

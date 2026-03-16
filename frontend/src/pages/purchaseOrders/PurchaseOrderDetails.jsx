@@ -6,7 +6,7 @@ const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const FILE_BASE = BASE.replace(/\/api$/, "");
 
 const money = (v) =>
-  v == null || v === "" || isNaN(Number(v)) ? "-" : `$${Number(v).toFixed(2)}`;
+  v == null || v === "" || isNaN(Number(v)) ? "-" : "$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function PurchaseOrderDetails({ order: propOrder, onClose }) {
   const { id } = useParams();
@@ -16,10 +16,21 @@ if (!id || isNaN(Number(id))) {
 }
   const navigate = useNavigate();
 
-  const [fetchedOrder, setFetchedOrder] = useState(null);
+    const [fetchedOrder, setFetchedOrder] = useState(null);
   const [vendorInfo, setVendorInfo] = useState(null);
   const [parts, setParts] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // ✅ Payment Summary modal state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentSaving, setPaymentSaving] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    payment_method: "",
+    amount_paid: "",
+    payment_reference: "",
+    credit_applied: "",
+    payment_notes: "",
+  });
 
   // -------------------------------
   //  Load PO
@@ -43,6 +54,24 @@ if (!id || isNaN(Number(id))) {
     if (propOrder) return propOrder.data || propOrder;
     return fetchedOrder;
   }, [propOrder, fetchedOrder]);
+
+  useEffect(() => {
+    if (!po) return;
+
+    setPaymentForm({
+      payment_method: po.payment_method || "",
+      amount_paid:
+        po.amount_paid != null && po.amount_paid !== ""
+          ? po.amount_paid
+          : po.grand_total || "",
+      payment_reference: po.payment_reference || "",
+      credit_applied:
+        po.credit_applied != null && po.credit_applied !== ""
+          ? po.credit_applied
+          : "",
+      payment_notes: po.payment_notes || "",
+    });
+  }, [po]);
 
   // -------------------------------
   //  Load Vendor
@@ -90,19 +119,41 @@ if (!id || isNaN(Number(id))) {
 
   const isModal = !!onClose;
 
-  const Wrapper = ({ children }) =>
-    isModal ? (
-      <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-        {children}
-      </div>
-    ) : (
-      <div className="p-6 bg-white rounded shadow max-w-5xl mx-auto mt-0 mb-8">
-        {children}
-      </div>
-    );
+  const savePaymentSummary = async () => {
+    try {
+      setPaymentSaving(true);
+
+      await axios.put(`${BASE}/api/purchase_orders/${po.id}`, {
+        ...po,
+        status: "Paid",
+        payment_method: paymentForm.payment_method || null,
+        amount_paid: Number(paymentForm.amount_paid || 0),
+        payment_reference: paymentForm.payment_reference || null,
+        credit_applied: Number(paymentForm.credit_applied || 0),
+        payment_notes: paymentForm.payment_notes || null,
+      });
+
+      alert("PO marked as PAID.");
+      setShowPaymentModal(false);
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save payment summary.");
+    } finally {
+      setPaymentSaving(false);
+    }
+  };
+
+
 
   return (
-    <Wrapper>
+    <div
+      className={
+        isModal
+          ? "fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50"
+          : "p-6 bg-white rounded shadow max-w-5xl mx-auto mt-0 mb-8"
+      }
+    >
       {/* PRINT STYLES – KEEPING ORIGINAL SO PRINT IS CLEAN */}
       <style>
         {`
@@ -131,25 +182,10 @@ if (!id || isNaN(Number(id))) {
             🖨 Print
           </button>
 
-          {po.status !== "Paid" && (
+                    {po.status !== "Paid" && (
             <button
               className="px-3 h-10 bg-green-700 hover:bg-green-800 text-white text-sm rounded shadow flex items-center"
-              onClick={async () => {
-                if (!window.confirm("Mark this PO as PAID?")) return;
-
-                try {
-                  await axios.put(`${BASE}/api/purchase_orders/${po.id}`, {
-                    ...po,
-                    status: "Paid",
-                  });
-
-                  alert("PO marked as PAID.");
-                  window.location.reload();
-                } catch (err) {
-                  console.error(err);
-                  alert("Failed to update status.");
-                }
-              }}
+              onClick={() => setShowPaymentModal(true)}
             >
               💲 Mark as Paid
             </button>
@@ -264,16 +300,14 @@ if (!id || isNaN(Number(id))) {
 </div>
 
 
-
 {/* =======================================================
     PURCHASED FROM + SUMMARY (compact + THICK BLUE BORDERS)
    ======================================================= */}
-<div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-
+<div className="grid grid-cols-2 gap-3 mb-3 text-sm">
   {/* ---------------------------------------------
       PURCHASED FROM (Vendor) — Ultra Compact
      --------------------------------------------- */}
-<div className="border-2 border-blue-900 rounded-md bg-gray-50 p-3 leading-tight">
+<div className="border-2 border-blue-900 rounded-md bg-gray-50 px-3 py-2 leading-snug text-sm">
   <div className="font-semibold text-gray-800 mb-1">
     VENDOR:
   </div>
@@ -317,7 +351,7 @@ if (!id || isNaN(Number(id))) {
   {/* ---------------------------------------------
       ORDER SUMMARY (Ordered By + Dates + Terms + Remarks)
      --------------------------------------------- */}
-  <div className="border-2 border-blue-900 rounded-md bg-gray-50 p-3 leading-tight space-y-1">
+<div className="border-2 border-blue-900 rounded-md bg-gray-50 px-3 py-2 leading-snug space-y-0.5 text-sm">
 
     <div className="flex">
       <span className="w-32 font-medium text-gray-700">Ordered By:</span>
@@ -483,31 +517,55 @@ if (!id || isNaN(Number(id))) {
         {/* =======================================================
             TOTALS (Tax forced to 0)
            ======================================================= */}
-        <div className="mt-4 flex justify-end relative">
-          
+                <div className="mt-4 flex justify-end">
+          <div className="border border-gray-300 rounded-md bg-gray-50 px-4 py-3 text-sm w-72">
+            {po.status === "Paid" && (
+              <>
+                <div className="font-semibold text-gray-800 mb-2 border-b border-gray-300 pb-1">
+                  Payment Summary
+                </div>
 
-          <div className="border border-gray-300 rounded-md bg-gray-50 px-4 py-3 text-sm w-64">
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-700">Subtotal</span>
-              <span className="font-semibold">{money(po.subtotal)}</span>
-            </div>
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-700">Tax (0%)</span>
-              <span className="font-semibold">$0.00</span>
-            </div>
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-700">Shipping</span>
-              <span className="font-semibold">
-                {money(po.shipping_charges)}
-              </span>
-            </div>
-            <div className="border-t border-gray-300 mt-2 pt-2 flex justify-between">
-              <span className="font-semibold text-gray-800">
-                GRAND TOTAL
-              </span>
-              <span className="font-bold text-gray-900">
-                {money(po.grand_total)}
-              </span>
+                <div className="flex justify-between mb-1">
+                  <span className="text-gray-700">Date Paid</span>
+                  <span className="font-medium">
+                    {po.date_paid
+                      ? new Date(po.date_paid).toLocaleDateString()
+                      : "—"}
+                  </span>
+                </div>
+
+                <div className="flex justify-between mb-1">
+                  <span className="text-gray-700">Method</span>
+                  <span className="font-medium">{po.payment_method || "—"}</span>
+                </div>
+
+                <div className="flex justify-between mb-2">
+                  <span className="text-gray-700">Reference</span>
+                  <span className="font-medium">{po.payment_reference || "—"}</span>
+                </div>
+              </>
+            )}
+
+            <div className={po.status === "Paid" ? "border-t border-gray-300 pt-2 mt-2" : ""}>
+              <div className="flex justify-between mb-1">
+                <span className="text-gray-700">Subtotal</span>
+                <span className="font-semibold">{money(po.subtotal)}</span>
+              </div>
+
+              <div className="flex justify-between mb-1">
+                <span className="text-gray-700">Tax (0%)</span>
+                <span className="font-semibold">$0.00</span>
+              </div>
+
+              <div className="flex justify-between mb-1">
+                <span className="text-gray-700">Shipping</span>
+                <span className="font-semibold">{money(po.shipping_charges)}</span>
+              </div>
+
+              <div className="border-t border-gray-300 mt-2 pt-2 flex justify-between">
+                <span className="font-semibold text-gray-800">GRAND TOTAL</span>
+                <span className="font-bold text-gray-900">{money(po.grand_total)}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -517,7 +575,7 @@ if (!id || isNaN(Number(id))) {
            ======================================================= */}
         <h3 className="mt-6 font-semibold text-gray-800">Attachments</h3>
 
-        {files.length > 0 ? (
+               {files.length > 0 ? (
           <div className="grid grid-cols-4 gap-4 mt-2">
             {files.map((f) => {
               const fileUrl = `${FILE_BASE}${
@@ -562,6 +620,139 @@ if (!id || isNaN(Number(id))) {
           <p className="text-sm text-gray-500 mt-2">No attachments uploaded.</p>
         )}
       </div>
-    </Wrapper>
+
+      {showPaymentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 print-hide">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Payment Summary</h3>
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(false)}
+                className="text-xl font-bold text-gray-600 hover:text-black"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Payment Method
+                </label>
+                <select
+                  className="border p-2 rounded w-full"
+                  value={paymentForm.payment_method}
+                  onChange={(e) =>
+                    setPaymentForm((p) => ({
+                      ...p,
+                      payment_method: e.target.value,
+                    }))
+                  }
+                >
+                  <option value="">Select</option>
+                  <option value="Credit Card">Credit Card</option>
+                  <option value="Check">Check</option>
+                  <option value="ACH">ACH</option>
+                  <option value="Wire">Wire</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Amount Paid
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="border p-2 rounded w-full"
+                  value={paymentForm.amount_paid}
+                  onChange={(e) =>
+                    setPaymentForm((p) => ({
+                      ...p,
+                      amount_paid: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Payment Reference
+                </label>
+                <input
+                  type="text"
+                  className="border p-2 rounded w-full"
+                  value={paymentForm.payment_reference}
+                  onChange={(e) =>
+                    setPaymentForm((p) => ({
+                      ...p,
+                      payment_reference: e.target.value,
+                    }))
+                  }
+                  placeholder="Check # / Transaction # / Ref #"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Credit Applied
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="border p-2 rounded w-full"
+                  value={paymentForm.credit_applied}
+                  onChange={(e) =>
+                    setPaymentForm((p) => ({
+                      ...p,
+                      credit_applied: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Payment Notes
+                </label>
+                <textarea
+                  className="border p-2 rounded w-full"
+                  rows={3}
+                  value={paymentForm.payment_notes}
+                  onChange={(e) =>
+                    setPaymentForm((p) => ({
+                      ...p,
+                      payment_notes: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(false)}
+                className="px-4 py-2 bg-gray-200 rounded"
+                disabled={paymentSaving}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={savePaymentSummary}
+                className="px-4 py-2 bg-green-700 hover:bg-green-800 text-white rounded"
+                disabled={paymentSaving}
+              >
+                {paymentSaving ? "Saving..." : "Save & Mark Paid"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

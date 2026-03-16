@@ -158,7 +158,7 @@ export default function PartDetail({ part, onClose }) {
               label="Unit Price"
               value={
                 part.current_unit_price
-                  ? `$${Number(part.current_unit_price).toFixed(2)}`
+                  ? "$" + Number(part.current_unit_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                   : "—"
               }
             />
@@ -194,7 +194,7 @@ export default function PartDetail({ part, onClose }) {
                 label="Unit Price"
                 value={
                   latestPO.unit_price
-                    ? `$${Number(latestPO.unit_price).toFixed(2)}`
+                    ? "$" + Number(latestPO.unit_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                     : "—"
                 }
               />
@@ -202,7 +202,7 @@ export default function PartDetail({ part, onClose }) {
                 label="Total"
                 value={
                   latestPO.total_price
-                    ? `$${Number(latestPO.total_price).toFixed(2)}`
+                    ? "$" + Number(latestPO.total_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                     : "—"
                 }
               />
@@ -255,10 +255,10 @@ export default function PartDetail({ part, onClose }) {
                       </td>
                       <td className="border px-2 py-1">{po.quantity}</td>
                       <td className="border px-2 py-1">
-                        {po.unit_price ? `$${Number(po.unit_price).toFixed(2)}` : "—"}
+                        {po.unit_price ? "$" + Number(po.unit_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}
                       </td>
                       <td className="border px-2 py-1">
-                        {po.total_price ? `$${Number(po.total_price).toFixed(2)}` : "—"}
+                        {po.total_price ? "$" + Number(po.total_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}
                       </td>
                       <td className="border px-2 py-1">
                         <a

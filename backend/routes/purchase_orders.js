@@ -653,12 +653,19 @@ router.post("/", async (req, res) => {
           created_by: createdBy,
           vendor_id: vendorId,
 
-          payment_method: body.payment_method || null,
+                   payment_method: body.payment_method || null,
           payment_terms: body.payment_terms || null,
           currency: body.currency || "USD",
           remarks: body.remarks || null,
           received_by: body.received_by || null,
           received_on: normalizeDate(body.received_on),
+
+          // ✅ payment summary fields
+          amount_paid: Number(body.amount_paid ?? 0),
+          payment_reference: body.payment_reference || null,
+          credit_applied: Number(body.credit_applied ?? 0),
+          payment_notes: body.payment_notes || null,
+
           tax_percent: Number(body.tax_percent ?? 0),
           shipping_charges: Number(body.shipping_charges ?? 0),
           subtotal: Number(body.subtotal ?? 0),
@@ -731,14 +738,22 @@ router.put("/:id", async (req, res) => {
     const datePaidToSet = isBecomingPaid ? systemDateYmd() : existing.date_paid;
 
     await db.transaction(async (trx) => {
-      await trx("purchase_orders")
+            await trx("purchase_orders")
         .where({ id })
         .update({
           expected_delivery_date: normalizeDate(body.expected_delivery_date),
           created_by: body.created_by ?? existing.created_by,
           vendor_id: body.vendor_id ? Number(body.vendor_id) : existing.vendor_id,
+
           payment_method: body.payment_method ?? existing.payment_method,
           payment_terms: body.payment_terms ?? existing.payment_terms,
+
+          // ✅ payment summary fields
+          amount_paid: Number(body.amount_paid ?? existing.amount_paid ?? 0),
+          payment_reference: body.payment_reference ?? existing.payment_reference,
+          credit_applied: Number(body.credit_applied ?? existing.credit_applied ?? 0),
+          payment_notes: body.payment_notes ?? existing.payment_notes,
+
           currency: body.currency ?? existing.currency,
           remarks: body.remarks ?? existing.remarks,
           received_by: body.received_by ?? existing.received_by,

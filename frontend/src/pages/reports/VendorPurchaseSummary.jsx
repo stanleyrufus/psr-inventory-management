@@ -158,8 +158,8 @@ export default function VendorPurchaseSummary() {
       body: data.map((r) => [
         r.vendor_name,
         r.po_count,
-        `$${r.total_spend.toFixed(2)}`,
-        `$${r.avg_order.toFixed(2)}`,
+        "$" + Number(r.total_spend).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        "$" + Number(r.avg_order).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         r.last_po_date ? format(new Date(r.last_po_date), "yyyy-MM-dd") : "—",
       ]),
       styles: { fontSize: 8 },

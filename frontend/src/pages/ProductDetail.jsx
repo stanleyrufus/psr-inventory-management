@@ -4,7 +4,7 @@ import axios from "axios";
 
 const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
 
-const money = (v) => `$${Number(v || 0).toFixed(2)}`;
+const money = (v) => "$" + Number(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function ProductDetail() {
   const { state } = useLocation();

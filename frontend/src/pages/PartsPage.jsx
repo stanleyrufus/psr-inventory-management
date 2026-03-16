@@ -290,7 +290,7 @@ export default function PartsPage() {
       width: 110,
       valueFormatter: (p) => {
         const v = p.data.last_unit_price ?? p.data.unit_price ?? null;
-        return v ? `$${Number(v).toFixed(2)}` : "-";
+        return v ? "$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "-";
       },
     },
 

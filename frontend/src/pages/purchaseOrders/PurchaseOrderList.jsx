@@ -439,7 +439,14 @@ export default function PurchaseOrderList() {
       headerName: "Grand Total",
       field: "grand_total",
       width: 140,
-      valueFormatter: (p) => (p.value != null ? `$${p.value.toLocaleString()}` : "-"),
+      valueFormatter: (p) =>
+      p.value != null
+        ? "$" +
+          Number(p.value).toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })
+        : "-",
     },
     {
       headerName: "Order Date",

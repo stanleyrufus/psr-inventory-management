@@ -187,7 +187,7 @@ export default function PartPurchaseSummary() {
         r.part_name,
         r.po_count,
         r.total_qty,
-        `$${r.total_spend.toFixed(2)}`,
+        "$" + Number(r.total_spend).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
         r.last_purchase ? format(new Date(r.last_purchase), "yyyy-MM-dd") : "—",
       ]),
       styles: { fontSize: 8 },

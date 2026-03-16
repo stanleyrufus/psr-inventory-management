@@ -145,7 +145,7 @@ const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const FILE_BASE = BASE.replace(/\/api$/, "");
 
 const n = (v) => Number(v ?? 0);
-const money = (v) => n(v).toFixed(2);
+const money = (v) => v == null || v === "" || Number.isNaN(Number(v)) ? "-" : "$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export default function PurchaseOrderForm({
   initialPo,
@@ -1379,8 +1379,7 @@ export default function PurchaseOrderForm({
                   )}
                 </td>
 
-                <td className="border p-2 text-right">${money(item.totalPrice)}</td>
-
+<td className="border p-2 text-right">{money(item.totalPrice)}</td>
                 <td className="border p-2 text-center">
                   <button
                     type="button"
@@ -1410,9 +1409,8 @@ export default function PurchaseOrderForm({
 
       {/* --- Totals --- */}
       <div className="mt-6 border-t pt-4 text-right space-y-1">
-        <div>Subtotal: ${money(po.subtotal)}</div>
-        <div>Tax ({po.tax_percent}%): ${money(po.tax_amount)}</div>
-
+<div>Subtotal: {money(po.subtotal)}</div>
+<div>Tax ({po.tax_percent}%): {money(po.tax_amount)}</div>
         <div>
           Shipping:{" "}
           <input
@@ -1424,7 +1422,7 @@ export default function PurchaseOrderForm({
           />
         </div>
 
-        <div className="font-bold mt-2">Grand Total: ${money(po.grand_total)}</div>
+<div className="font-bold mt-2">Grand Total: {money(po.grand_total)}</div>
       </div>
 
       {/* --- Upload New Attachments --- */}
