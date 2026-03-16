@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (username, password) => {
     try {
       // ✅ This will now always become: http://<server>:5000/api/users/login
-      const res = await axios.post(`${BASE}/api/users/login`, {
+      const res = await axios.post(`${BASE}/users/login`, {
         username,
         password,
       });

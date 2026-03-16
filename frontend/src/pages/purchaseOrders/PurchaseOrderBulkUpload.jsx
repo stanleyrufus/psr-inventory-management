@@ -21,7 +21,7 @@ export default function PurchaseOrderBulkUpload() {
       const fd = new FormData();
       fd.append("file", file);
 
-      const res = await axios.post(`${BASE}/api/po_import/import`, fd);
+      const res = await axios.post(`${BASE}/po_import/import`, fd);
       setResult(res.data);
     } catch (e) {
       setError(e.response?.data?.message || e.message);

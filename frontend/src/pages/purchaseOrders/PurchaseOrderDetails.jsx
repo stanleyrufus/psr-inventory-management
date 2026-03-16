@@ -41,7 +41,7 @@ if (!id || isNaN(Number(id))) {
 
     setLoading(true);
     axios
-      .get(`${BASE}/api/purchase_orders/${id}`)
+      .get(`${BASE}/purchase_orders/${id}`)
       .then((res) => setFetchedOrder(res.data?.data || res.data || null))
       .catch((err) => {
         console.error("❌ Error loading PO:", err);
@@ -80,7 +80,7 @@ if (!id || isNaN(Number(id))) {
     if (!po?.vendor_id) return;
 
     axios
-      .get(`${BASE}/api/vendors/${po.vendor_id}`)
+      .get(`${BASE}/vendors/${po.vendor_id}`)
       .then((res) => setVendorInfo(res.data?.data || res.data || null))
       .catch((err) => console.error("❌ Failed to load vendor info:", err));
   }, [po?.vendor_id]);
@@ -90,7 +90,7 @@ if (!id || isNaN(Number(id))) {
   // -------------------------------
   useEffect(() => {
     axios
-      .get(`${BASE}/api/parts`)
+      .get(`${BASE}/parts`)
       .then((res) => {
         const raw = res.data?.data || res.data || [];
         const normalized = raw.map((p) => ({
@@ -123,7 +123,7 @@ if (!id || isNaN(Number(id))) {
     try {
       setPaymentSaving(true);
 
-      await axios.put(`${BASE}/api/purchase_orders/${po.id}`, {
+      await axios.put(`${BASE}/purchase_orders/${po.id}`, {
         ...po,
         status: "Paid",
         payment_method: paymentForm.payment_method || null,
@@ -198,7 +198,7 @@ if (!id || isNaN(Number(id))) {
                 if (!window.confirm("Revert this PO to UNPAID status?")) return;
 
                 try {
-                  await axios.put(`${BASE}/api/purchase_orders/${po.id}`, {
+                  await axios.put(`${BASE}/purchase_orders/${po.id}`, {
                     ...po,
                     status: "Received", // revert to previous state
                   });
@@ -235,7 +235,7 @@ if (!id || isNaN(Number(id))) {
                 return;
 
               try {
-                await axios.delete(`${BASE}/api/purchase_orders/${po.id}`);
+                await axios.delete(`${BASE}/purchase_orders/${po.id}`);
                 alert("✅ Purchase Order deleted");
                 handleClose();
               } catch (err) {

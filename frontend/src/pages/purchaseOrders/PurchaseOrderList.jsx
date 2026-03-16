@@ -72,7 +72,7 @@ export default function PurchaseOrderList() {
 
   const loadOrders = async () => {
     try {
-      const res = await axios.get(`${BASE}/api/purchase_orders`);
+      const res = await axios.get(`${BASE}/purchase_orders`);
       const data = Array.isArray(res.data) ? res.data : [];
       setOrders(data);
     } catch (err) {
@@ -127,7 +127,7 @@ export default function PurchaseOrderList() {
   // ✅ Load vendors for Reserve modal
   const loadVendors = async () => {
     try {
-      const res = await axios.get(`${BASE}/api/vendors`);
+      const res = await axios.get(`${BASE}/vendors`);
       const raw = res.data?.data || res.data || [];
       setVendors(Array.isArray(raw) ? raw : []);
     } catch {
@@ -149,7 +149,7 @@ export default function PurchaseOrderList() {
         setReserveLoading(true);
         setReservePreview({ psr_po_number: "", order_date: "" });
 
-        const res = await axios.get(`${BASE}/api/purchase_orders/next-number`);
+        const res = await axios.get(`${BASE}/purchase_orders/next-number`);
         setReservePreview({
           psr_po_number: res.data?.psr_po_number || "",
           order_date: res.data?.order_date || "",
@@ -280,7 +280,7 @@ export default function PurchaseOrderList() {
       setReserveLoading(true);
       setReservePreview({ psr_po_number: "", order_date: "" });
 
-      const res = await axios.get(`${BASE}/api/purchase_orders/next-number`);
+      const res = await axios.get(`${BASE}/purchase_orders/next-number`);
       setReservePreview({
         psr_po_number: res.data?.psr_po_number || "",
         order_date: res.data?.order_date || "",
@@ -303,7 +303,7 @@ export default function PurchaseOrderList() {
       setReserveErr("");
       setReserveSubmitting(true);
 
-      const res = await axios.post(`${BASE}/api/vendors`, {
+      const res = await axios.post(`${BASE}/vendors`, {
         ...newVendor,
         is_active: true,
       });
@@ -372,7 +372,7 @@ export default function PurchaseOrderList() {
         remarks: reserveForm.remarks || "",
       };
 
-      const res = await axios.post(`${BASE}/api/purchase_orders/reserve`, payload);
+      const res = await axios.post(`${BASE}/purchase_orders/reserve`, payload);
 
       const newId = res.data?.data?.id;
 

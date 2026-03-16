@@ -95,7 +95,7 @@ export default function PoImportFromPdfPage() {
       setError("");
       setResult(null);
 
-      const res = await axios.post(`${BASE}/api/po_import/pdf`, formData, {
+      const res = await axios.post(`${BASE}/po_import/pdf`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 

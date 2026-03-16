@@ -25,7 +25,7 @@ export default function ProductDetail() {
         setLoading(true);
         setError("");
 
-        const res = await axios.get(`${BASE}/api/products/${id}`);
+        const res = await axios.get(`${BASE}/products/${id}`);
         if (!ignore) {
           setProduct(res?.data?.data || null);
         }
@@ -56,7 +56,7 @@ export default function ProductDetail() {
     async function loadBom() {
       try {
         setBomLoading(true);
-        const res = await axios.get(`${BASE}/api/products/${id}/bom`);
+        const res = await axios.get(`${BASE}/products/${id}/bom`);
         if (!ignore) {
           setBom(res?.data?.data || null);
         }

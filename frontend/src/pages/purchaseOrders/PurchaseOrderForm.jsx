@@ -341,7 +341,7 @@ export default function PurchaseOrderForm({
     let cancelled = false;
 
     axios
-      .get(`${BASE}/api/purchase_orders/next-number`)
+      .get(`${BASE}/purchase_orders/next-number`)
       .then((res) => {
         if (cancelled) return;
 
@@ -366,12 +366,12 @@ export default function PurchaseOrderForm({
   // Load vendors + parts
   useEffect(() => {
     axios
-      .get(`${BASE}/api/vendors`)
+      .get(`${BASE}/vendors`)
       .then((res) => setVendors(res.data || []))
       .catch(() => setVendors([]));
 
     axios
-      .get(`${BASE}/api/parts`)
+      .get(`${BASE}/parts`)
       .then((res) => {
         const raw = res.data?.data || res.data || [];
         const normalized = raw.map((p) => ({
@@ -451,7 +451,7 @@ export default function PurchaseOrderForm({
     }
 
     try {
-      const res = await axios.post(`${BASE}/api/parts`, {
+      const res = await axios.post(`${BASE}/parts`, {
         part_number: draft.part_number,
         part_name: draft.part_name || "",
         description: draft.description || "",
@@ -547,7 +547,7 @@ export default function PurchaseOrderForm({
       return;
     }
     try {
-      const res = await axios.post(`${BASE}/api/parts`, {
+      const res = await axios.post(`${BASE}/parts`, {
         part_number: globalPart.part_number,
         part_name: globalPart.part_name || "",
         description: globalPart.description || "",
@@ -595,7 +595,7 @@ export default function PurchaseOrderForm({
       return;
     }
     try {
-      const res = await axios.post(`${BASE}/api/vendors`, {
+      const res = await axios.post(`${BASE}/vendors`, {
         ...newVendor,
         is_active: true,
       });
@@ -638,7 +638,7 @@ export default function PurchaseOrderForm({
 
     try {
       setDeletingFileIds((prev) => [...prev, fileId]);
-      await axios.delete(`${BASE}/api/purchase_orders/${initialPo.id}/file/${fileId}`);
+      await axios.delete(`${BASE}/purchase_orders/${initialPo.id}/file/${fileId}`);
       setExistingFiles((prev) => prev.filter((f) => f.id !== fileId));
     } catch (err) {
       console.error("❌ File delete error:", err);
@@ -660,7 +660,7 @@ export default function PurchaseOrderForm({
     try {
       setSubmitting(true);
 
-      const res = await axios.post(`${BASE}/api/purchase_orders`, {
+      const res = await axios.post(`${BASE}/purchase_orders`, {
         ...po,
         status: "Draft",
         received_by: po.received_by || "",
@@ -689,7 +689,7 @@ export default function PurchaseOrderForm({
         });
 
         const uploadRes = await axios.post(
-          `${BASE}/api/purchase_orders/${newId}/upload`,
+          `${BASE}/purchase_orders/${newId}/upload`,
           formData,
           { headers: { "Content-Type": "multipart/form-data" } }
         );
@@ -775,24 +775,24 @@ export default function PurchaseOrderForm({
 
     try {
       if (initialPo?.id) {
-        await axios.put(`${BASE}/api/purchase_orders/${initialPo.id}`, payload);
+        await axios.put(`${BASE}/purchase_orders/${initialPo.id}`, payload);
 
         if (attachments.length > 0) {
           const fd = new FormData();
           attachments.forEach((f) => fd.append("files", f));
-          await axios.post(`${BASE}/api/purchase_orders/${initialPo.id}/upload`, fd);
+          await axios.post(`${BASE}/purchase_orders/${initialPo.id}/upload`, fd);
         }
 
         alert("PO updated successfully.");
       } else {
-        const res = await axios.post(`${BASE}/api/purchase_orders`, payload);
+        const res = await axios.post(`${BASE}/purchase_orders`, payload);
 
         const poId = res.data?.po_id;
 
         if (poId && attachments.length) {
           const fd = new FormData();
           attachments.forEach((f) => fd.append("files", f));
-          await axios.post(`${BASE}/api/purchase_orders/${poId}/upload`, fd);
+          await axios.post(`${BASE}/purchase_orders/${poId}/upload`, fd);
         }
 
         alert("PO created successfully.");
@@ -816,7 +816,7 @@ export default function PurchaseOrderForm({
   const markPlaced = async () => {
     if (!initialPo?.id) return;
 
-    await axios.put(`${BASE}/api/purchase_orders/${initialPo.id}`, {
+    await axios.put(`${BASE}/purchase_orders/${initialPo.id}`, {
       ...po,
       status: "Placed",
     });
@@ -828,7 +828,7 @@ export default function PurchaseOrderForm({
   const markReceived = async () => {
     if (!initialPo?.id) return;
 
-    await axios.put(`${BASE}/api/purchase_orders/${initialPo.id}`, {
+    await axios.put(`${BASE}/purchase_orders/${initialPo.id}`, {
       ...po,
       status: "Received",
     });
@@ -841,7 +841,7 @@ export default function PurchaseOrderForm({
     if (!initialPo?.id) return;
     if (!window.confirm("Cancel this PO?")) return;
 
-    await axios.put(`${BASE}/api/purchase_orders/${initialPo.id}`, {
+    await axios.put(`${BASE}/purchase_orders/${initialPo.id}`, {
       ...po,
       status: "Cancelled",
     });

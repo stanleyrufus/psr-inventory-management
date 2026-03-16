@@ -53,7 +53,7 @@ export default function PartDetail({ part, onClose }) {
   React.useEffect(() => {
     if (!part?.part_id) return;
 
-    fetch(`${BASE}/api/parts/${part.part_id}/purchase-orders`)
+    fetch(`${BASE}/parts/${part.part_id}/purchase-orders`)
       .then((res) => res.json())
       .then((json) => setRelatedPOs(json.data || []))
       .catch(() => setRelatedPOs([]));
@@ -83,7 +83,7 @@ export default function PartDetail({ part, onClose }) {
             onClick={() => {
               if (!window.confirm("Delete this part permanently?")) return;
 
-              fetch(`${BASE}/api/parts/${part.part_id}`, { method: "DELETE" })
+              fetch(`${BASE}/parts/${part.part_id}`, { method: "DELETE" })
                 .then(() => {
                   alert("Deleted successfully.");
                   onClose();

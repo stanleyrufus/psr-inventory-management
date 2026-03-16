@@ -18,7 +18,7 @@ if (!id || isNaN(Number(id))) {
 
   const loadPo = async () => {
     try {
-      const res = await axios.get(`${BASE}/api/purchase_orders/${id}`);
+      const res = await axios.get(`${BASE}/purchase_orders/${id}`);
 
       const normalized =
         res.data?.data && typeof res.data.data === "object"

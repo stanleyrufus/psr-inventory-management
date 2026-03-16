@@ -184,21 +184,21 @@ export default function SendRfqPage() {
         setLoading(true);
 
         // 1) Load vendors (same as POForm source)
-        const vRes = await axios.get(`${BASE}/api/vendors`);
+        const vRes = await axios.get(`${BASE}/vendors`);
         if (!cancelled) {
           const arr = vRes.data?.data || vRes.data || [];
           setVendorsRaw(Array.isArray(arr) ? arr : []);
         }
 
         // 2) Load PO header info
-        const poRes = await axios.get(`${BASE}/api/purchase_orders/${id}`);
+        const poRes = await axios.get(`${BASE}/purchase_orders/${id}`);
         const poData = poRes.data?.data || poRes.data;
         if (!poData) throw new Error("PO not found");
         if (!cancelled) setPo(poData);
 
         // 3) Load RFQ preview (includes main vendor email & subject)
         const prevRes = await axios.get(
-          `${BASE}/api/purchase_orders/${id}/rfq/preview`
+          `${BASE}/purchase_orders/${id}/rfq/preview`
         );
         const data = prevRes.data;
 
@@ -282,7 +282,7 @@ export default function SendRfqPage() {
     try {
       setSending(true);
 
-      await axios.post(`${BASE}/api/purchase_orders/${id}/rfq/send`, {
+      await axios.post(`${BASE}/purchase_orders/${id}/rfq/send`, {
         to: parsedTo,
         cc: parsedCc,
         bcc: parsedBcc,

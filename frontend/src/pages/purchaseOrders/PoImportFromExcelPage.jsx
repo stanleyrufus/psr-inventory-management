@@ -105,7 +105,7 @@ export default function PoImportFromExcelPage() {
       setError("");
       setResult(null);
 
-      const res = await axios.post(`${BASE}/api/po_import/excel`, formData, {
+      const res = await axios.post(`${BASE}/po_import/excel`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
