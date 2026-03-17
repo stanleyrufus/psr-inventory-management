@@ -365,16 +365,20 @@ export default function PurchaseOrderForm({
 
   // Load vendors + parts
   useEffect(() => {
-    axios
+        axios
       .get(`${BASE}/vendors`)
-      .then((res) => setVendors(res.data || []))
+      .then((res) => {
+        const raw = res.data?.data || res.data || [];
+        setVendors(Array.isArray(raw) ? raw : []);
+      })
       .catch(() => setVendors([]));
 
-    axios
+        axios
       .get(`${BASE}/parts`)
       .then((res) => {
         const raw = res.data?.data || res.data || [];
-        const normalized = raw.map((p) => ({
+        const safeRaw = Array.isArray(raw) ? raw : [];
+        const normalized = safeRaw.map((p) => ({
           part_id: p.part_id || p.id,
           part_number: p.part_number,
           description: p.description || "",
@@ -813,29 +817,7 @@ export default function PurchaseOrderForm({
   const status = po.status;
 
   // ✅ OPTIONAL ACTIONS (no RFQ)
-  const markPlaced = async () => {
-    if (!initialPo?.id) return;
 
-    await axios.put(`${BASE}/purchase_orders/${initialPo.id}`, {
-      ...po,
-      status: "Placed",
-    });
-
-    setPo((p) => ({ ...p, status: "Placed" }));
-    alert("PO Marked Placed");
-  };
-
-  const markReceived = async () => {
-    if (!initialPo?.id) return;
-
-    await axios.put(`${BASE}/purchase_orders/${initialPo.id}`, {
-      ...po,
-      status: "Received",
-    });
-
-    setPo((p) => ({ ...p, status: "Received" }));
-    alert("PO Marked Received");
-  };
 
   const cancelPO = async () => {
     if (!initialPo?.id) return;
@@ -1558,28 +1540,8 @@ export default function PurchaseOrderForm({
         )}
 
         {/* Optional non-RFQ actions (keep or remove as you like) */}
-        {initialPo?.id && status === "Draft" && (
-          <button
-            type="button"
-            onClick={markPlaced}
-            className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded shadow"
-            disabled={submitting}
-          >
-            Mark As Placed
-          </button>
-        )}
 
-        {initialPo?.id && status === "Placed" && (
-          <button
-            type="button"
-            onClick={markReceived}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
-            disabled={submitting}
-          >
-            Mark As Received
-          </button>
-        )}
-
+        
         {initialPo?.id && status !== "Cancelled" && (
           <button
             type="button"
