@@ -131,15 +131,6 @@ function SearchSelect({
    EXISTING FILE CONTENT
    ============================= */
 
-function PaidStamp() {
-  return (
-    <div className="absolute top-2 right-2 rotate-[-15deg] pointer-events-none opacity-70">
-      <span className="inline-block px-4 py-1 text-red-700 border-4 border-red-700 font-extrabold text-2xl tracking-wider rounded-lg">
-        PAID
-      </span>
-    </div>
-  );
-}
 
 const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const FILE_BASE = BASE.replace(/\/api$/, "");
@@ -894,7 +885,6 @@ export default function PurchaseOrderForm({
             {/* ✅ RFQ statuses removed */}
             <option value="Ordered">Ordered</option>
             <option value="Received">Received</option>
-            <option value="Paid">Paid</option>
             <option value="Cancelled">Cancelled</option>
           </select>
         </div>
@@ -1502,9 +1492,7 @@ export default function PurchaseOrderForm({
         </div>
       </div>
 
-      {/* PAID STAMP */}
-      {po.status === "Paid" && <PaidStamp />}
-
+      
       {/* --- Buttons --- */}
       <div className="mt-6 flex justify-end space-x-4">
         <button

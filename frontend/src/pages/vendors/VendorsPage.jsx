@@ -98,7 +98,6 @@ export default function VendorsPage() {
       try {
         await deleteVendor(vendor.vendor_id);
 
-        // ✅ Optimistic remove so user immediately sees change
         setVendors((prev) =>
           prev.filter((v) => String(v.vendor_id) !== String(vendor.vendor_id))
         );
@@ -165,34 +164,8 @@ export default function VendorsPage() {
           );
         },
       },
-      {
-        headerName: "Actions",
-        flex: 1,
-        cellRenderer: (params) => (
-          <div className="flex gap-2">
-            <button
-              className="bg-gray-200 hover:bg-gray-300 px-2 py-1 text-xs rounded"
-              onClick={() => onView(params.data)}
-            >
-              View
-            </button>
-            <button
-              className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 text-xs rounded"
-              onClick={() => onEdit(params.data)}
-            >
-              Edit
-            </button>
-            <button
-              className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 text-xs rounded"
-              onClick={() => onDeleteFromGrid(params.data)}
-            >
-              Delete
-            </button>
-          </div>
-        ),
-      },
     ],
-    [onView, onEdit, onDeleteFromGrid]
+    [onView]
   );
 
   return (
@@ -269,7 +242,6 @@ export default function VendorsPage() {
         </select>
       </div>
 
-      {/* AG GRID */}
       <div className="ag-theme-quartz" style={{ width: "100%" }}>
         <AgGridReact
           rowData={pageData}
@@ -278,93 +250,6 @@ export default function VendorsPage() {
           domLayout="autoHeight"
         />
       </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center mt-4 gap-3 text-sm">
-          <button
-            onClick={() => goToPage(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="px-3 py-1 border rounded disabled:opacity-50"
-          >
-            Prev
-          </button>
-
-          <span>
-            Page {currentPage} of {totalPages}
-          </span>
-
-          <button
-            onClick={() => goToPage(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="px-3 py-1 border rounded disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
-      )}
-
-      {/* Add/Edit Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex justify-center items-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-6">
-            <VendorForm
-              initial={editingVendor}
-              onSaved={() => {
-                setShowForm(false);
-                setEditingVendor(null);
-                loadVendors();
-              }}
-              onCancel={() => {
-                setShowForm(false);
-                setEditingVendor(null);
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* View Vendor Modal */}
-      {viewingVendor && (
-        <VendorDetails
-          vendor={viewingVendor}
-          onClose={() => setViewingVendor(null)}
-          onEdit={(v) => {
-            setViewingVendor(null);
-            setEditingVendor(v);
-            setShowForm(true);
-          }}
-          onDeleted={(deletedId) => {
-            setViewingVendor(null);
-            // ✅ remove from list immediately
-            setVendors((prev) =>
-              prev.filter((x) => String(x.vendor_id) !== String(deletedId))
-            );
-            alert("Vendor deleted successfully.");
-          }}
-        />
-      )}
-
-      {/* Bulk Upload Modal */}
-      {showBulk && (
-        <div className="fixed inset-0 bg-black/40 flex justify-center items-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full p-6 relative">
-            <VendorBulkUpload
-              onClose={() => setShowBulk(false)}
-              onComplete={() => {
-                setShowBulk(false);
-                loadVendors();
-              }}
-            />
-            <button
-              className="absolute top-3 right-4 text-gray-500 hover:text-gray-700"
-              onClick={() => setShowBulk(false)}
-            >
-              ✖
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
