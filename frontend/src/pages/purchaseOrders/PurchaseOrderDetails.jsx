@@ -216,13 +216,11 @@ if (!id || isNaN(Number(id))) {
           )}
 
           <button
-            className="px-3 h-10 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded shadow flex items-center"
-            onClick={() =>
-              (window.location.href = `/purchase-orders/edit/${po.id}`)
-            }
-          >
-            ✏️ Edit
-          </button>
+  className="px-3 h-10 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded shadow flex items-center"
+  onClick={() => navigate(`/purchase-orders/edit/${po.id}`)}
+>
+  ✏️ Edit
+</button>
 
           <button
             className="px-3 h-10 bg-red-600 hover:bg-red-700 text-white text-sm rounded shadow flex items-center"

@@ -102,10 +102,19 @@ export default function PoImportFromPdfPage() {
       setResult(res.data);
     } catch (err) {
       console.error("❌ PDF import failed:", err);
+
+      const data = err?.response?.data;
+
+      // ✅ keep backend details so failed file reasons still render
+      if (data && (data.errors || data.created)) {
+        setResult(data);
+      }
+
       const msg =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
+        data?.message ||
+        data?.error ||
         "Failed to import POs from PDF.";
+
       setError(msg);
     } finally {
       setUploading(false);

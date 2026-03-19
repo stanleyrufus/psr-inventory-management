@@ -6,10 +6,7 @@ function getLatestPO(relatedPOs) {
   return relatedPOs[0];
 }
 
-const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
-  /\/api$/,
-  ""
-);
+const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
 /* IMAGE HELPERS */
 function getPartImagePaths(image_url) {
@@ -53,7 +50,7 @@ export default function PartDetail({ part, onClose }) {
   React.useEffect(() => {
     if (!part?.part_id) return;
 
-    fetch(`${BASE}/parts/${part.part_id}/purchase-orders`)
+fetch(`${BASE}/parts/${part.part_id}/purchase-orders`)
       .then((res) => res.json())
       .then((json) => setRelatedPOs(json.data || []))
       .catch(() => setRelatedPOs([]));
