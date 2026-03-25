@@ -11,24 +11,32 @@ const router = express.Router();
  */
 router.get("/", async (req, res) => {
   try {
-    const { category, status } = req.query;
-    let query = db("products").select("*").orderBy("id", "desc");
+    const { category } = req.query;
 
-    if (category) query = query.whereILike("category", `%${category}%`);
-    if (status) query = query.where("status", status);
+    let query = db("products")
+      .select("*")
+      .where("status", "Active")
+      .whereNotNull("image_url")
+      .whereRaw("trim(coalesce(image_url, '')) <> ''")
+      .orderBy("id", "asc");
+
+    if (category) {
+      query = query.whereILike("category", `%${category}%`);
+    }
 
     const products = await query;
 
     return res.status(200).json({
       success: true,
-      message: "Products fetched successfully",
       data: products,
     });
   } catch (err) {
     console.error("❌ Error fetching products:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Error fetching products", data: [] });
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching products",
+      data: [],
+    });
   }
 });
 
