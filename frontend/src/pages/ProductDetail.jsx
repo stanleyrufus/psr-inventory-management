@@ -2,9 +2,100 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 
-const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
+const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
-const money = (v) => "$" + Number(v || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+<div className="mb-4 p-2 bg-yellow-100 border border-yellow-300 text-sm font-semibold">
+  DEBUG: Electrical BOM section enabled
+</div>
+
+const money = (v) =>
+  "$" +
+  Number(v || 0).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+function BomTable({ title, rows, total, bomLoading, emptyText }) {
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-2xl font-semibold text-gray-800">{title}</h2>
+        {bomLoading ? (
+          <span className="text-sm text-gray-500">Loading BOM...</span>
+        ) : (
+          <span className="text-lg font-semibold text-green-700">
+            {title.replace(" Parts", "")} Budget: {money(total)}
+          </span>
+        )}
+      </div>
+
+      {bomLoading ? (
+        <div className="text-gray-500 py-6">Loading BOM details...</div>
+      ) : rows.length === 0 ? (
+        <div className="text-gray-500 py-6">{emptyText}</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm border">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="border px-3 py-2 text-left">Part Number</th>
+                <th className="border px-3 py-2 text-left">Part Name / Description</th>
+                <th className="border px-3 py-2 text-left">Vendor</th>
+                <th className="border px-3 py-2 text-right">Unit Price</th>
+                <th className="border px-3 py-2 text-right">Qty Required</th>
+                <th className="border px-3 py-2 text-right">Extended Cost</th>
+                <th className="border px-3 py-2 text-right">Stock</th>
+                <th className="border px-3 py-2 text-left">UOM</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id}>
+                  <td className="border px-3 py-2 font-medium text-gray-800">
+                    {row.part_number}
+                  </td>
+                  <td className="border px-3 py-2 text-gray-700">
+                    {row.part_name || row.description || row.source_description || "-"}
+                  </td>
+                  <td className="border px-3 py-2 text-gray-700">
+                    {row.last_vendor_name || "-"}
+                  </td>
+                  <td className="border px-3 py-2 text-right text-gray-700">
+                    {money(row.unit_price_for_budget)}
+                  </td>
+                  <td className="border px-3 py-2 text-right text-gray-700">
+                    {Number(row.qty_required || 0)}
+                  </td>
+                  <td className="border px-3 py-2 text-right font-semibold text-gray-800">
+                    {money(row.extended_cost)}
+                  </td>
+                  <td className="border px-3 py-2 text-right text-gray-700">
+                    {Number(row.quantity_on_hand || 0)}
+                  </td>
+                  <td className="border px-3 py-2 text-gray-700">{row.uom || "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="bg-gray-50">
+                <td
+                  colSpan="5"
+                  className="border px-3 py-2 text-right font-semibold text-gray-800"
+                >
+                  {title.replace(" Parts", "")} Total
+                </td>
+                <td className="border px-3 py-2 text-right font-bold text-green-700">
+                  {money(total)}
+                </td>
+                <td colSpan="2" className="border px-3 py-2"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
 
 export default function ProductDetail() {
   const { state } = useLocation();
@@ -24,26 +115,18 @@ export default function ProductDetail() {
       try {
         setLoading(true);
         setError("");
-
         const res = await axios.get(`${BASE}/products/${id}`);
-        if (!ignore) {
-          setProduct(res?.data?.data || null);
-        }
+        if (!ignore) setProduct(res?.data?.data || null);
       } catch (err) {
         console.error("❌ Error loading product:", err);
-        if (!ignore) {
-          setError("Failed to load product details.");
-        }
+        if (!ignore) setError("Failed to load product details.");
       } finally {
         if (!ignore) setLoading(false);
       }
     }
 
-    if (!state?.product) {
-      loadProduct();
-    } else {
-      setLoading(false);
-    }
+    if (!state?.product) loadProduct();
+    else setLoading(false);
 
     return () => {
       ignore = true;
@@ -57,14 +140,10 @@ export default function ProductDetail() {
       try {
         setBomLoading(true);
         const res = await axios.get(`${BASE}/products/${id}/bom`);
-        if (!ignore) {
-          setBom(res?.data?.data || null);
-        }
+        if (!ignore) setBom(res?.data?.data || null);
       } catch (err) {
         console.error("❌ Error loading product BOM:", err);
-        if (!ignore) {
-          setBom(null);
-        }
+        if (!ignore) setBom(null);
       } finally {
         if (!ignore) setBomLoading(false);
       }
@@ -78,7 +157,17 @@ export default function ProductDetail() {
   }, [id]);
 
   const mechanicalParts = useMemo(() => bom?.grouped?.mechanical || [], [bom]);
-  const totals = bom?.totals || { mechanical: 0, electrical: 0, other: 0, grand: 0 };
+  const electricalParts = useMemo(() => bom?.grouped?.electrical || [], [bom]);
+  const totals = bom?.totals || {
+    mechanical: 0,
+    electrical: 0,
+    other: 0,
+    grand: 0,
+  };
+
+  console.log("BOM DATA:", bom);
+  console.log("Mechanical:", mechanicalParts.length);
+  console.log("Electrical:", electricalParts.length);
 
   if (loading) {
     return <div className="p-6 text-center text-gray-500">Loading product details...</div>;
@@ -94,13 +183,8 @@ export default function ProductDetail() {
     product.nozzle_count ||
     typeof product.demo_available !== "undefined";
 
-  const keyFeatures = Array.isArray(product.key_features)
-    ? product.key_features
-    : [];
-
-  const applications = Array.isArray(product.applications)
-    ? product.applications
-    : [];
+  const keyFeatures = Array.isArray(product.key_features) ? product.key_features : [];
+  const applications = Array.isArray(product.applications) ? product.applications : [];
 
   return (
     <div className="p-8 max-w-7xl mx-auto bg-white rounded-lg shadow-md">
@@ -216,82 +300,23 @@ export default function ProductDetail() {
 
       <hr className="my-6" />
 
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-2xl font-semibold text-gray-800">Mechanical Parts</h2>
-          {bomLoading ? (
-            <span className="text-sm text-gray-500">Loading BOM...</span>
-          ) : (
-            <span className="text-lg font-semibold text-green-700">
-              Mechanical Budget: {money(totals.mechanical)}
-            </span>
-          )}
-        </div>
+      <BomTable
+        title="Mechanical Parts"
+        rows={mechanicalParts}
+        total={totals.mechanical}
+        bomLoading={bomLoading}
+        emptyText="No mechanical BOM parts found."
+      />
 
-        {bomLoading ? (
-          <div className="text-gray-500 py-6">Loading BOM details...</div>
-        ) : mechanicalParts.length === 0 ? (
-          <div className="text-gray-500 py-6">No mechanical BOM parts found.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm border">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="border px-3 py-2 text-left">Part Number</th>
-                  <th className="border px-3 py-2 text-left">Part Name / Description</th>
-                  <th className="border px-3 py-2 text-left">Vendor</th>
-                  <th className="border px-3 py-2 text-right">Unit Price</th>
-                  <th className="border px-3 py-2 text-right">Qty Required</th>
-                  <th className="border px-3 py-2 text-right">Extended Cost</th>
-                  <th className="border px-3 py-2 text-right">Stock</th>
-                  <th className="border px-3 py-2 text-left">UOM</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mechanicalParts.map((row) => (
-                  <tr key={row.id}>
-                    <td className="border px-3 py-2 font-medium text-gray-800">
-                      {row.part_number}
-                    </td>
-                    <td className="border px-3 py-2 text-gray-700">
-                      {row.part_name || row.description || row.source_description || "-"}
-                    </td>
-                    <td className="border px-3 py-2 text-gray-700">
-                      {row.last_vendor_name || "-"}
-                    </td>
-                    <td className="border px-3 py-2 text-right text-gray-700">
-                      {money(row.unit_price_for_budget)}
-                    </td>
-                    <td className="border px-3 py-2 text-right text-gray-700">
-                      {Number(row.qty_required || 0)}
-                    </td>
-                    <td className="border px-3 py-2 text-right font-semibold text-gray-800">
-                      {money(row.extended_cost)}
-                    </td>
-                    <td className="border px-3 py-2 text-right text-gray-700">
-                      {Number(row.quantity_on_hand || 0)}
-                    </td>
-                    <td className="border px-3 py-2 text-gray-700">
-                      {row.uom || "-"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="bg-gray-50">
-                  <td colSpan="5" className="border px-3 py-2 text-right font-semibold text-gray-800">
-                    Mechanical Total
-                  </td>
-                  <td className="border px-3 py-2 text-right font-bold text-green-700">
-                    {money(totals.mechanical)}
-                  </td>
-                  <td colSpan="2" className="border px-3 py-2"></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        )}
-      </section>
+      <hr className="my-6" />
+
+      <BomTable
+        title="Electrical Parts"
+        rows={electricalParts}
+        total={totals.electrical}
+        bomLoading={bomLoading}
+        emptyText="No electrical BOM parts found."
+      />
 
       <hr className="my-6" />
 

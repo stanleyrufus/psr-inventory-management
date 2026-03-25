@@ -196,6 +196,98 @@ router.get("/", async (req, res) => {
    GET SINGLE PART  ->  GET /api/parts/:id
    ⚠️ THIS MUST COME AFTER ALL THE /xxx ROUTES ABOVE
 ---------------------------------------------------------*/
+/* --------------------------------------------------------
+   BULK UPLOAD PARTS  ->  POST /api/parts/bulk-upload
+---------------------------------------------------------*/
+router.post("/bulk-upload", async (req, res) => {
+  try {
+    const parts = Array.isArray(req.body.parts) ? req.body.parts : [];
+
+    if (!parts.length) {
+      return res.status(400).json({
+        success: 0,
+        message: "No parts provided for bulk upload.",
+      });
+    }
+
+    let insertedCount = 0;
+    let skippedCount = 0;
+    const skipped = [];
+
+    for (const row of parts) {
+      const part_number = String(row.part_number || "").trim();
+      const part_name = String(row.part_name || "").trim();
+
+      if (!part_number || !part_name) {
+        skippedCount++;
+        skipped.push({
+          part_number: part_number || "(missing)",
+          reason: "Missing required field(s): part_number and/or part_name",
+        });
+        continue;
+      }
+
+      const existing = await db("inventory")
+        .where({ part_number })
+        .first();
+
+      if (existing) {
+        skippedCount++;
+        skipped.push({
+          part_number,
+          reason: "Duplicate part_number already exists",
+        });
+        continue;
+      }
+
+      await db("inventory").insert({
+        part_number,
+        part_name,
+        category: row.category || "",
+        description: row.description || "",
+        uom: row.uom || "",
+        quantity_on_hand: Number(row.quantity_on_hand) || 0,
+        minimum_stock_level: Number(row.minimum_stock_level) || 0,
+        current_unit_price: Number(row.current_unit_price) || 0,
+        weight_kg:
+          row.weight_kg === "" || row.weight_kg === null || row.weight_kg === undefined
+            ? null
+            : Number(row.weight_kg),
+        lead_time_days:
+          row.lead_time_days === "" || row.lead_time_days === null || row.lead_time_days === undefined
+            ? null
+            : Number(row.lead_time_days),
+        location: row.location || "",
+        status: row.status || "Active",
+        material: row.material || "",
+        remarks: row.remarks || "",
+        machine_name: row.machine_name || "",
+        last_po_date: row.last_po_date || null,
+        updated_on: db.fn.now(),
+      });
+
+      insertedCount++;
+    }
+
+    return res.json({
+      success: 1,
+      message:
+        `Bulk upload completed.\n` +
+        `Inserted: ${insertedCount}\n` +
+        `Skipped: ${skippedCount}`,
+      inserted: insertedCount,
+      skipped: skippedCount,
+      skipped_rows: skipped,
+    });
+  } catch (err) {
+    console.error("❌ POST /api/parts/bulk-upload error:", err);
+    return res.status(500).json({
+      success: 0,
+      message: "Failed to bulk upload parts",
+    });
+  }
+});
+
 router.get("/:id", async (req, res) => {
   const id = Number(req.params.id);
   try {

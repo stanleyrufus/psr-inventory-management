@@ -1,5 +1,3 @@
-// backend/services/poHybridExtractor.js
-
 import { extractPoFromPdf as extractClassic } from "./poPdfExtractor.js";
 import { extractPoWithAzureAi as extractAi } from "./poAzureAiExtractor.js";
 
@@ -22,14 +20,12 @@ function isPersonLikeName(v) {
   return /^[A-Za-z .'-]+$/.test(t);
 }
 
-// Move "Attn: Pam ..." out of vendor contact and into orderedBy
 function sanitizeAttn(result) {
   if (!result || !result.vendor) return result;
 
   const vendorName = s(result.vendor.name).toLowerCase();
   const contact = s(result.vendor.contactName);
 
-  // If contact contains Attn: X, that is PSR person, not vendor
   const m = contact.match(/\battn\b[:\-]?\s*(.+)$/i);
   if (m?.[1]) {
     const name = s(m[1]);
@@ -37,7 +33,6 @@ function sanitizeAttn(result) {
     result.vendor.contactName = null;
   }
 
-  // McMaster: if vendor contact looks like a human name, move it
   if (vendorName.includes("mcmaster")) {
     if (contact && isPersonLikeName(contact)) {
       if (!s(result.orderedBy)) result.orderedBy = contact;
@@ -57,17 +52,32 @@ function normalizeTotals(result) {
   result.taxPercent = n(result.taxPercent, 0);
   result.grandTotal = n(result.grandTotal, 0);
 
-  // If grandTotal missing, compute
   if (!result.grandTotal || result.grandTotal <= 0) {
     result.grandTotal = result.subtotal + result.shipping + result.taxAmount;
   }
 
-  // If grandTotal < subtotal, fix
   if (result.grandTotal < result.subtotal) {
     result.grandTotal = result.subtotal + result.shipping + result.taxAmount;
   }
 
   return result;
+}
+
+function hasTooManyDuplicateItems(items = []) {
+  if (!Array.isArray(items) || items.length < 2) return false;
+
+  const keys = items.map((x) =>
+    [
+      s(x.partNumber),
+      s(x.description),
+      n(x.quantity, 0),
+      n(x.unitPrice, 0),
+      n(x.totalPrice, 0),
+    ].join("|")
+  );
+
+  const unique = new Set(keys);
+  return unique.size <= Math.ceil(items.length / 2);
 }
 
 function looksValid(r) {
@@ -81,36 +91,70 @@ function looksValid(r) {
 /* ---------------- AI-FIRST extractor ---------------- */
 
 export async function extractPoHybrid(filePath) {
-  // ✅ Always use AI first
   try {
-const MAX_PAGES = Number(process.env.PO_IMPORT_MAX_PAGES || 3);
+    const MAX_PAGES = Number(process.env.PO_IMPORT_MAX_PAGES || 4);
 
-const ai = await extractAi(filePath, {
-  pages: MAX_PAGES,
-  debug: false
-});
+    const ai = await extractAi(filePath, {
+      pages: MAX_PAGES,
+      debug: false,
+    });
+
+    console.log("🟦 AI pages used:", MAX_PAGES);
+    console.log("🟦 AI PO:", ai?.psrPoNumber);
+    console.log("🟦 AI vendor:", ai?.vendor?.name);
+    console.log("🟦 AI item count before sanitize:", ai?.items?.length || 0);
 
     sanitizeAttn(ai);
     normalizeTotals(ai);
 
-    // If AI is valid, return it
+    console.log("🟦 AI item count after sanitize:", ai?.items?.length || 0);
+    console.log(
+      "🟦 AI items preview:",
+      (ai?.items || []).map((x, i) => ({
+        line: i + 1,
+        partNumber: x.partNumber,
+        description: x.description,
+        quantity: x.quantity,
+        unitPrice: x.unitPrice,
+        totalPrice: x.totalPrice,
+      }))
+    );
+
     if (looksValid(ai)) {
       ai.extractionSource = "azure-ai";
       ai.remarks = ai.remarks || "";
       return ai;
     }
-    // If AI returns weak output, fall through to classic
+
+    console.log("🟨 AI output invalid or suspicious, falling back to classic");
   } catch (e) {
-    // AI failed -> fall back to classic
+    console.log("🟥 AI extractor failed, falling back to classic:", e.message);
   }
 
-  // ✅ Classic fallback only if AI fails
   const classic = await extractClassic(filePath);
+
+  console.log("🟪 Classic PO:", classic?.psrPoNumber);
+  console.log("🟪 Classic vendor:", classic?.vendor?.name);
+  console.log("🟪 Classic item count before sanitize:", classic?.items?.length || 0);
 
   sanitizeAttn(classic);
   normalizeTotals(classic);
 
+  console.log("🟪 Classic item count after sanitize:", classic?.items?.length || 0);
+  console.log(
+    "🟪 Classic items preview:",
+    (classic?.items || []).map((x, i) => ({
+      line: i + 1,
+      partNumber: x.partNumber,
+      description: x.description,
+      quantity: x.quantity,
+      unitPrice: x.unitPrice,
+      totalPrice: x.totalPrice,
+    }))
+  );
+
   classic.extractionSource = classic.extractionSource || "classic";
   classic.remarks = classic.remarks || "";
+
   return classic;
 }

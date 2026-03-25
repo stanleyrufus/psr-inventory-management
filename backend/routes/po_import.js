@@ -211,10 +211,31 @@ router.post("/pdf", upload.array("files", 10), async (req, res) => {
     for (const file of req.files) {
       try {
         const filePath = file.path;
-        const extracted = await extractPoHybrid(filePath);
+   const extracted = await extractPoHybrid(filePath);
 
-        console.log("✅ Hybrid extraction source:", extracted?.extractionSource);
-        console.log("✅ Hybrid PO:", extracted?.psrPoNumber);
+console.log("=== PDF IMPORT DEBUG START ===");
+console.log("file:", file.originalname);
+console.log("extractionSource:", extracted?.extractionSource);
+console.log("psrPoNumber:", extracted?.psrPoNumber);
+console.log("vendor:", extracted?.vendor?.name);
+console.log("items length:", extracted?.items?.length || 0);
+console.log("items full:", JSON.stringify(extracted?.items || [], null, 2));
+console.log("=== PDF IMPORT DEBUG END ===");
+
+console.log("✅ Hybrid extraction source:", extracted?.extractionSource);
+console.log("✅ Hybrid PO:", extracted?.psrPoNumber);
+console.log("✅ Extracted item count:", extracted?.items?.length || 0);
+console.log(
+  "✅ Extracted items preview:",
+  (extracted?.items || []).map((x, i) => ({
+    line: i + 1,
+    partNumber: x.partNumber,
+    description: x.description,
+    quantity: x.quantity,
+    unitPrice: x.unitPrice,
+    totalPrice: x.totalPrice,
+  }))
+);
 
         if (!extracted?.psrPoNumber) {
           throw new Error("Could not detect PO number from PDF");

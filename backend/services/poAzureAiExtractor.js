@@ -1,4 +1,3 @@
-// backend/services/poAzureAiExtractor.js
 import "dotenv/config";
 import axios from "axios";
 import fs from "fs/promises";
@@ -9,6 +8,8 @@ const endpoint = (process.env.AZURE_OPENAI_ENDPOINT || "").replace(/\/+$/, "");
 const deployment = process.env.AZURE_OPENAI_DEPLOYMENT;
 const apiKey = process.env.AZURE_OPENAI_API_KEY;
 const apiVersion = process.env.AZURE_OPENAI_API_VERSION || "2024-06-01";
+
+/* ---------------- helpers ---------------- */
 
 function toBase64(buffer) {
   return buffer.toString("base64");
@@ -83,42 +84,28 @@ function sanitizeAttnAndOrderedBy(result) {
   return result;
 }
 
-/**
- * ✅ STRONG totals normalization:
- * - force numeric
- * - if subtotal/grandTotal are missing or 0 but items have totals, compute from items
- * - infer tax when possible
- */
 function normalizeTotals(result) {
   if (!result) return result;
 
-  // normalize numeric first
   result.subtotal = toNum(result.subtotal);
   result.shipping = toNum(result.shipping);
   result.taxAmount = toNum(result.taxAmount);
   result.taxPercent = toNum(result.taxPercent);
   result.grandTotal = toNum(result.grandTotal);
 
-  // sum line totals from items (robust)
   const items = Array.isArray(result.items) ? result.items : [];
-  const itemsSum = items.reduce((sum, it) => {
-    const lt = toNum(it?.totalPrice);
-    return sum + (lt > 0 ? lt : 0);
-  }, 0);
+  const itemsSum = items.reduce((sum, it) => sum + toNum(it?.totalPrice), 0);
 
-  // If PDF totals are blank/0 but line totals exist, compute subtotal from line totals
   if ((result.subtotal <= 0 || !Number.isFinite(result.subtotal)) && itemsSum > 0) {
     result.subtotal = Number(itemsSum.toFixed(2));
   }
 
-  // If grandTotal missing/0, compute from subtotal + shipping + tax
   if ((result.grandTotal <= 0 || !Number.isFinite(result.grandTotal)) && result.subtotal > 0) {
     result.grandTotal = Number(
       (result.subtotal + (result.shipping || 0) + (result.taxAmount || 0)).toFixed(2)
     );
   }
 
-  // If tax is 0 but grandTotal and subtotal imply tax, infer it
   if (
     (result.taxAmount === 0 || result.taxAmount === null) &&
     result.grandTotal > 0 &&
@@ -130,7 +117,6 @@ function normalizeTotals(result) {
     }
   }
 
-  // Safety: if grandTotal < subtotal, recompute
   if (result.grandTotal < result.subtotal) {
     result.grandTotal = Number(
       (result.subtotal + (result.shipping || 0) + (result.taxAmount || 0)).toFixed(2)
@@ -140,9 +126,8 @@ function normalizeTotals(result) {
   return result;
 }
 
-/**
- * Extract PO data using Azure OpenAI Vision.
- */
+/* ---------------- main extractor ---------------- */
+
 export async function extractPoWithAzureAi(pdfPath, { pages = 1, debug = false } = {}) {
   if (!endpoint || !deployment || !apiKey) {
     throw new Error("Azure OpenAI config missing");
@@ -150,7 +135,7 @@ export async function extractPoWithAzureAi(pdfPath, { pages = 1, debug = false }
 
   const url = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
 
-  const { tmpDir, pngs } = await pdfToPngPages(pdfPath, pages, 300);
+  const { tmpDir, pngs } = await pdfToPngPages(pdfPath, pages, 200);
   if (!pngs.length) throw new Error("No PNG pages produced from PDF");
 
   const imageParts = [];
@@ -167,9 +152,13 @@ export async function extractPoWithAzureAi(pdfPath, { pages = 1, debug = false }
 You are a purchasing document extractor.
 Return ONLY valid JSON (no markdown, no code fences).
 
+CRITICAL GOAL:
+Extract the FULL purchasing document from ALL provided pages.
+This may be a multi-page purchase order, sales order, or acknowledgment with line items continuing across pages.
+
 CRITICAL RULES (avoid wrong PO numbers):
 - PO number must be the customer's purchase order number (PSR's PO).
-- DO NOT use address numbers, ship-to codes, customer IDs, invoice numbers, sales order numbers.
+- DO NOT use address numbers, ship-to codes, customer IDs, invoice numbers, sales order numbers, or vendor order numbers.
 - If document is a SALES ORDER / ACKNOWLEDGEMENT and the customer PO is NOT present, return poNumber as null.
 - If multiple numbers exist, choose ONLY the number explicitly labeled as "PO", "P.O.", "Purchase Order", or "Customer PO".
 
@@ -187,9 +176,19 @@ TOTALS:
   tax = grandTotal - subtotal - shipping (assume shipping 0 if missing).
 - Return best numeric extraction; do NOT default tax to 0 if totals show a difference.
 
-ITEMS:
-- Extract: partNumber (if present), description, qty, unitPrice, lineTotal.
-- If uncertain, set field null instead of guessing.
+LINE ITEMS — VERY IMPORTANT:
+- Extract EVERY visible line item from ALL provided pages.
+- Do NOT summarize.
+- Do NOT stop after the first few rows.
+- Do NOT return sample items.
+- Preserve one JSON item per visible line item row.
+- If table headers repeat on each page, ignore the repeated headers and continue extracting rows.
+- If the document continues across pages, continue until the final page provided.
+- Keep the items in reading order from page 1 to the last page.
+- If a part number is missing but description/qty/price are present, still include the row with partNumber as null.
+- Do not invent values.
+- Do not merge separate rows into one.
+- If the same item truly appears more than once in the document, keep each occurrence.
 
 VENDOR:
 - vendor.name is the supplier company name.
@@ -221,23 +220,53 @@ Return JSON with this exact shape:
       { role: "system", content: system },
       {
         role: "user",
-        content: [{ type: "text", text: "Extract the purchase order data from these pages." }, ...imageParts],
+        content: [
+          {
+            type: "text",
+            text: `
+Extract the purchase order data from ALL pages provided.
+
+This document may be a multi-page acknowledgment or sales order.
+You must extract the full line item table across all pages.
+
+Important:
+- Return every visible line item row from all pages.
+- Do not stop after the first few rows.
+- Ignore repeated table headers.
+- Keep rows in document order.
+- Do not summarize or deduplicate unless the document truly shows duplicate rows.
+`.trim(),
+          },
+          ...imageParts,
+        ],
       },
     ],
     temperature: 0,
-    max_tokens: 1800,
+    max_tokens: 4000,
   };
 
-  if (debug) console.log("AI calling pages:", pngs);
+  if (debug) {
+    console.log("AI calling pages:", pngs);
+  }
 
   try {
     const resp = await axios.post(url, payload, {
-      headers: { "Content-Type": "application/json", "api-key": apiKey },
-      timeout: 90000,
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": apiKey,
+      },
+      timeout: 180000,
     });
 
     const raw = resp.data?.choices?.[0]?.message?.content?.trim() || "";
+
+    console.log("🔹 Azure raw response length:", raw.length);
+    console.log("🔹 Azure raw preview:", raw.slice(0, 1500));
+
     const ai = safeJsonParse(raw);
+
+    console.log("🔹 Azure parsed JSON:", !!ai);
+    console.log("🔹 Azure parsed items:", Array.isArray(ai?.items) ? ai.items.length : 0);
 
     if (!ai) {
       if (debug) console.log("AI raw response:", raw);
@@ -260,20 +289,29 @@ Return JSON with this exact shape:
     };
 
     const orderedBy = toNullStr(ai.orderedBy);
+    const poNumber = toNullStr(ai.poNumber);
 
     const items = Array.isArray(ai.items) ? ai.items : [];
+
     const normItems = items
       .map((it, idx) => ({
         lineNo: idx + 1,
-        partNumber: (toNullStr(it?.partNumber) || "").trim(),
+        partNumber: toNullStr(it?.partNumber) || "",
         partName: String(it?.description || it?.partNumber || "").slice(0, 60),
-        description: (toNullStr(it?.description) || "").trim(),
+        description: toNullStr(it?.description) || "",
         quantity: toNullNum(it?.qty) ?? 0,
         unitPrice: toNullNum(it?.unitPrice) ?? 0,
         totalPrice: toNullNum(it?.lineTotal) ?? 0,
         uom: null,
       }))
-      .filter((x) => x.partNumber || x.description);
+      .filter(
+        (x) =>
+          x.partNumber ||
+          x.description ||
+          x.quantity ||
+          x.unitPrice ||
+          x.totalPrice
+      );
 
     let subtotal = toNum(ai?.totals?.subtotal);
     let shipping = toNum(ai?.totals?.shipping);
@@ -282,10 +320,10 @@ Return JSON with this exact shape:
 
     if ((taxAmount === 0 || taxAmount === null) && grandTotal > 0 && subtotal > 0) {
       const inferred = grandTotal - subtotal - (shipping || 0);
-      if (inferred > 0 && inferred < grandTotal) taxAmount = Number(inferred.toFixed(2));
+      if (inferred > 0 && inferred < grandTotal) {
+        taxAmount = Number(inferred.toFixed(2));
+      }
     }
-
-    const poNumber = toNullStr(ai.poNumber);
 
     const result = {
       extractionSource: "azure-ai",
@@ -314,7 +352,7 @@ Return JSON with this exact shape:
       await Promise.all(files.map((f) => fs.unlink(path.join(tmpDir, f))));
       await fs.rmdir(tmpDir);
     } catch {
-      // ignore
+      // ignore cleanup errors
     }
   }
 }

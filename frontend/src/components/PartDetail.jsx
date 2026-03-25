@@ -75,22 +75,28 @@ fetch(`${BASE}/parts/${part.part_id}/purchase-orders`)
             Edit
           </button>
 
-          <button
-            className="bg-red-600 text-white px-3 h-8 rounded text-xs"
-            onClick={() => {
-              if (!window.confirm("Delete this part permanently?")) return;
+<button
+  className="bg-red-600 text-white px-3 h-8 rounded text-xs"
+  onClick={async () => {
+    if (!window.confirm("Delete this part permanently?")) return;
 
-              fetch(`${BASE}/parts/${part.part_id}`, { method: "DELETE" })
-                .then(() => {
-                  alert("Deleted successfully.");
-                  onClose();
-                  window.dispatchEvent(new Event("reload-parts"));
-                })
-                .catch(() => alert("Delete failed."));
-            }}
-          >
-            Delete
-          </button>
+    try {
+      const res = await fetch(`${BASE}/parts/${part.part_id}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) throw new Error("Delete failed");
+
+      window.dispatchEvent(new Event("reload-parts"));
+      alert("Deleted successfully.");
+      onClose();
+    } catch {
+      alert("Delete failed.");
+    }
+  }}
+>
+  Delete
+</button>
 
           <button
             onClick={onClose}
