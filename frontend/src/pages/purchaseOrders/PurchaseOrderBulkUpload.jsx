@@ -3,8 +3,7 @@ import axios from "axios";
 import { Link } from "react-router-dom";
 import { CloudArrowUpIcon } from "@heroicons/react/24/solid";
 
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
+const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 export default function PurchaseOrderBulkUpload() {
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);

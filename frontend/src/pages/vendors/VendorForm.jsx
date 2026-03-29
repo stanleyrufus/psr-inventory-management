@@ -27,7 +27,6 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [fadeOut, setFadeOut] = useState(false);
 
-  // preload edit values
   useEffect(() => {
     if (safeInitial && Object.keys(safeInitial).length > 0) {
       setFormData((prev) => ({
@@ -46,10 +45,40 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
         website: safeInitial.website ?? prev.website,
         remarks: safeInitial.remarks ?? prev.remarks,
         is_active:
-          safeInitial.is_active !== undefined ? safeInitial.is_active : true,
+          safeInitial.is_active !== undefined
+            ? safeInitial.is_active
+            : safeInitial.isactive !== undefined
+            ? safeInitial.isactive
+            : true,
       }));
+    } else {
+      setFormData({
+        vendor_name: "",
+        contact_name: "",
+        phone: "",
+        email: "",
+        address1: "",
+        address2: "",
+        city: "",
+        state: "",
+        country: "",
+        postal_code: "",
+        fax: "",
+        website: "",
+        remarks: "",
+        is_active: true,
+      });
     }
   }, [safeInitial]);
+
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === "Escape") onCancel?.();
+    };
+
+    document.addEventListener("keydown", handleEsc);
+    return () => document.removeEventListener("keydown", handleEsc);
+  }, [onCancel]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -84,6 +113,7 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!validate()) {
       setMessage("⚠️ Please fix the highlighted fields.");
       scrollTop();
@@ -104,12 +134,13 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
         setFadeOut(false);
         setTimeout(() => setFadeOut(true), 3000);
         setTimeout(() => {
-          if (onSaved) onSaved();
+          onSaved?.();
         }, 800);
       } else {
         setMessage(res.message || "⚠️ Vendor already exists or not saved.");
         setFadeOut(false);
       }
+
       scrollTop();
     } catch (err) {
       console.error("❌ Error:", err);
@@ -122,190 +153,194 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
   const handleClose = () => onCancel?.();
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-3 bg-white p-4 rounded-lg shadow-md max-h-[80vh] overflow-y-auto relative"
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50"
+      onClick={handleClose}
     >
-      {/* close button */}
-      <button
-        type="button"
-        onClick={handleClose}
-        className="absolute top-3 right-4 text-gray-500 hover:text-gray-700 text-lg"
+      <form
+        onSubmit={handleSubmit}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-4xl bg-white p-4 rounded-lg shadow-xl max-h-[90vh] overflow-y-auto relative"
       >
-        ✖
-      </button>
-
-      <div ref={topRef} />
-
-      <h2 className="text-lg font-semibold text-gray-700 mb-2">
-        {safeInitial.vendor_id ? "Edit Vendor" : "Add New Vendor"}
-      </h2>
-
-      {message && (
-        <div
-          className={`p-2 text-sm rounded transition-opacity duration-1000 ${
-            fadeOut ? "opacity-0" : "opacity-100"
-          } ${
-            message.startsWith("✅")
-              ? "bg-green-100 text-green-700 border border-green-300"
-              : message.startsWith("⚠️")
-              ? "bg-yellow-100 text-yellow-700 border border-yellow-300"
-              : "bg-red-100 text-red-700 border border-red-300"
-          }`}
-        >
-          {message}
-        </div>
-      )}
-
-      {/* FORM GRID */}
-      <div className="grid grid-cols-2 gap-3">
-
-        <label className="flex flex-col">
-          <span className="text-sm font-medium">Vendor Name *</span>
-          <input
-            name="vendor_name"
-            value={formData.vendor_name}
-            onChange={handleChange}
-            className={`border p-2 rounded ${
-              errors.vendor_name ? "border-red-500 animate-pulse" : ""
-            }`}
-          />
-        </label>
-
-        <label className="flex flex-col">
-          <span className="text-sm font-medium">Contact Name</span>
-          <input
-            name="contact_name"
-            value={formData.contact_name}
-            onChange={handleChange}
-            className="border p-2 rounded"
-          />
-        </label>
-
-        <input
-          name="phone"
-          value={formData.phone}
-          onChange={handleChange}
-          placeholder="Phone"
-          className="border p-2 rounded"
-        />
-
-        <label className="flex flex-col">
-          <span className="text-sm font-medium">Email</span>
-          <input
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            className={`border p-2 rounded ${
-              errors.email ? "border-red-500 animate-pulse" : ""
-            }`}
-          />
-          {errors.email && (
-            <span className="text-xs text-red-500">{errors.email}</span>
-          )}
-        </label>
-
-        <input
-          name="fax"
-          value={formData.fax}
-          onChange={handleChange}
-          placeholder="Fax"
-          className="border p-2 rounded"
-        />
-
-        <input
-          name="website"
-          value={formData.website}
-          onChange={handleChange}
-          placeholder="Website"
-          className="border p-2 rounded"
-        />
-
-        <input
-          name="address1"
-          value={formData.address1}
-          onChange={handleChange}
-          placeholder="Address Line 1"
-          className="border p-2 rounded col-span-2"
-        />
-
-        <input
-          name="address2"
-          value={formData.address2}
-          onChange={handleChange}
-          placeholder="Address Line 2"
-          className="border p-2 rounded col-span-2"
-        />
-
-        <input
-          name="city"
-          value={formData.city}
-          onChange={handleChange}
-          placeholder="City"
-          className="border p-2 rounded"
-        />
-
-        <input
-          name="state"
-          value={formData.state}
-          onChange={handleChange}
-          placeholder="State"
-          className="border p-2 rounded"
-        />
-
-        <input
-          name="country"
-          value={formData.country}
-          onChange={handleChange}
-          placeholder="Country"
-          className="border p-2 rounded"
-        />
-
-        <input
-          name="postal_code"
-          value={formData.postal_code}
-          onChange={handleChange}
-          placeholder="Postal Code"
-          className="border p-2 rounded"
-        />
-
-        <label className="flex items-center gap-2 mt-2">
-          <input
-            type="checkbox"
-            name="is_active"
-            checked={formData.is_active}
-            onChange={handleChange}
-          />
-          <span className="text-sm text-gray-700">Active</span>
-        </label>
-      </div>
-
-      <textarea
-        name="remarks"
-        value={formData.remarks}
-        onChange={handleChange}
-        placeholder="Remarks"
-        className="border p-2 rounded w-full"
-      />
-
-      <div className="flex justify-end gap-2 pt-3">
         <button
           type="button"
           onClick={handleClose}
-          className="px-4 py-2 rounded border hover:bg-gray-100"
+          className="absolute top-3 right-4 text-gray-500 hover:text-gray-700 text-lg"
+          title="Close"
         >
-          Cancel
+          ✖
         </button>
 
-        {!isSubmitted && (
-          <button
-            type="submit"
-            className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+        <div ref={topRef} />
+
+        <h2 className="text-lg font-semibold text-gray-700 mb-2">
+          {safeInitial.vendor_id ? "Edit Vendor" : "Add New Vendor"}
+        </h2>
+
+        {message && (
+          <div
+            className={`p-2 text-sm rounded transition-opacity duration-1000 ${
+              fadeOut ? "opacity-0" : "opacity-100"
+            } ${
+              message.startsWith("✅")
+                ? "bg-green-100 text-green-700 border border-green-300"
+                : message.startsWith("⚠️")
+                ? "bg-yellow-100 text-yellow-700 border border-yellow-300"
+                : "bg-red-100 text-red-700 border border-red-300"
+            }`}
           >
-            {safeInitial.vendor_id ? "Update" : "Add Vendor"}
-          </button>
+            {message}
+          </div>
         )}
-      </div>
-    </form>
+
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          <label className="flex flex-col">
+            <span className="text-sm font-medium">Vendor Name *</span>
+            <input
+              name="vendor_name"
+              value={formData.vendor_name}
+              onChange={handleChange}
+              className={`border p-2 rounded ${
+                errors.vendor_name ? "border-red-500 animate-pulse" : ""
+              }`}
+            />
+          </label>
+
+          <label className="flex flex-col">
+            <span className="text-sm font-medium">Contact Name</span>
+            <input
+              name="contact_name"
+              value={formData.contact_name}
+              onChange={handleChange}
+              className="border p-2 rounded"
+            />
+          </label>
+
+          <input
+            name="phone"
+            value={formData.phone}
+            onChange={handleChange}
+            placeholder="Phone"
+            className="border p-2 rounded"
+          />
+
+          <label className="flex flex-col">
+            <span className="text-sm font-medium">Email</span>
+            <input
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              className={`border p-2 rounded ${
+                errors.email ? "border-red-500 animate-pulse" : ""
+              }`}
+            />
+            {errors.email && (
+              <span className="text-xs text-red-500">{errors.email}</span>
+            )}
+          </label>
+
+          <input
+            name="fax"
+            value={formData.fax}
+            onChange={handleChange}
+            placeholder="Fax"
+            className="border p-2 rounded"
+          />
+
+          <input
+            name="website"
+            value={formData.website}
+            onChange={handleChange}
+            placeholder="Website"
+            className="border p-2 rounded"
+          />
+
+          <input
+            name="address1"
+            value={formData.address1}
+            onChange={handleChange}
+            placeholder="Address Line 1"
+            className="border p-2 rounded col-span-2"
+          />
+
+          <input
+            name="address2"
+            value={formData.address2}
+            onChange={handleChange}
+            placeholder="Address Line 2"
+            className="border p-2 rounded col-span-2"
+          />
+
+          <input
+            name="city"
+            value={formData.city}
+            onChange={handleChange}
+            placeholder="City"
+            className="border p-2 rounded"
+          />
+
+          <input
+            name="state"
+            value={formData.state}
+            onChange={handleChange}
+            placeholder="State"
+            className="border p-2 rounded"
+          />
+
+          <input
+            name="country"
+            value={formData.country}
+            onChange={handleChange}
+            placeholder="Country"
+            className="border p-2 rounded"
+          />
+
+          <input
+            name="postal_code"
+            value={formData.postal_code}
+            onChange={handleChange}
+            placeholder="Postal Code"
+            className="border p-2 rounded"
+          />
+
+          <label className="flex items-center gap-2 mt-2">
+            <input
+              type="checkbox"
+              name="is_active"
+              checked={formData.is_active}
+              onChange={handleChange}
+            />
+            <span className="text-sm text-gray-700">Active</span>
+          </label>
+        </div>
+
+        <textarea
+          name="remarks"
+          value={formData.remarks}
+          onChange={handleChange}
+          placeholder="Remarks"
+          className="border p-2 rounded w-full mt-3"
+        />
+
+        <div className="flex justify-end gap-2 pt-3">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="px-4 py-2 rounded border hover:bg-gray-100"
+          >
+            Cancel
+          </button>
+
+          {!isSubmitted && (
+            <button
+              type="submit"
+              className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+            >
+              {safeInitial.vendor_id ? "Update" : "Add Vendor"}
+            </button>
+          )}
+        </div>
+      </form>
+    </div>
   );
 }

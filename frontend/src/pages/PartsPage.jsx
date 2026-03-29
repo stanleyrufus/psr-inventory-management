@@ -1,35 +1,16 @@
 // frontend/src/pages/PartsPage.jsx
 import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
 import api from "../utils/api";
 import PartForm from "../components/forms/PartForm";
 import BulkUploadModal from "../components/modals/BulkUploadModal";
 import PartDetail from "../components/PartDetail";
 
-// ⭐ Helper to handle both JSON-array and single-string images
-function getPartImageUrl(raw) {
-  if (!raw) return "/no-image.png";
-
-  let path = raw;
-
-  try {
-    // JSON array?
-    const arr = JSON.parse(raw);
-    if (Array.isArray(arr) && arr.length > 0) {
-      path = arr[0]; // use first image
-    }
-  } catch (e) {
-    // single string → do nothing
-  }
-
-  // Ensure starts with /uploads/...
-  if (!path.startsWith("/")) path = "/" + path;
-
-  const base = import.meta.env.VITE_API_URL.replace(/\/$/, "");
-  return `${base}${path}`;
-}
 
 export default function PartsPage() {
+
+  const location = useLocation();
   // ⭐ NEW – moved inside component to follow React rules
   const [selectedPart, setSelectedPart] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
@@ -56,35 +37,39 @@ export default function PartsPage() {
 
   const [zoomImage, setZoomImage] = useState(null);
 
-  const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
-    /\/$/,
-    ""
-  );
+const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
+const FILE_BASE = BASE.replace(/\/api$/, "");
+   
 
   // ⭐ NEW: safe image URL normalizer
-  const normalizeImageUrl = (raw) => {
-    if (!raw) return null;
+const normalizeImageUrl = (raw) => {
+  if (!raw) return null;
 
-    let clean = String(raw).trim();
+  let clean = String(raw).trim();
 
-    // If it's already an absolute URL, just use it
-    if (clean.startsWith("http://") || clean.startsWith("https://")) {
-      return clean;
-    }
+  if (clean.startsWith("http://") || clean.startsWith("https://")) {
+    return clean;
+  }
 
-    // Strip any accidental host prefix, keep path from first /uploads
-    const uploadsIndex = clean.indexOf("/uploads");
-    if (uploadsIndex !== -1) {
-      clean = clean.substring(uploadsIndex);
-    }
+  const uploadsIndex = clean.indexOf("/uploads");
+  if (uploadsIndex !== -1) {
+    clean = clean.substring(uploadsIndex);
+  }
 
-    // Ensure exactly one leading slash
-    if (!clean.startsWith("/")) {
-      clean = "/" + clean;
-    }
+  if (!clean.startsWith("/")) {
+    clean = "/" + clean;
+  }
 
-    return `${BASE}${clean}`;
-  };
+  if (clean.startsWith("/uploads/")) {
+    return `${FILE_BASE}${clean}`;
+  }
+
+  if (clean.startsWith("/images/")) {
+    return clean;
+  }
+
+  return clean;
+};
 
   const loadParts = async () => {
     try {
@@ -101,9 +86,23 @@ export default function PartsPage() {
     }
   };
 
-  useEffect(() => {
+    useEffect(() => {
     loadParts();
   }, []);
+
+  useEffect(() => {
+    const openPartId = location.state?.openPartId;
+    if (!openPartId || parts.length === 0) return;
+
+    const found = parts.find(
+      (p) => String(p.part_id) === String(openPartId)
+    );
+
+    if (found) {
+      setSelectedPart(found);
+      setShowDetail(true);
+    }
+  }, [location.state, parts]);
 
   useEffect(() => {
     const f = parts.filter((p) => {
@@ -173,44 +172,73 @@ export default function PartsPage() {
    ✅ CELL RENDERERS (Updated for multi-image support)
 *************************************/
 
-  // Helper: supports JSON-array OR single string
-  function getPartImageUrl(image_url) {
-    if (!image_url) return "/no-image.png";
+ function getPartImageUrl(image_url) {
+  if (!image_url) return "/no-image.png";
 
-    let firstPath = image_url;
+  let firstPath = image_url;
 
-    try {
-      const parsed = JSON.parse(image_url);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        firstPath = parsed[0];
-      }
-    } catch (e) {
-      // single string → do nothing
+  try {
+    const parsed = JSON.parse(image_url);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      firstPath = parsed[0];
     }
-
-    if (!firstPath.startsWith("/")) {
-      firstPath = "/" + firstPath;
-    }
-
-    const base = import.meta.env.VITE_API_URL.replace(/\/$/, "");
-    return `${base}${firstPath}`;
+  } catch (e) {
+    // single string → do nothing
   }
 
-  const ImageRenderer = (props) => {
-    const url = getPartImageUrl(props.value);
+  firstPath = String(firstPath).trim();
 
-    return (
+  if (!firstPath) return "/no-image.png";
+
+  if (/^https?:\/\//i.test(firstPath)) {
+    return firstPath;
+  }
+
+  if (firstPath.startsWith("/images/")) {
+    return firstPath;
+  }
+  if (firstPath.startsWith("images/")) {
+    return `/${firstPath}`;
+  }
+
+  if (firstPath.startsWith("/uploads/")) {
+    return `${FILE_BASE}${firstPath}`;
+  }
+  if (firstPath.startsWith("uploads/")) {
+    return `${FILE_BASE}/${firstPath}`;
+  }
+
+  if (firstPath.startsWith("/")) {
+    return firstPath;
+  }
+
+  return `${FILE_BASE}/uploads/parts/${firstPath}`;
+}
+
+
+ const ImageRenderer = (props) => {
+  const url = getPartImageUrl(props.value);
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className="flex items-center justify-center h-full"
+      title="Open image in new tab"
+    >
       <img
         src={url}
         className="w-12 h-12 object-cover rounded border cursor-pointer"
-        onClick={() => setZoomImage(url)}
         onError={(e) => {
-          e.target.src = "/no-image.png";
-          e.target.onerror = null;
+          e.currentTarget.src = "/no-image.png";
+          e.currentTarget.onerror = null;
         }}
       />
-    );
-  };
+    </a>
+  );
+};
 
   const StatusRenderer = (props) => {
     const s = props.value || "Unknown";
@@ -304,7 +332,7 @@ export default function PartsPage() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="className='text-2xl font-semibold text-gray-800'">
+<h2 className="text-2xl font-semibold text-gray-800">
             Inventory Dashboard
           </h2>
           <p className="text-gray-500 text-sm">
@@ -379,40 +407,42 @@ export default function PartsPage() {
         </select>
       </div>
 
-      {/* AG Grid */}
-      <div className="ag-theme-quartz" style={{ height: 500, width: "100%" }}>
-        <AgGridReact
-          rowData={paginated}
-          columnDefs={columnDefs}
-          animateRows={true}
-          suppressMovableColumns={true}
-        />
-      </div>
+     {/* AG Grid + Pagination */}
+<div className="bg-white shadow-md rounded-lg p-2">
+<div className="ag-theme-quartz" style={{ width: "100%" }}>
+  <AgGridReact
+    rowData={paginated}
+    columnDefs={columnDefs}
+    animateRows={true}
+    suppressMovableColumns={true}
+    domLayout="autoHeight"
+  />
+</div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center mt-4 gap-3 text-sm">
-          <button
-            disabled={currentPage === 1}
-            onClick={() => goToPage(currentPage - 1)}
-            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Prev
-          </button>
+  {totalPages > 1 && (
+    <div className="flex justify-center items-center gap-3 mt-4 text-sm">
+      <button
+        disabled={currentPage === 1}
+        onClick={() => goToPage(currentPage - 1)}
+        className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+      >
+        Prev
+      </button>
 
-          <span>
-            Page {currentPage} of {totalPages}
-          </span>
+      <span>
+        Page {currentPage} of {totalPages}
+      </span>
 
-          <button
-            disabled={currentPage === totalPages}
-            onClick={() => goToPage(currentPage + 1)}
-            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <button
+        disabled={currentPage === totalPages}
+        onClick={() => goToPage(currentPage + 1)}
+        className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+      >
+        Next
+      </button>
+    </div>
+  )}
+</div>
 
       {/* Modals */}
       {showForm && (

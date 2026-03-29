@@ -9,7 +9,7 @@ ModuleRegistry.registerModules([AllCommunityModule]);
 
 import "ag-grid-community/styles/ag-grid.css";
 
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 const PO_LIST_STATE_KEY = "purchaseOrderListState";
 
 const getSavedPOListState = () => {
@@ -396,13 +396,20 @@ export default function PurchaseOrderList() {
   // -------------------------------------------------------------
   // Column Definitions
   // -------------------------------------------------------------
+  const formatDate = (value) => {
+    if (!value) return "-";
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? "-" : d.toLocaleDateString();
+  };
+
   const columns = [
     {
-      headerName: "PO #",
-      field: "psr_po_number",
-      width: 220,
-      minWidth: 220,
-      flex: 0,
+  headerName: "PO #",
+  field: "psr_po_number",
+  width: 170,
+  minWidth: 160,
+  maxWidth: 190,
+  flex: 0,
       tooltipField: "psr_po_number",
       cellClass: "whitespace-nowrap",
       cellRenderer: (params) => {
@@ -429,16 +436,17 @@ export default function PurchaseOrderList() {
         );
       },
     },
+  {
+  headerName: "Vendor",
+  field: "vendor_name",
+  flex: 1,
+  minWidth: 150,
+},
     {
-      headerName: "Vendor",
-      field: "vendor_name",
-      flex: 1,
-      minWidth: 180,
-    },
-    {
-      headerName: "Grand Total",
-      field: "grand_total",
-      width: 140,
+  headerName: "Grand Total",
+  field: "grand_total",
+  width: 120,
+  minWidth: 115,
       valueFormatter: (p) =>
       p.value != null
         ? "$" +
@@ -448,16 +456,25 @@ export default function PurchaseOrderList() {
           })
         : "-",
     },
-    {
-      headerName: "Order Date",
-      field: "order_date",
-      width: 160,
-      valueFormatter: (p) => (p.value ? new Date(p.value).toLocaleDateString() : "-"),
-    },
-    {
-      headerName: "Status",
-      field: "status",
-      width: 130,
+       {
+  headerName: "Order Date",
+  field: "order_date",
+  width: 125,
+  minWidth: 120,
+  valueFormatter: (p) => formatDate(p.value),
+},
+{
+  headerName: "Created Date",
+  field: "created_at",
+  width: 125,
+  minWidth: 120,
+  valueFormatter: (p) => formatDate(p.value),
+},
+   {
+  headerName: "Status",
+  field: "status",
+  width: 110,
+  minWidth: 105,
       cellRenderer: (params) => {
         // normalize label: show "Ordered" instead of "Placed" if old data exists
         const raw = params.value;

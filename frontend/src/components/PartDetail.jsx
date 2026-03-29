@@ -7,7 +7,7 @@ function getLatestPO(relatedPOs) {
 }
 
 const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
-
+const FILE_BASE = BASE.replace(/\/api$/, "");
 /* IMAGE HELPERS */
 function getPartImagePaths(image_url) {
   if (!image_url) return [];
@@ -28,11 +28,7 @@ function makeAbsoluteUrl(relativePath) {
   if (idx !== -1) clean = clean.substring(idx);
   if (!clean.startsWith("/")) clean = "/" + clean;
 
-  const base = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(
-    /\/$/,
-    ""
-  );
-  return `${base}${clean}`;
+  return `${FILE_BASE}${clean}`;
 }
 
 export default function PartDetail({ part, onClose }) {

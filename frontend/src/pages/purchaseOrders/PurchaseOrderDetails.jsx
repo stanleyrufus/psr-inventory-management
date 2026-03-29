@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 const FILE_BASE = BASE.replace(/\/api$/, "");
 
 const money = (v) =>
@@ -461,49 +461,50 @@ if (!id || isNaN(Number(id))) {
                     }
                   }
 
-                  return (
-                    <tr
-                      key={idx}
-                      className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                    >
-                      <td className="border border-gray-300 px-2 py-1 text-center">
-                        {it.line_no ?? idx + 1}
-                      </td>
+const isBackOrdered = Boolean(it.back_ordered ?? it.bo ?? false);
 
-                      <td className="border border-gray-300 px-2 py-1">
-                        {part?.part_number ||
-                          `Part #${it.part_id || it.partId || "-"}`}
-                      </td>
+return (
+  <tr
+    key={idx}
+    className={isBackOrdered ? "bg-yellow-200" : idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
+  >
+    <td className={`border border-gray-300 px-2 py-1 text-center ${isBackOrdered ? "bg-yellow-200" : ""}`}>
+      {it.line_no ?? idx + 1}
+    </td>
 
-                      <td className="border border-gray-300 px-2 py-1">
-                        {part?.description || it.description || "—"}
-                      </td>
+    <td className={`border border-gray-300 px-2 py-1 ${isBackOrdered ? "bg-yellow-200" : ""}`}>
+      {part?.part_number || `Part #${it.part_id || it.partId || "-"}`}
+    </td>
 
-                      <td className="border border-gray-300 px-2 py-1 text-center">
-                        {imgUrl ? (
-                          <img
-                            src={imgUrl}
-                            alt={part?.part_number || "Part image"}
-                            className="w-12 h-12 object-cover border border-gray-300 rounded"
-                          />
-                        ) : (
-                          <span className="text-gray-400 text-[11px]">
-                            No Image
-                          </span>
-                        )}
-                      </td>
+    <td className={`border border-gray-300 px-2 py-1 ${isBackOrdered ? "bg-yellow-200" : ""}`}>
+      {part?.description || it.description || "—"}
+    </td>
 
-                      <td className="border border-gray-300 px-2 py-1 text-right">
-                        {it.quantity}
-                      </td>
-                      <td className="border border-gray-300 px-2 py-1 text-right">
-                        {money(it.unit_price)}
-                      </td>
-                      <td className="border border-gray-300 px-2 py-1 text-right">
-                        {money(it.total_price)}
-                      </td>
-                    </tr>
-                  );
+    <td className={`border border-gray-300 px-2 py-1 text-center ${isBackOrdered ? "bg-yellow-200" : ""}`}>
+      {imgUrl ? (
+        <img
+          src={imgUrl}
+          alt={part?.part_number || "Part image"}
+          className="w-12 h-12 object-cover border border-gray-300 rounded"
+        />
+      ) : (
+        <span className="text-gray-400 text-[11px]">No Image</span>
+      )}
+    </td>
+
+    <td className={`border border-gray-300 px-2 py-1 text-right ${isBackOrdered ? "bg-yellow-200" : ""}`}>
+      {it.quantity}
+    </td>
+
+    <td className={`border border-gray-300 px-2 py-1 text-right ${isBackOrdered ? "bg-yellow-200" : ""}`}>
+      {money(it.unit_price)}
+    </td>
+
+    <td className={`border border-gray-300 px-2 py-1 text-right ${isBackOrdered ? "bg-yellow-200" : ""}`}>
+      {money(it.total_price)}
+    </td>
+  </tr>
+);
                 })}
               </tbody>
             </table>

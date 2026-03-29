@@ -1,5 +1,4 @@
-// frontend/src/pages/vendors/VendorBulkUpload.jsx
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { bulkUploadVendors } from "../../utils/api";
 
@@ -11,6 +10,15 @@ export default function VendorBulkUploadModal({ onClose }) {
   const [uploadSummary, setUploadSummary] = useState(null);
   const topRef = useRef(null);
 
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+
+    document.addEventListener("keydown", handleEsc);
+    return () => document.removeEventListener("keydown", handleEsc);
+  }, [onClose]);
+
   const scrollTop = () => {
     requestAnimationFrame(() => {
       topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -20,7 +28,6 @@ export default function VendorBulkUploadModal({ onClose }) {
   const normalizeHeader = (raw) =>
     raw?.toString().trim().toLowerCase().replace(/\s+/g, "_") || "";
 
-  // ✅ Helper: Convert Excel serial date → "YYYY-MM-DD"
   const excelDateToJS = (serial) => {
     if (!serial || isNaN(serial)) return serial;
     const excelEpoch = new Date(Date.UTC(1899, 11, 30));
@@ -39,7 +46,6 @@ export default function VendorBulkUploadModal({ onClose }) {
           const sheet = workbook.Sheets[workbook.SheetNames[0]];
           const json = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
-          // normalize excel date-looking numeric cells into nice strings
           const converted = json.map((row) => {
             const r2 = {};
             for (const [key, value] of Object.entries(row)) {
@@ -62,7 +68,6 @@ export default function VendorBulkUploadModal({ onClose }) {
       };
       reader.readAsArrayBuffer(file);
     } else {
-      // CSV
       reader.onload = (e) => {
         try {
           const text = e.target.result;
@@ -88,6 +93,7 @@ export default function VendorBulkUploadModal({ onClose }) {
   const handleFile = (ev) => {
     const file = ev.target.files[0];
     if (!file) return;
+
     setFileName(file.name);
     setErrors([]);
     setPreviewRows([]);
@@ -158,10 +164,10 @@ export default function VendorBulkUploadModal({ onClose }) {
           return mapped;
         });
 
-        // require vendor_name
         const hasVendor = normalizedRows.some(
           (r) => r.vendor_name && r.vendor_name.trim()
         );
+
         if (!hasVendor) {
           setErrors([
             'Missing required column: vendor_name ("Vendor Name" / "vendor_name").',
@@ -215,94 +221,102 @@ export default function VendorBulkUploadModal({ onClose }) {
   };
 
   return (
-    <div className="p-4 bg-white rounded-lg shadow-md max-h-[80vh] overflow-y-auto">
-      <div ref={topRef} />
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50"
+      onClick={() => onClose?.()}
+    >
+      <div
+        className="w-full max-w-6xl bg-white rounded-lg shadow-xl max-h-[90vh] overflow-y-auto p-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div ref={topRef} />
 
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-lg">Bulk Upload Vendors</h3>
-        <button
-          className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
-          onClick={() => onClose && onClose()}
-        >
-          Close
-        </button>
-      </div>
-
-      {errors.length > 0 && (
-        <div className="text-red-600 mb-3 text-sm border border-red-300 bg-red-50 p-2 rounded">
-          {errors.map((e, i) => (
-            <div key={i}>{e}</div>
-          ))}
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-lg">Bulk Upload Vendors</h3>
+          <button
+            className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
+            onClick={() => onClose?.()}
+          >
+            Close
+          </button>
         </div>
-      )}
 
-      {uploadSummary && (
-        <div className="mb-3 text-sm border border-green-300 bg-green-50 text-green-700 p-2 rounded">
-          {uploadSummary}
-        </div>
-      )}
-
-      <div className="mb-4">
-        <input
-          type="file"
-          accept=".csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          onChange={handleFile}
-          className="block text-sm"
-        />
-        {fileName && (
-          <div className="text-sm text-gray-600 mt-2">Loaded: {fileName}</div>
-        )}
-      </div>
-
-      <div className="overflow-auto max-h-60 border rounded mb-4">
-        {previewRows.length === 0 ? (
-          <div className="text-center py-6 text-gray-500 text-sm">
-            No preview
+        {errors.length > 0 && (
+          <div className="text-red-600 mb-3 text-sm border border-red-300 bg-red-50 p-2 rounded">
+            {errors.map((e, i) => (
+              <div key={i}>{e}</div>
+            ))}
           </div>
-        ) : (
-          <table className="min-w-full text-xs">
-            <thead className="bg-gray-100 sticky top-0">
-              <tr>
-                {Object.keys(previewRows[0]).map((k) => (
-                  <th key={k} className="px-2 py-1 border">
-                    {k}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {previewRows.map((r, i) => (
-                <tr key={i} className="hover:bg-gray-50">
-                  {Object.values(r).map((v, j) => (
-                    <td key={j} className="px-2 py-1 border truncate">
-                      {String(v)}
-                    </td>
+        )}
+
+        {uploadSummary && (
+          <div className="mb-3 text-sm border border-green-300 bg-green-50 text-green-700 p-2 rounded">
+            {uploadSummary}
+          </div>
+        )}
+
+        <div className="mb-4">
+          <input
+            type="file"
+            accept=".csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            onChange={handleFile}
+            className="block text-sm"
+          />
+          {fileName && (
+            <div className="text-sm text-gray-600 mt-2">Loaded: {fileName}</div>
+          )}
+        </div>
+
+        <div className="overflow-auto max-h-60 border rounded mb-4">
+          {previewRows.length === 0 ? (
+            <div className="text-center py-6 text-gray-500 text-sm">
+              No preview
+            </div>
+          ) : (
+            <table className="min-w-full text-xs">
+              <thead className="bg-gray-100 sticky top-0">
+                <tr>
+                  {Object.keys(previewRows[0]).map((k) => (
+                    <th key={k} className="px-2 py-1 border">
+                      {k}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+              </thead>
+              <tbody>
+                {previewRows.map((r, i) => (
+                  <tr key={i} className="hover:bg-gray-50">
+                    {Object.values(r).map((v, j) => (
+                      <td key={j} className="px-2 py-1 border truncate">
+                        {String(v)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
 
-      <div className="flex justify-end gap-2">
-        <button
-          onClick={() => onClose && onClose()}
-          className="px-3 py-2 border rounded hover:bg-gray-100"
-        >
-          Close
-        </button>
-        <button
-          onClick={handleUpload}
-          disabled={uploading || previewRows.length === 0}
-          className={`px-3 py-2 rounded text-white ${
-            uploading
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700"
-          }`}
-        >
-          {uploading ? "Uploading..." : "Upload"}
-        </button>
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={() => onClose?.()}
+            className="px-3 py-2 border rounded hover:bg-gray-100"
+          >
+            Close
+          </button>
+          <button
+            onClick={handleUpload}
+            disabled={uploading || previewRows.length === 0}
+            className={`px-3 py-2 rounded text-white ${
+              uploading
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700"
+            }`}
+          >
+            {uploading ? "Uploading..." : "Upload"}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -132,7 +132,7 @@ function SearchSelect({
    ============================= */
 
 
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 const FILE_BASE = BASE.replace(/\/api$/, "");
 
 const n = (v) => Number(v ?? 0);
@@ -254,8 +254,14 @@ export default function PurchaseOrderForm({
           if (!it.partId) errs[`items[${idx}].partId`] = "Part is required.";
           if (!it.quantity || Number(it.quantity) <= 0)
             errs[`items[${idx}].quantity`] = "Qty must be > 0.";
-          if (!it.unitPrice || Number(it.unitPrice) <= 0)
-            errs[`items[${idx}].unitPrice`] = "Unit price must be > 0.";
+if (
+  it.unitPrice === "" ||
+  it.unitPrice === null ||
+  it.unitPrice === undefined ||
+  Number(it.unitPrice) < 0
+) {
+  errs[`items[${idx}].unitPrice`] = "Unit price must be 0 or more.";
+}
         });
       }
     }
@@ -275,15 +281,17 @@ export default function PurchaseOrderForm({
     const rawItems = poData.items || poData.po_items || [];
 
     const items = rawItems.map((i) => ({
-      poItemId: i.id,
-      partId: i.part_id || i.partId,
-      description: i.description || "",
-      quantity: Number(i.quantity),
-      unitPrice: Number(i.unit_price),
-      totalPrice: Number(i.total_price),
-      lineNo: i.line_no || null,
-      lastUnitPrice: i.last_unit_price || null,
-    }));
+  poItemId: i.id,
+  partId: i.part_id || i.partId,
+  description: i.description || "",
+  quantity: Number(i.quantity),
+  unitPrice: Number(i.unit_price),
+  totalPrice: Number(i.total_price),
+  lineNo: i.line_no || null,
+  lastUnitPrice: i.last_unit_price || null,
+  rcvd: Boolean(i.received_complete ?? false),
+  bo: Boolean(i.back_ordered ?? false),
+}));
 
     return {
       ...poData,
@@ -398,22 +406,24 @@ export default function PurchaseOrderForm({
   };
 
   const addItemRow = () => {
-    setPo((prev) => ({
-      ...prev,
-      items: [
-        ...prev.items,
-        {
-          partId: "",
-          description: "",
-          quantity: 1,
-          unit: "pcs",
-          unitPrice: 0,
-          totalPrice: 0,
-          lastUnitPrice: null,
-        },
-      ],
-    }));
-  };
+  setPo((prev) => ({
+    ...prev,
+    items: [
+      ...prev.items,
+      {
+        partId: "",
+        description: "",
+        quantity: 1,
+        unit: "pcs",
+        unitPrice: 0,
+        totalPrice: 0,
+        lastUnitPrice: null,
+        rcvd: false,
+        bo: false,
+      },
+    ],
+  }));
+};
 
   // ---- PER-ROW NEW PART ----
   const openNewPartFormForRow = (rowIndex) => {
@@ -534,6 +544,22 @@ export default function PurchaseOrderForm({
     setPo({ ...po, items: updatedItems });
     recalcTotals(updatedItems);
   };
+
+const updateItemFlags = (index, field, checked) => {
+  const updatedItems = [...po.items];
+  updatedItems[index][field] = checked;
+
+  // mutually exclusive
+  if (field === "rcvd" && checked) {
+    updatedItems[index].bo = false;
+  }
+
+  if (field === "bo" && checked) {
+    updatedItems[index].rcvd = false;
+  }
+
+  setPo({ ...po, items: updatedItems });
+};
 
   // GLOBAL NEW PART PANEL
   const saveGlobalPart = async () => {
@@ -660,15 +686,17 @@ export default function PurchaseOrderForm({
         status: "Draft",
         received_by: po.received_by || "",
         received_on: po.received_on || "",
-        items: po.items.map((i, index) => ({
-          id: null,
-          part_id: Number(i.partId),
-          line_no: index + 1,
-          quantity: String(i.quantity),
-          unit_price: String(i.unitPrice),
-          total_price: String(i.totalPrice),
-          description: i.description || "",
-        })),
+    items: po.items.map((i, index) => ({
+  id: null,
+  part_id: Number(i.partId),
+  line_no: index + 1,
+  quantity: String(i.quantity),
+  unit_price: String(i.unitPrice),
+  total_price: String(i.totalPrice),
+  description: i.description || "",
+  received_complete: !!i.rcvd,
+  back_ordered: !!i.bo,
+})),
       });
 
       const newId = res.data?.po_id;
@@ -758,14 +786,16 @@ export default function PurchaseOrderForm({
       grand_total: Number(po.grand_total),
       status: finalStatus,
       items: po.items.map((i, index) => ({
-        id: i.poItemId ?? null,
-        part_id: Number(i.partId),
-        line_no: index + 1,
-        quantity: String(i.quantity),
-        unit_price: String(i.unitPrice),
-        total_price: String(i.totalPrice),
-        description: i.description || "",
-      })),
+  id: i.poItemId ?? null,
+  part_id: Number(i.partId),
+  line_no: index + 1,
+  quantity: String(i.quantity),
+  unit_price: String(i.unitPrice),
+  total_price: String(i.totalPrice),
+  description: i.description || "",
+  received_complete: !!i.rcvd,
+  back_ordered: !!i.bo,
+})),
     };
 
     try {
@@ -797,10 +827,10 @@ export default function PurchaseOrderForm({
 
       if (isModal && onSaved) onSaved();
       else navigate("/purchase-orders");
-    } catch (err) {
-      console.error("❌ PO save error:", err);
-      alert("Save failed.");
-    } finally {
+   } catch (err) {
+  console.error("❌ PO save error:", err);
+  alert(err?.response?.data?.message || "Save failed.");
+} finally {
       setSubmitting(false);
     }
   };
@@ -884,6 +914,8 @@ export default function PurchaseOrderForm({
 
             {/* ✅ RFQ statuses removed */}
             <option value="Ordered">Ordered</option>
+<option value="Back Ordered">Back Ordered</option>
+
             <option value="Received">Received</option>
             <option value="Cancelled">Cancelled</option>
           </select>
@@ -1160,13 +1192,15 @@ export default function PurchaseOrderForm({
       <table className="w-full border mb-4 text-sm">
         <thead className="bg-gray-100">
           <tr>
-            <th className="p-2 border">#</th>
-            <th className="p-2 border">Part</th>
-            <th className="p-2 border">Qty</th>
-            <th className="p-2 border">Unit Price</th>
-            <th className="p-2 border text-right">Total</th>
-            <th className="p-2 border text-center">Remove</th>
-          </tr>
+  <th className="p-2 border">#</th>
+  <th className="p-2 border">Part</th>
+  <th className="p-2 border">Qty</th>
+  <th className="p-2 border">Unit Price</th>
+  <th className="p-2 border text-right">Total</th>
+  <th className="p-2 border text-center">Rcvd</th>
+  <th className="p-2 border text-center">BO</th>
+  <th className="p-2 border text-center">Remove</th>
+</tr>
         </thead>
 
         <tbody>
@@ -1352,17 +1386,35 @@ export default function PurchaseOrderForm({
                 </td>
 
 <td className="border p-2 text-right">{money(item.totalPrice)}</td>
-                <td className="border p-2 text-center">
-                  <button
-                    type="button"
-                    onClick={() => removeItemRow(i)}
-                    disabled={submitting || saved}
-                    className="text-red-600 font-bold hover:text-red-800"
-                  >
-                    ✕
-                  </button>
-                </td>
-              </tr>
+
+<td className="border p-2 text-center">
+  <input
+    type="checkbox"
+    checked={!!item.rcvd}
+    onChange={(e) => updateItemFlags(i, "rcvd", e.target.checked)}
+    disabled={submitting || saved}
+  />
+</td>
+
+<td className="border p-2 text-center">
+  <input
+    type="checkbox"
+    checked={!!item.bo}
+    onChange={(e) => updateItemFlags(i, "bo", e.target.checked)}
+    disabled={submitting || saved}
+  />
+</td>
+
+<td className="border p-2 text-center">
+  <button
+    type="button"
+    onClick={() => removeItemRow(i)}
+    disabled={submitting || saved}
+    className="text-red-600 font-bold hover:text-red-800"
+  >
+    ✕
+  </button>
+</td>              </tr>
             );
           })}
         </tbody>

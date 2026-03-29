@@ -3,8 +3,7 @@ import axios from "axios";
 import { useParams, Link } from "react-router-dom";
 import PurchaseOrderForm from "./PurchaseOrderForm";
 
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
+const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 export default function PurchaseOrderEdit() {
   const { id } = useParams();
 

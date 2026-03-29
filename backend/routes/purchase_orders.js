@@ -228,23 +228,23 @@ router.get("/status/monthly", async (req, res) => {
       .orderBy("ym", "asc");
 
     // Normalize your real statuses into the dashboard buckets
-    const normalizeStatus = (s) => {
-      const x = String(s || "").toLowerCase().trim();
+const normalizeStatus = (s) => {
+  const x = String(s || "").toLowerCase().trim();
 
-      if (x === "draft") return "draft";
-      if (x === "pending") return "pending";
-      if (x === "sent") return "sent";
-      if (x === "completed") return "completed";
+  if (x === "draft") return "draft";
+  if (x === "pending") return "pending";
+  if (x === "sent") return "sent";
+  if (x === "completed") return "completed";
 
-      // map common PSR statuses (adjust if needed)
-      if (x === "reserved") return "pending";
-      if (x === "paid") return "completed";
-      if (x === "received") return "completed";
-      if (x === "closed") return "completed";
+  if (x === "reserved") return "pending";
+  if (x === "ordered") return "pending";
+  if (x === "back ordered") return "pending";
+  if (x === "paid") return "completed";
+  if (x === "received") return "completed";
+  if (x === "closed") return "completed";
 
-      // anything else -> ignore (or you can map to pending)
-      return null;
-    };
+  return null;
+};
 
     // Initialize months with zeros
     const outMap = {};
@@ -398,6 +398,8 @@ router.get("/", async (_, res) => {
       "po.shipping_charges",
       "po.grand_total",
       "po.order_date",
+  "po.created_at",   // ✅ ADD THIS
+
       "po.status",
       "po.created_by"
     )
@@ -610,36 +612,55 @@ router.post("/", async (req, res) => {
     }
 
     // every item must be valid
-    for (let idx = 0; idx < items.length; idx++) {
-      const it = items[idx] || {};
+for (let idx = 0; idx < items.length; idx++) {
+  const it = items[idx] || {};
 
-      const partId = Number(it.part_id);
-      if (!partId || Number.isNaN(partId)) {
-        return res.status(400).json({
-          success: 0,
-          field: `items[${idx}].part_id`,
-          message: `Line ${idx + 1}: Part is required.`,
-        });
-      }
+  const partId = Number(it.part_id);
+  if (!partId || Number.isNaN(partId)) {
+    return res.status(400).json({
+      success: 0,
+      field: `items[${idx}].part_id`,
+      message: `Line ${idx + 1}: Part is required.`,
+    });
+  }
 
-      const qty = Number(it.quantity);
-      if (!qty || Number.isNaN(qty) || qty <= 0) {
-        return res.status(400).json({
-          success: 0,
-          field: `items[${idx}].quantity`,
-          message: `Line ${idx + 1}: Quantity must be greater than 0.`,
-        });
-      }
+  const qty = Number(it.quantity);
+  if (!qty || Number.isNaN(qty) || qty <= 0) {
+    return res.status(400).json({
+      success: 0,
+      field: `items[${idx}].quantity`,
+      message: `Line ${idx + 1}: Quantity must be greater than 0.`,
+    });
+  }
 
-      const unitPrice = Number(it.unit_price);
-      if (!unitPrice || Number.isNaN(unitPrice) || unitPrice <= 0) {
-        return res.status(400).json({
-          success: 0,
-          field: `items[${idx}].unit_price`,
-          message: `Line ${idx + 1}: Unit Price must be greater than 0.`,
-        });
-      }
-    }
+const unitPriceRaw = it.unit_price;
+const unitPrice = Number(unitPriceRaw);
+
+if (
+  unitPriceRaw === "" ||
+  unitPriceRaw === null ||
+  unitPriceRaw === undefined ||
+  Number.isNaN(unitPrice) ||
+  unitPrice < 0
+) {
+  return res.status(400).json({
+    success: 0,
+    field: `items[${idx}].unit_price`,
+    message: `Line ${idx + 1}: Unit Price must be 0 or more.`,
+  });
+}
+
+  const receivedComplete = Boolean(it.received_complete);
+  const backOrdered = Boolean(it.back_ordered);
+
+  if (receivedComplete && backOrdered) {
+    return res.status(400).json({
+      success: 0,
+      field: `items[${idx}]`,
+      message: `Line ${idx + 1}: Item cannot be both fully received and back ordered.`,
+    });
+  }
+}
 
     // ✅ Transaction: PO + items together
     const result = await db.transaction(async (trx) => {
@@ -679,15 +700,17 @@ router.post("/", async (req, res) => {
       const poId = inserted[0].id;
 
       // ✅ Insert items (we already validated)
-      const rows = items.map((i) => ({
-        po_id: poId,
-        part_id: Number(i.part_id),
-        line_no: Number(i.line_no),
-        quantity: String(i.quantity),
-        unit_price: String(i.unit_price),
-        total_price: String(i.total_price),
-        description: i.description || "",
-      }));
+    const rows = items.map((i) => ({
+  po_id: poId,
+  part_id: Number(i.part_id),
+  line_no: Number(i.line_no),
+  quantity: String(i.quantity),
+  unit_price: String(i.unit_price),
+  total_price: String(i.total_price),
+  description: i.description || "",
+  received_complete: Boolean(i.received_complete),
+  back_ordered: Boolean(i.back_ordered),
+}));
       await trx("purchase_order_items").insert(rows);
 
       return {
@@ -733,22 +756,68 @@ router.put("/:id", async (req, res) => {
       return res.status(404).json({ success: 0, message: "PO not found" });
     }
 
-    // ✅ If marking Paid now, set date_paid to system date
+    for (let idx = 0; idx < items.length; idx++) {
+      const it = items[idx] || {};
+
+      const partId = Number(it.part_id);
+      if (!partId || Number.isNaN(partId)) {
+        return res.status(400).json({
+          success: 0,
+          field: `items[${idx}].part_id`,
+          message: `Line ${idx + 1}: Part is required.`,
+        });
+      }
+
+      const qty = Number(it.quantity);
+      if (!qty || Number.isNaN(qty) || qty <= 0) {
+        return res.status(400).json({
+          success: 0,
+          field: `items[${idx}].quantity`,
+          message: `Line ${idx + 1}: Quantity must be greater than 0.`,
+        });
+      }
+
+      const unitPriceRaw = it.unit_price;
+const unitPrice = Number(unitPriceRaw);
+
+if (
+  unitPriceRaw === "" ||
+  unitPriceRaw === null ||
+  unitPriceRaw === undefined ||
+  Number.isNaN(unitPrice) ||
+  unitPrice < 0
+) {
+  return res.status(400).json({
+    success: 0,
+    field: `items[${idx}].unit_price`,
+    message: `Line ${idx + 1}: Unit Price must be 0 or more.`,
+  });
+}
+      const receivedComplete = Boolean(it.received_complete);
+      const backOrdered = Boolean(it.back_ordered);
+
+      if (receivedComplete && backOrdered) {
+        return res.status(400).json({
+          success: 0,
+          field: `items[${idx}]`,
+          message: `Line ${idx + 1}: Item cannot be both fully received and back ordered.`,
+        });
+      }
+    }
+
     const isBecomingPaid = body.status === "Paid" && existing.status !== "Paid";
     const datePaidToSet = isBecomingPaid ? systemDateYmd() : existing.date_paid;
 
     await db.transaction(async (trx) => {
-            await trx("purchase_orders")
+      await trx("purchase_orders")
         .where({ id })
         .update({
           expected_delivery_date: normalizeDate(body.expected_delivery_date),
           created_by: body.created_by ?? existing.created_by,
           vendor_id: body.vendor_id ? Number(body.vendor_id) : existing.vendor_id,
-
           payment_method: body.payment_method ?? existing.payment_method,
           payment_terms: body.payment_terms ?? existing.payment_terms,
 
-          // ✅ payment summary fields
           amount_paid: Number(body.amount_paid ?? existing.amount_paid ?? 0),
           payment_reference: body.payment_reference ?? existing.payment_reference,
           credit_applied: Number(body.credit_applied ?? existing.credit_applied ?? 0),
@@ -759,9 +828,7 @@ router.put("/:id", async (req, res) => {
           received_by: body.received_by ?? existing.received_by,
           received_on: normalizeDate(body.received_on) ?? existing.received_on,
           tax_percent: Number(body.tax_percent ?? existing.tax_percent ?? 0),
-          shipping_charges: Number(
-            body.shipping_charges ?? existing.shipping_charges ?? 0
-          ),
+          shipping_charges: Number(body.shipping_charges ?? existing.shipping_charges ?? 0),
           subtotal: Number(body.subtotal ?? existing.subtotal ?? 0),
           tax_amount: Number(body.tax_amount ?? existing.tax_amount ?? 0),
           grand_total: Number(body.grand_total ?? existing.grand_total ?? 0),
@@ -769,7 +836,6 @@ router.put("/:id", async (req, res) => {
           date_paid: datePaidToSet,
         });
 
-      // ✅ Replace items safely
       await trx("purchase_order_items").where({ po_id: id }).del();
 
       if (items.length > 0) {
@@ -781,7 +847,10 @@ router.put("/:id", async (req, res) => {
           unit_price: String(i.unit_price),
           total_price: String(i.total_price),
           description: i.description || "",
+          received_complete: Boolean(i.received_complete),
+          back_ordered: Boolean(i.back_ordered),
         }));
+
         await trx("purchase_order_items").insert(rows);
       }
     });

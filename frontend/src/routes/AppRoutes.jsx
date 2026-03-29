@@ -49,16 +49,13 @@ import ProductDetail from "../pages/ProductDetail";
 export default function AppRoutes() {
   const { user } = useContext(AuthContext);
 
-  // PrivateLayout inside AppRoutes.jsx
   const PrivateLayout = ({ children }) => {
     const { user, logout } = useContext(AuthContext);
 
     return (
       <div className="flex h-screen bg-psr-sky overflow-hidden">
-        {/* Sidebar */}
         <Sidebar />
 
-        {/* MAIN AREA */}
         <main className="flex-1 flex flex-col">
           <header
             className="
@@ -73,7 +70,6 @@ export default function AppRoutes() {
               shadow-sm
             "
           >
-            {/* Center Title */}
             <div className="flex-1 text-center">
               <h1
                 className="text-xl font-bold text-gray-700 tracking-wide"
@@ -83,7 +79,6 @@ export default function AppRoutes() {
               </h1>
             </div>
 
-            {/* User + Logout */}
             <div className="flex items-center gap-4">
               <span className="text-sm text-gray-700 font-medium">
                 {user?.username} ({user?.role})
@@ -98,7 +93,6 @@ export default function AppRoutes() {
             </div>
           </header>
 
-          {/* PAGE CONTENT */}
           <div className="flex-1 pt-2 px-6 pb-6 overflow-y-auto">{children}</div>
         </main>
       </div>
@@ -110,13 +104,11 @@ export default function AppRoutes() {
 
   return (
     <Routes>
-      {/* Public */}
       <Route
         path="/login"
         element={!user ? <Login /> : <Navigate to="/" replace />}
       />
 
-      {/* Dashboard */}
       <Route
         path="/"
         element={Protected(
@@ -126,7 +118,6 @@ export default function AppRoutes() {
         )}
       />
 
-      {/* Products */}
       <Route
         path="/products"
         element={Protected(
@@ -144,7 +135,6 @@ export default function AppRoutes() {
         )}
       />
 
-      {/* Parts */}
       <Route
         path="/parts"
         element={Protected(
@@ -154,7 +144,6 @@ export default function AppRoutes() {
         )}
       />
 
-      {/* Sales Orders */}
       <Route
         path="/sales-orders"
         element={Protected(
@@ -164,7 +153,6 @@ export default function AppRoutes() {
         )}
       />
 
-      {/* Purchase Orders */}
       <Route
         path="/purchase-orders"
         element={Protected(
@@ -192,7 +180,6 @@ export default function AppRoutes() {
         )}
       />
 
-      {/* ✅ Import routes MUST be above /purchase-orders/:id */}
       <Route
         path="/purchase-orders/import-from-pdf"
         element={Protected(
@@ -236,7 +223,6 @@ export default function AppRoutes() {
         )}
       />
 
-      {/* Vendors */}
       <Route
         path="/vendors"
         element={Protected(
@@ -278,9 +264,6 @@ export default function AppRoutes() {
         )}
       />
 
-      {/* ==========================
-          ✅ Reports (ADMIN ONLY)
-         ========================== */}
       <Route
         path="/reports"
         element={Protected(
@@ -342,9 +325,6 @@ export default function AppRoutes() {
         )}
       />
 
-      {/* ==========================
-          ✅ Settings (ADMIN ONLY)
-         ========================== */}
       <Route
         path="/settings"
         element={Protected(
@@ -386,7 +366,6 @@ export default function AppRoutes() {
         )}
       />
 
-      {/* Monitoring under settings => also admin only */}
       <Route
         path="/settings/monitoring"
         element={Protected(
@@ -398,7 +377,6 @@ export default function AppRoutes() {
         )}
       />
 
-      {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

@@ -1,8 +1,8 @@
 console.log("🔥 PartForm updated version loaded!");
 
 // frontend/src/components/forms/PartForm.jsx
-const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
-
+const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
+const FILE_BASE = BASE.replace(/\/api$/, "");
 import React, { useState, useEffect } from "react";
 import api, { apiRaw } from "../../utils/api";
 
@@ -38,12 +38,41 @@ function parseImageUrls(raw) {
 
 // ⭐ Helper: turn DB path into full URL
 function buildImageUrl(path) {
-  if (!path) return `${BASE}/no-image.png`;
+  if (!path) return "/no-image.png";
+
   let p = String(path).trim();
+
+  if (!p) return "/no-image.png";
+
+  // absolute URL
+  if (/^https?:\/\//i.test(p)) {
+    return p;
+  }
+
+  // frontend static images
+  if (p.startsWith("/images/")) {
+    return p;
+  }
+  if (p.startsWith("images/")) {
+    return `/${p}`;
+  }
+
+  // normalize uploads path
   const idx = p.indexOf("/uploads");
-  if (idx !== -1) p = p.substring(idx);
-  if (!p.startsWith("/")) p = "/" + p;
-  return `${BASE}${p}`;
+  if (idx !== -1) {
+    p = p.substring(idx);
+  }
+
+  if (!p.startsWith("/")) {
+    p = "/" + p;
+  }
+
+  // uploaded files must use FILE_BASE, not BASE
+  if (p.startsWith("/uploads/")) {
+    return `${FILE_BASE}${p}`;
+  }
+
+  return p;
 }
 
 export default function PartForm({ initial = {}, onSaved, onCancel }) {

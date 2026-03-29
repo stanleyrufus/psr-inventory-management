@@ -3,8 +3,7 @@ import React, { useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
-const BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
+const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 const bytesToSize = (bytes = 0) => {
   const b = Number(bytes || 0);
   if (!b) return "0 B";

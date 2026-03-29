@@ -62,8 +62,8 @@ export default function VendorsPage() {
         statusFilter === ""
           ? true
           : statusFilter === "Active"
-          ? activeVal
-          : !activeVal;
+            ? activeVal
+            : !activeVal;
 
       return matchSearch && matchStatus;
     });
@@ -85,31 +85,32 @@ export default function VendorsPage() {
   };
 
   /* ---------------- Handlers ---------------- */
-  const onView = useCallback((vendor) => setViewingVendor(vendor), []);
+  const onView = useCallback((vendor) => {
+    setViewingVendor(vendor);
+  }, []);
+
   const onEdit = useCallback((vendor) => {
+    setViewingVendor(null);
     setEditingVendor(vendor);
     setShowForm(true);
   }, []);
 
-  const onDeleteFromGrid = useCallback(
-    async (vendor) => {
-      if (!window.confirm(`Delete vendor "${vendor.vendor_name}"?`)) return;
+  const onDeleteFromGrid = useCallback(async (vendor) => {
+    if (!window.confirm(`Delete vendor "${vendor.vendor_name}"?`)) return;
 
-      try {
-        await deleteVendor(vendor.vendor_id);
+    try {
+      await deleteVendor(vendor.vendor_id);
 
-        setVendors((prev) =>
-          prev.filter((v) => String(v.vendor_id) !== String(vendor.vendor_id))
-        );
+      setVendors((prev) =>
+        prev.filter((v) => String(v.vendor_id) !== String(vendor.vendor_id))
+      );
 
-        alert("Vendor deleted successfully.");
-      } catch (e) {
-        console.error("Delete vendor failed:", e);
-        alert(e?.response?.data?.message || "Failed to delete vendor.");
-      }
-    },
-    []
-  );
+      alert("Vendor deleted successfully.");
+    } catch (e) {
+      console.error("Delete vendor failed:", e);
+      alert(e?.response?.data?.message || "Failed to delete vendor.");
+    }
+  }, []);
 
   /* ---------------- AG Grid columns ---------------- */
   const columnDefs = useMemo(
@@ -122,7 +123,7 @@ export default function VendorsPage() {
         cellRenderer: (params) => (
           <span
             className="text-blue-700 hover:underline cursor-pointer"
-            onClick={() => setViewingVendor(params.data)}
+            onClick={() => onView(params.data)}
           >
             {params.value}
           </span>
@@ -183,7 +184,9 @@ export default function VendorsPage() {
 
         <div className="flex gap-2">
           <button
-            onClick={() => setShowBulk(true)}
+            onClick={() => {
+              setShowBulk(true);
+            }}
             className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-sm rounded shadow"
           >
             ⬆️ Bulk Upload
@@ -191,6 +194,7 @@ export default function VendorsPage() {
 
           <button
             onClick={() => {
+              setViewingVendor(null);
               setEditingVendor(null);
               setShowForm(true);
             }}
@@ -242,14 +246,81 @@ export default function VendorsPage() {
         </select>
       </div>
 
-      <div className="ag-theme-quartz" style={{ width: "100%" }}>
-        <AgGridReact
-          rowData={pageData}
-          columnDefs={columnDefs}
-          pagination={false}
-          domLayout="autoHeight"
+   <div className="bg-white shadow-md rounded-lg p-2">
+  <div className="ag-theme-quartz" style={{ width: "100%" }}>
+    <AgGridReact
+      rowData={pageData}
+      columnDefs={columnDefs}
+      pagination={false}
+      domLayout="autoHeight"
+    />
+  </div>
+
+  {totalPages > 1 && (
+    <div className="flex justify-center items-center gap-3 mt-4 text-sm">
+      <button
+        disabled={currentPage === 1}
+        onClick={() => goToPage(currentPage - 1)}
+        className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+      >
+        Prev
+      </button>
+
+      <span>
+        Page {currentPage} of {totalPages}
+      </span>
+
+      <button
+        disabled={currentPage === totalPages}
+        onClick={() => goToPage(currentPage + 1)}
+        className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+      >
+        Next
+      </button>
+    </div>
+  )}
+</div>
+
+      {showForm && (
+        <VendorForm
+          initial={editingVendor || {}}
+          onCancel={() => {
+            setShowForm(false);
+            setEditingVendor(null);
+          }}
+          onSaved={() => {
+            setShowForm(false);
+            setEditingVendor(null);
+            setViewingVendor(null);
+            loadVendors();
+          }}
         />
-      </div>
+      )}
+
+      {showBulk && (
+        <VendorBulkUpload
+          onClose={() => {
+            setShowBulk(false);
+            loadVendors();
+          }}
+        />
+      )}
+
+      {viewingVendor && (
+        <VendorDetails
+          vendor={viewingVendor}
+          onClose={() => setViewingVendor(null)}
+          onDeleted={() => {
+            setViewingVendor(null);
+            loadVendors();
+          }}
+          onEdit={(vendor) => {
+            setViewingVendor(null);
+            setEditingVendor(vendor);
+            setShowForm(true);
+          }}
+        />
+      )}
     </div>
   );
 }

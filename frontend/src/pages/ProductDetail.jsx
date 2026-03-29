@@ -1,12 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import PartDetail from "../components/PartDetail";
 
 const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
-
-<div className="mb-4 p-2 bg-yellow-100 border border-yellow-300 text-sm font-semibold">
-  DEBUG: Electrical BOM section enabled
-</div>
+const FILE_BASE = BASE.replace(/\/api$/, "");
 
 const money = (v) =>
   "$" +
@@ -15,7 +13,33 @@ const money = (v) =>
     maximumFractionDigits: 2,
   });
 
-function BomTable({ title, rows, total, bomLoading, emptyText }) {
+const getProductImageUrl = (raw) => {
+  if (!raw) return "";
+
+  const value = String(raw).trim();
+  if (!value) return "";
+
+  if (/^https?:\/\//i.test(value)) return value;
+
+  if (value.startsWith("/images/")) return value;
+  if (value.startsWith("images/")) return `/${value}`;
+
+  if (value.startsWith("/uploads")) return `${FILE_BASE}${value}`;
+  if (value.startsWith("uploads/")) return `${FILE_BASE}/${value}`;
+
+  if (value.startsWith("/")) return value;
+
+  return `${FILE_BASE}/uploads/products/${value}`;
+};
+
+function BomTable({
+  title,
+  rows,
+  total,
+  bomLoading,
+  emptyText,
+  onOpenPart,
+}) {
   return (
     <section>
       <div className="flex items-center justify-between mb-3">
@@ -39,7 +63,9 @@ function BomTable({ title, rows, total, bomLoading, emptyText }) {
             <thead className="bg-gray-100">
               <tr>
                 <th className="border px-3 py-2 text-left">Part Number</th>
-                <th className="border px-3 py-2 text-left">Part Name / Description</th>
+                <th className="border px-3 py-2 text-left">
+                  Part Name / Description
+                </th>
                 <th className="border px-3 py-2 text-left">Vendor</th>
                 <th className="border px-3 py-2 text-right">Unit Price</th>
                 <th className="border px-3 py-2 text-right">Qty Required</th>
@@ -49,13 +75,29 @@ function BomTable({ title, rows, total, bomLoading, emptyText }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={row.id}>
-                  <td className="border px-3 py-2 font-medium text-gray-800">
-                    {row.part_number}
+              {rows.map((row, index) => (
+                <tr key={row.id || row.part_id || index}>
+                  <td className="border px-3 py-2 font-medium">
+                    {row.part_id ? (
+                      <button
+                        type="button"
+                        className="text-blue-600 hover:underline cursor-pointer bg-transparent border-0 p-0 font-medium"
+                        title="Open part details"
+                        onClick={() => onOpenPart(row)}
+                      >
+                        {row.part_number}
+                      </button>
+                    ) : (
+                      <span className="text-gray-800">
+                        {row.part_number || "-"}
+                      </span>
+                    )}
                   </td>
                   <td className="border px-3 py-2 text-gray-700">
-                    {row.part_name || row.description || row.source_description || "-"}
+                    {row.part_name ||
+                      row.description ||
+                      row.source_description ||
+                      "-"}
                   </td>
                   <td className="border px-3 py-2 text-gray-700">
                     {row.last_vendor_name || "-"}
@@ -72,7 +114,9 @@ function BomTable({ title, rows, total, bomLoading, emptyText }) {
                   <td className="border px-3 py-2 text-right text-gray-700">
                     {Number(row.quantity_on_hand || 0)}
                   </td>
-                  <td className="border px-3 py-2 text-gray-700">{row.uom || "-"}</td>
+                  <td className="border px-3 py-2 text-gray-700">
+                    {row.uom || "-"}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -97,64 +141,99 @@ function BomTable({ title, rows, total, bomLoading, emptyText }) {
   );
 }
 
-export default function ProductDetail() {
-  const { state } = useLocation();
-  const navigate = useNavigate();
-  const { id } = useParams();
+function DetailRow({ label, value }) {
+  return (
+    <div className="grid grid-cols-12 gap-3 py-2 border-b border-gray-100">
+      <div className="col-span-4 text-sm font-semibold text-gray-600">
+        {label}
+      </div>
+      <div className="col-span-8 text-sm text-gray-800 break-words">
+        {value || "-"}
+      </div>
+    </div>
+  );
+}
 
-  const [product, setProduct] = useState(state?.product || null);
+export default function ProductDetail() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+
+  const [product, setProduct] = useState(null);
   const [bom, setBom] = useState(null);
-  const [loading, setLoading] = useState(!state?.product);
+  const [loading, setLoading] = useState(true);
   const [bomLoading, setBomLoading] = useState(true);
   const [error, setError] = useState("");
+  const [imageFailed, setImageFailed] = useState(false);
+
+  const [selectedPart, setSelectedPart] = useState(null);
+  const [showPartDetail, setShowPartDetail] = useState(false);
+  const [partModalLoading, setPartModalLoading] = useState(false);
 
   useEffect(() => {
-    let ignore = false;
+    let cancelled = false;
 
-    async function loadProduct() {
+    async function loadData() {
       try {
         setLoading(true);
-        setError("");
-        const res = await axios.get(`${BASE}/products/${id}`);
-        if (!ignore) setProduct(res?.data?.data || null);
-      } catch (err) {
-        console.error("❌ Error loading product:", err);
-        if (!ignore) setError("Failed to load product details.");
-      } finally {
-        if (!ignore) setLoading(false);
-      }
-    }
-
-    if (!state?.product) loadProduct();
-    else setLoading(false);
-
-    return () => {
-      ignore = true;
-    };
-  }, [id, state]);
-
-  useEffect(() => {
-    let ignore = false;
-
-    async function loadBom() {
-      try {
         setBomLoading(true);
-        const res = await axios.get(`${BASE}/products/${id}/bom`);
-        if (!ignore) setBom(res?.data?.data || null);
+        setError("");
+        setImageFailed(false);
+
+        const [productRes, bomRes] = await Promise.all([
+          axios.get(`${BASE}/products/${id}`),
+          axios.get(`${BASE}/products/${id}/bom`),
+        ]);
+
+        if (cancelled) return;
+
+        const resolvedProduct = productRes?.data?.data || productRes?.data || null;
+        const resolvedBom = bomRes?.data?.data || bomRes?.data || null;
+
+        setProduct(resolvedProduct);
+        setBom(resolvedBom);
       } catch (err) {
-        console.error("❌ Error loading product BOM:", err);
-        if (!ignore) setBom(null);
+        if (cancelled) return;
+        console.error("ProductDetail load error:", err);
+        setError(
+          err?.response?.data?.message || err.message || "Failed to load"
+        );
       } finally {
-        if (!ignore) setBomLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setBomLoading(false);
+        }
       }
     }
 
-    loadBom();
-
+    loadData();
     return () => {
-      ignore = true;
+      cancelled = true;
     };
   }, [id]);
+
+  const openPartDetail = async (row) => {
+    if (!row) return;
+
+    setSelectedPart(row);
+    setShowPartDetail(true);
+
+    if (!row.part_id) return;
+
+    try {
+      setPartModalLoading(true);
+
+      // Try to enrich the BOM row with full part details.
+      // If this endpoint is not available, the modal will still open with BOM row data.
+      const res = await axios.get(`${BASE}/parts/${row.part_id}`);
+      const resolvedPart = res?.data?.data || res?.data || row;
+      setSelectedPart(resolvedPart);
+    } catch (err) {
+      console.warn("Part detail enrichment failed, using BOM row data:", err);
+      setSelectedPart(row);
+    } finally {
+      setPartModalLoading(false);
+    }
+  };
 
   const mechanicalParts = useMemo(() => bom?.grouped?.mechanical || [], [bom]);
   const electricalParts = useMemo(() => bom?.grouped?.electrical || [], [bom]);
@@ -165,138 +244,95 @@ export default function ProductDetail() {
     grand: 0,
   };
 
-  console.log("BOM DATA:", bom);
-  console.log("Mechanical:", mechanicalParts.length);
-  console.log("Electrical:", electricalParts.length);
+  const rawImageValue =
+    product?.image_url ||
+    product?.image ||
+    product?.product_image ||
+    product?.image_path ||
+    product?.photo ||
+    product?.image_filename ||
+    product?.filename ||
+    product?.file_name ||
+    product?.thumbnail ||
+    product?.product_photo ||
+    product?.productImage ||
+    product?.imageUrl ||
+    product?.img ||
+    product?.picture ||
+    product?.media_url ||
+    product?.photo_url;
+
+  const productImage = getProductImageUrl(rawImageValue);
 
   if (loading) {
-    return <div className="p-6 text-center text-gray-500">Loading product details...</div>;
+    return (
+      <div className="p-6 text-center text-gray-500">
+        Loading product details...
+      </div>
+    );
   }
 
   if (error || !product) {
-    return <div className="p-6 text-center text-gray-500">{error || "No product details found."}</div>;
+    return (
+      <div className="p-6 text-center text-gray-500">
+        {error || "No product details found."}
+      </div>
+    );
   }
-
-  const hasLegacySpecs =
-    product.machine_type ||
-    product.frame_series ||
-    product.nozzle_count ||
-    typeof product.demo_available !== "undefined";
-
-  const keyFeatures = Array.isArray(product.key_features) ? product.key_features : [];
-  const applications = Array.isArray(product.applications) ? product.applications : [];
 
   return (
     <div className="p-8 max-w-7xl mx-auto bg-white rounded-lg shadow-md">
-      <button
-        onClick={() => navigate(-1)}
-        className="text-blue-600 text-sm font-medium mb-4 hover:underline"
-      >
-        ← Back to Products
-      </button>
+      <h1 className="text-3xl font-bold text-gray-800 mb-6">Product Detail</h1>
 
-      <div className="grid md:grid-cols-2 gap-8">
-        <div className="flex justify-center">
-          <img
-            src={product.image_url || "/images/placeholder.jpg"}
-            alt={product.product_name}
-            className="w-full max-w-md rounded-lg object-cover shadow"
-          />
-        </div>
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+        <section className="xl:col-span-4">
+          <div className="bg-gray-50 rounded-lg border p-4">
+            <div className="w-full h-[320px] flex items-center justify-center bg-white rounded-lg border overflow-hidden">
+              {productImage && !imageFailed ? (
+                <img
+                  src={productImage}
+                  alt={product?.product_name || product?.name || "Product"}
+                  className="max-h-full max-w-full object-contain"
+                  onError={() => setImageFailed(true)}
+                />
+              ) : (
+                <div className="text-gray-400">No product image</div>
+              )}
+            </div>
+          </div>
+        </section>
 
-        <div className="flex flex-col">
-          <h1 className="text-3xl font-bold text-gray-800 mb-1">
-            {product.product_code ? `${product.product_code} — ` : ""}
-            {product.product_name}
-          </h1>
-
-          <p className="text-blue-600 font-semibold mb-1">{product.category}</p>
-
-          <p className="text-gray-700 mb-4 leading-relaxed whitespace-pre-line">
-            {product.full_description || product.long_description || product.short_description}
-          </p>
-
-          {product.pdf_brochure_url && (
-            <a
-              href={product.pdf_brochure_url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-block text-blue-600 font-medium hover:underline mb-4"
-            >
-              📄 Download Brochure
-            </a>
-          )}
-
-          {keyFeatures.length > 0 && (
-            <section className="mb-4">
-              <h2 className="text-xl font-semibold mb-2 text-gray-800">Key Features</h2>
-              <ul className="list-disc list-inside text-gray-700 space-y-1">
-                {keyFeatures.map((f, i) => (
-                  <li key={i}>{f}</li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {hasLegacySpecs ? (
-            <section className="mb-2">
-              <h2 className="text-xl font-semibold mb-2 text-gray-800">Technical Specifications</h2>
-              <table className="min-w-full text-sm border">
-                <tbody>
-                  {product.machine_type && (
-                    <tr>
-                      <td className="border px-3 py-2 font-medium w-1/3 text-gray-800">
-                        Machine Type
-                      </td>
-                      <td className="border px-3 py-2 text-gray-700">{product.machine_type}</td>
-                    </tr>
-                  )}
-                  {product.frame_series && (
-                    <tr>
-                      <td className="border px-3 py-2 font-medium w-1/3 text-gray-800">
-                        Frame Series
-                      </td>
-                      <td className="border px-3 py-2 text-gray-700">{product.frame_series}</td>
-                    </tr>
-                  )}
-                  {typeof product.nozzle_count !== "undefined" && product.nozzle_count && (
-                    <tr>
-                      <td className="border px-3 py-2 font-medium w-1/3 text-gray-800">
-                        Nozzle Count
-                      </td>
-                      <td className="border px-3 py-2 text-gray-700">{product.nozzle_count}</td>
-                    </tr>
-                  )}
-                  {typeof product.demo_available !== "undefined" && (
-                    <tr>
-                      <td className="border px-3 py-2 font-medium w-1/3 text-gray-800">
-                        Demo Available
-                      </td>
-                      <td className="border px-3 py-2 text-gray-700">
-                        {product.demo_available ? "Yes" : "No"}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </section>
-          ) : null}
-        </div>
-      </div>
-
-      {applications.length > 0 && (
-        <>
-          <hr className="my-6" />
-          <section>
-            <h2 className="text-xl font-semibold mb-3 text-gray-800">Applications</h2>
-            <ul className="list-disc list-inside text-gray-700 space-y-1">
-              {applications.map((a, i) => (
-                <li key={i}>{a}</li>
-              ))}
-            </ul>
+        <section className="xl:col-span-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <section className="bg-gray-50 rounded-lg p-5 border">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              Product Information
+            </h2>
+            <DetailRow label="Product Name" value={product.product_name || product.name} />
+            <DetailRow label="Product Number" value={product.product_number} />
+            <DetailRow label="SKU" value={product.sku} />
+            <DetailRow label="Category" value={product.category_name || product.category} />
+            <DetailRow label="Type" value={product.product_type} />
+            <DetailRow label="Status" value={product.status} />
+            <DetailRow label="Revision" value={product.revision} />
+            <DetailRow label="Unit Price" value={money(product.unit_price)} />
+            <DetailRow label="Description" value={product.description} />
           </section>
-        </>
-      )}
+
+          <section className="bg-gray-50 rounded-lg p-5 border">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+              Inventory / Build Summary
+            </h2>
+            <DetailRow label="Qty On Hand" value={product.quantity_on_hand} />
+            <DetailRow label="Min Stock" value={product.min_stock} />
+            <DetailRow label="Max Stock" value={product.max_stock} />
+            <DetailRow label="UOM" value={product.uom} />
+            <DetailRow label="Mechanical Budget" value={money(totals.mechanical)} />
+            <DetailRow label="Electrical Budget" value={money(totals.electrical)} />
+            <DetailRow label="Other Budget" value={money(totals.other)} />
+            <DetailRow label="Grand Total" value={money(totals.grand)} />
+          </section>
+        </section>
+      </div>
 
       <hr className="my-6" />
 
@@ -306,6 +342,7 @@ export default function ProductDetail() {
         total={totals.mechanical}
         bomLoading={bomLoading}
         emptyText="No mechanical BOM parts found."
+        onOpenPart={openPartDetail}
       />
 
       <hr className="my-6" />
@@ -316,19 +353,34 @@ export default function ProductDetail() {
         total={totals.electrical}
         bomLoading={bomLoading}
         emptyText="No electrical BOM parts found."
+        onOpenPart={openPartDetail}
       />
 
-      <hr className="my-6" />
-
-      <div className="text-sm text-gray-700">
-        📞 {product.contact_phone} &nbsp; | &nbsp; ✉️{" "}
-        <a
-          href={`mailto:${product.contact_email}`}
-          className="text-blue-600 hover:underline"
+      <div className="mt-6">
+        <button
+          onClick={() => navigate("/products")}
+          className="px-4 py-2 bg-blue-600 text-white rounded"
         >
-          {product.contact_email}
-        </a>
+          Back to Products
+        </button>
       </div>
+
+      {showPartDetail && selectedPart && (
+        <PartDetail
+          part={selectedPart}
+          onClose={() => {
+            setShowPartDetail(false);
+            setSelectedPart(null);
+            setPartModalLoading(false);
+          }}
+        />
+      )}
+
+      {showPartDetail && partModalLoading && (
+        <div className="fixed bottom-4 right-4 z-[60] bg-white border shadow px-4 py-2 rounded text-sm text-gray-600">
+          Loading full part details...
+        </div>
+      )}
     </div>
   );
 }
