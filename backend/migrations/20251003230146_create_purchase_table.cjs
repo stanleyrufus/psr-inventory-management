@@ -1,7 +1,7 @@
 exports.up = function(knex) {
   return knex.schema.createTable('purchase_orders', table => {
     table.increments('id').primary();
-    table.integer('product_id').unsigned().references('id').inTable('products').onDelete('CASCADE');
+table.integer('product_id').unsigned();
     table.integer('quantity').notNullable();
     table.float('total_price').notNullable();
     table.string('supplier_name').notNullable();
