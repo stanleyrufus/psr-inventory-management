@@ -427,6 +427,9 @@ if (!id || isNaN(Number(id))) {
                   <th className="border border-gray-300 px-2 py-1 text-right w-28">
                     LINE TOTAL
                   </th>
+<th className="border border-gray-300 px-2 py-1 text-center w-24">
+  BO
+</th>
                 </tr>
               </thead>
 
@@ -461,26 +464,44 @@ if (!id || isNaN(Number(id))) {
                     }
                   }
 
-const isBackOrdered = Boolean(it.back_ordered ?? it.bo ?? false);
+
+const isBackOrdered =
+  String(it.back_ordered).toLowerCase() === "true" ||
+  String(it.back_ordered).toLowerCase() === "t" ||
+  String(it.back_ordered) === "1" ||
+  it.back_ordered === true ||
+  it.back_ordered === 1 ||
+  String(it.bo).toLowerCase() === "true" ||
+  String(it.bo).toLowerCase() === "t" ||
+  String(it.bo) === "1" ||
+  it.bo === true ||
+  it.bo === 1;
 
 return (
-  <tr
-    key={idx}
-    className={isBackOrdered ? "bg-yellow-200" : idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
-  >
-    <td className={`border border-gray-300 px-2 py-1 text-center ${isBackOrdered ? "bg-yellow-200" : ""}`}>
+<tr
+  key={idx}
+  style={isBackOrdered ? { backgroundColor: "#fecaca" } : {}}
+  className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
+>
+<td
+  className="border border-gray-300 px-2 py-1 text-center"
+  style={isBackOrdered ? { backgroundColor: "#fecaca" } : {}}
+>
       {it.line_no ?? idx + 1}
     </td>
 
-    <td className={`border border-gray-300 px-2 py-1 ${isBackOrdered ? "bg-yellow-200" : ""}`}>
+    <td className={`border border-gray-300 px-2 py-1 ${isBackOrdered ? "bg-red-100" : ""}`}>
       {part?.part_number || `Part #${it.part_id || it.partId || "-"}`}
     </td>
 
-    <td className={`border border-gray-300 px-2 py-1 ${isBackOrdered ? "bg-yellow-200" : ""}`}>
+<td
+  className="border border-gray-300 px-2 py-1 text-center"
+  style={isBackOrdered ? { backgroundColor: "#fecaca" } : {}}
+>
       {part?.description || it.description || "—"}
     </td>
 
-    <td className={`border border-gray-300 px-2 py-1 text-center ${isBackOrdered ? "bg-yellow-200" : ""}`}>
+    <td className={`border border-gray-300 px-2 py-1 text-center ${isBackOrdered ? "bg-red-100" : ""}`}>
       {imgUrl ? (
         <img
           src={imgUrl}
@@ -492,17 +513,32 @@ return (
       )}
     </td>
 
-    <td className={`border border-gray-300 px-2 py-1 text-right ${isBackOrdered ? "bg-yellow-200" : ""}`}>
+    <td className={`border border-gray-300 px-2 py-1 text-right ${isBackOrdered ? "bg-red-100" : ""}`}>
       {it.quantity}
     </td>
 
-    <td className={`border border-gray-300 px-2 py-1 text-right ${isBackOrdered ? "bg-yellow-200" : ""}`}>
+    <td className={`border border-gray-300 px-2 py-1 text-right ${isBackOrdered ? "bg-red-100" : ""}`}>
       {money(it.unit_price)}
     </td>
 
-    <td className={`border border-gray-300 px-2 py-1 text-right ${isBackOrdered ? "bg-yellow-200" : ""}`}>
+    <td className={`border border-gray-300 px-2 py-1 text-right ${isBackOrdered ? "bg-red-100" : ""}`}>
       {money(it.total_price)}
     </td>
+
+<td
+  className="border border-gray-300 px-2 py-1 text-center"
+  style={isBackOrdered ? { backgroundColor: "#fecaca" } : {}}
+>
+  {isBackOrdered ? (
+    <span className="px-2 py-1 rounded bg-red-600 text-white text-[11px] font-semibold">
+      BO
+    </span>
+) : it.received_complete ? (
+  <span className="px-2 py-1 bg-green-600 text-white rounded text-xs font-semibold">
+    RCV
+  </span>
+) : "—"}
+</td>
   </tr>
 );
                 })}

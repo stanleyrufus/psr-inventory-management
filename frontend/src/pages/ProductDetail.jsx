@@ -143,17 +143,16 @@ function BomTable({
 
 function DetailRow({ label, value }) {
   return (
-    <div className="grid grid-cols-12 gap-3 py-2 border-b border-gray-100">
-      <div className="col-span-4 text-sm font-semibold text-gray-600">
+    <div className="grid grid-cols-12 gap-2 py-[2px] border-b border-gray-100">
+<div className="col-span-5 text-[13px] font-medium text-gray-600">
         {label}
       </div>
-      <div className="col-span-8 text-sm text-gray-800 break-words">
+<div className="col-span-7 text-[13px] text-gray-800 break-words">
         {value || "-"}
       </div>
     </div>
   );
 }
-
 export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -168,6 +167,7 @@ export default function ProductDetail() {
   const [selectedPart, setSelectedPart] = useState(null);
   const [showPartDetail, setShowPartDetail] = useState(false);
   const [partModalLoading, setPartModalLoading] = useState(false);
+  const [importingBom, setImportingBom] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -235,6 +235,25 @@ export default function ProductDetail() {
     }
   };
 
+  const handleImportBom = async () => {
+    try {
+      setImportingBom(true);
+await axios.post(`${BASE}/products/${id}/bom/import`);
+
+alert("BOM imported successfully");
+
+// reload BOM
+const bomRes = await axios.get(`${BASE}/products/${id}/bom`);
+const resolvedBom = bomRes?.data?.data || bomRes?.data || null;
+setBom(resolvedBom);
+    } catch (err) {
+      console.error("BOM import trigger failed:", err);
+      alert("Failed to import BOM");
+    } finally {
+      setImportingBom(false);
+    }
+  };
+
   const mechanicalParts = useMemo(() => bom?.grouped?.mechanical || [], [bom]);
   const electricalParts = useMemo(() => bom?.grouped?.electrical || [], [bom]);
   const totals = bom?.totals || {
@@ -281,13 +300,12 @@ export default function ProductDetail() {
   }
 
   return (
-    <div className="p-8 max-w-7xl mx-auto bg-white rounded-lg shadow-md">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Product Detail</h1>
-
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+<div className="pt-4 px-8 pb-8 max-w-7xl mx-auto bg-white rounded-lg shadow-md">
+<h1 className="text-2xl font-semibold text-gray-800 mb-2">Product Detail</h1>
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
         <section className="xl:col-span-4">
-          <div className="bg-gray-50 rounded-lg border p-4">
-            <div className="w-full h-[320px] flex items-center justify-center bg-white rounded-lg border overflow-hidden">
+          <div className="bg-gray-50 rounded-lg border p-3">
+<div className="w-full h-[360px] flex items-center justify-center bg-white rounded-lg border overflow-hidden">
               {productImage && !imageFailed ? (
                 <img
                   src={productImage}
@@ -296,45 +314,69 @@ export default function ProductDetail() {
                   onError={() => setImageFailed(true)}
                 />
               ) : (
-                <div className="text-gray-400">No product image</div>
+                <div className="text-gray-400 text-sm">No product image</div>
               )}
             </div>
           </div>
         </section>
 
-        <section className="xl:col-span-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <section className="bg-gray-50 rounded-lg p-5 border">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+<section className="xl:col-span-8 flex flex-col gap-3 h-[360px] min-h-[360px]">
+<section className="bg-gray-50 rounded-lg p-4 border flex-1">
+<h2 className="text-2xl font-semibold text-gray-800 mb-3">
               Product Information
             </h2>
-            <DetailRow label="Product Name" value={product.product_name || product.name} />
-            <DetailRow label="Product Number" value={product.product_number} />
-            <DetailRow label="SKU" value={product.sku} />
-            <DetailRow label="Category" value={product.category_name || product.category} />
-            <DetailRow label="Type" value={product.product_type} />
-            <DetailRow label="Status" value={product.status} />
-            <DetailRow label="Revision" value={product.revision} />
-            <DetailRow label="Unit Price" value={money(product.unit_price)} />
-            <DetailRow label="Description" value={product.description} />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+              <div>
+                <DetailRow label="Product Name" value={product.product_name || product.name} />
+                <DetailRow label="Product Number" value={product.product_number} />
+                <DetailRow label="SKU" value={product.sku} />
+                <DetailRow label="Category" value={product.category_name || product.category} />
+                <DetailRow label="Type" value={product.product_type} />
+              </div>
+
+              <div>
+                <DetailRow label="Status" value={product.status} />
+                <DetailRow label="Revision" value={product.revision} />
+                <DetailRow label="Unit Price" value={money(product.unit_price)} />
+                <DetailRow label="Description" value={product.description} />
+              </div>
+            </div>
           </section>
 
-          <section className="bg-gray-50 rounded-lg p-5 border">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+<section className="bg-gray-50 rounded-lg p-4 border flex-1">
+<h2 className="text-2xl font-semibold text-gray-800 mb-3">
               Inventory / Build Summary
             </h2>
-            <DetailRow label="Qty On Hand" value={product.quantity_on_hand} />
-            <DetailRow label="Min Stock" value={product.min_stock} />
-            <DetailRow label="Max Stock" value={product.max_stock} />
-            <DetailRow label="UOM" value={product.uom} />
-            <DetailRow label="Mechanical Budget" value={money(totals.mechanical)} />
-            <DetailRow label="Electrical Budget" value={money(totals.electrical)} />
-            <DetailRow label="Other Budget" value={money(totals.other)} />
-            <DetailRow label="Grand Total" value={money(totals.grand)} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+              <div>
+                <DetailRow label="Qty On Hand" value={product.quantity_on_hand} />
+                <DetailRow label="Min Stock" value={product.min_stock} />
+                <DetailRow label="Max Stock" value={product.max_stock} />
+                <DetailRow label="UOM" value={product.uom} />
+              </div>
+              <div>
+                <DetailRow label="Mechanical Budget" value={money(totals.mechanical)} />
+                <DetailRow label="Electrical Budget" value={money(totals.electrical)} />
+                <DetailRow label="Other Budget" value={money(totals.other)} />
+                <DetailRow label="Grand Total" value={money(totals.grand)} />
+              </div>
+            </div>
           </section>
         </section>
       </div>
+        <hr className="my-6" />
 
-      <hr className="my-6" />
+      <div className="flex justify-end mb-4 gap-2">
+        <button
+          type="button"
+          onClick={handleImportBom}
+          disabled={importingBom}
+          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+        >
+          {importingBom ? "Importing..." : "Import BOM"}
+        </button>
+      </div>
 
       <BomTable
         title="Mechanical Parts"
