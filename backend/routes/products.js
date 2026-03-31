@@ -137,47 +137,15 @@ router.get("/:id/bom", async (req, res) => {
 
 /**
  * POST /api/products/:id/bom/import
+ * TEMP DISABLED
  */
 router.post("/:id/bom/import", async (req, res) => {
-  try {
-    const productId = Number(req.params.id);
-
-    const product = await db("products").where({ id: productId }).first();
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: "Product not found",
-      });
-    }
-
-    await db("product_parts").where({ product_id: productId }).del();
-
-    const parts = await db("inventory")
-      .select("part_id")
-      .limit(10);
-
-    const rows = parts.map((p, index) => ({
-      product_id: productId,
-      part_id: p.part_id,
-      section: index % 2 === 0 ? "mechanical" : "electrical",
-      qty_required: 1,
-    }));
-
-    await db("product_parts").insert(rows);
-
-    return res.json({
-      success: true,
-      message: "BOM imported successfully",
-      inserted: rows.length,
-    });
-  } catch (err) {
-    console.error("❌ BOM import failed:", err);
-    res.status(500).json({
-      success: false,
-      message: "BOM import failed",
-    });
-  }
+  return res.status(400).json({
+    success: false,
+    message: "Temporary import disabled",
+  });
 });
+
 
 
 /**
