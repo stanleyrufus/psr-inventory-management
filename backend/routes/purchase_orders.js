@@ -839,17 +839,43 @@ if (
       await trx("purchase_order_items").where({ po_id: id }).del();
 
       if (items.length > 0) {
-        const rows = items.map((i) => ({
-          po_id: id,
-          part_id: Number(i.part_id),
-          line_no: Number(i.line_no),
-          quantity: String(i.quantity),
-          unit_price: String(i.unit_price),
-          total_price: String(i.total_price),
-          description: i.description || "",
-          received_complete: Boolean(i.received_complete),
-          back_ordered: Boolean(i.back_ordered),
-        }));
+        const rows = items.map((i, idx) => {
+  const qty = Number(i.quantity || 0);
+  const receivedQty = Number(i.received_quantity || 0);
+  const boQty = Number(i.backorder_quantity || 0);
+
+  // VALIDATION
+  if (receivedQty < 0 || boQty < 0) {
+    throw new Error("Received/BO quantity cannot be negative");
+  }
+
+  if (receivedQty + boQty > qty) {
+    throw new Error(
+      `Invalid quantities: received (${receivedQty}) + BO (${boQty}) exceeds ordered (${qty})`
+    );
+  }
+
+  // DERIVED FLAGS
+  const receivedComplete = receivedQty >= qty;
+  const backOrdered = boQty > 0;
+
+  return {
+    po_id: id,
+    line_no: idx + 1,
+    part_id: i.part_id,
+    quantity: qty,
+    unit_price: i.unit_price,
+    total_price: i.total_price,
+
+    // NEW FIELDS
+    received_quantity: receivedQty,
+    backorder_quantity: boQty,
+
+    // EXISTING FLAGS (AUTO DERIVED)
+    received_complete: receivedComplete,
+    back_ordered: backOrdered,
+  };
+});
 
         await trx("purchase_order_items").insert(rows);
       }
@@ -862,7 +888,10 @@ if (
     });
   } catch (err) {
     console.error("❌ UPDATE PO error:", err);
-    return res.status(500).json({ success: 0, message: "Failed to update PO" });
+return res.status(400).json({
+  success: 0,
+  message: err.message || "Failed to update PO"
+});
   }
 });
 

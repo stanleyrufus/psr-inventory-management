@@ -159,7 +159,7 @@ export default function PurchaseOrderForm({
     "Pam Ramnarain",
     "Shiney Ramnarain",
     "Brian Ramnarain",
-    "Dave Ramnarain",
+    "David Ramnarain",
     "Chris Ramnarain",
     "Anushka Ramnarain",
   ]);
@@ -262,6 +262,20 @@ if (
 ) {
   errs[`items[${idx}].unitPrice`] = "Unit price must be 0 or more.";
 }
+
+          if (it.bo) {
+            const qty = Number(it.quantity || 0);
+            const receivedQty = Number(it.received_quantity || 0);
+            const boQty = Number(it.backorder_quantity || 0);
+
+            if (receivedQty < 0 || boQty < 0) {
+              errs[`items[${idx}].boQty`] = "Received/BO qty cannot be negative.";
+            } else if (boQty <= 0) {
+              errs[`items[${idx}].boQty`] = "Enter BO Qty for backordered item.";
+            } else if (receivedQty + boQty > qty) {
+              errs[`items[${idx}].boQty`] = "Received Qty + BO Qty cannot exceed Qty.";
+            }
+          }
         });
       }
     }
@@ -280,7 +294,7 @@ if (
 
     const rawItems = poData.items || poData.po_items || [];
 
-    const items = rawItems.map((i) => ({
+const items = rawItems.map((i) => ({
   poItemId: i.id,
   partId: i.part_id || i.partId,
   description: i.description || "",
@@ -291,14 +305,17 @@ if (
   lastUnitPrice: i.last_unit_price || null,
   rcvd: Boolean(i.received_complete ?? false),
   bo: Boolean(i.back_ordered ?? false),
+  received_quantity: Number(i.received_quantity ?? 0),
+  backorder_quantity: Number(i.backorder_quantity ?? 0),
 }));
 
-    return {
-      ...poData,
-      order_date: toDateOnly(poData.order_date),
-      expected_delivery_date: toDateOnly(poData.expected_delivery_date),
-      items,
-    };
+   return {
+  ...poData,
+  order_date: toDateOnly(poData.order_date),
+  expected_delivery_date: toDateOnly(poData.expected_delivery_date),
+  received_on: toDateOnly(poData.received_on),
+  items,
+};
   };
 
   const [po, setPo] = useState(
@@ -411,16 +428,18 @@ if (
     items: [
       ...prev.items,
       {
-        partId: "",
-        description: "",
-        quantity: 1,
-        unit: "pcs",
-        unitPrice: 0,
-        totalPrice: 0,
-        lastUnitPrice: null,
-        rcvd: false,
-        bo: false,
-      },
+  partId: "",
+  description: "",
+  quantity: 1,
+  unit: "pcs",
+  unitPrice: 0,
+  totalPrice: 0,
+  lastUnitPrice: null,
+  rcvd: false,
+  bo: false,
+  received_quantity: 0,
+  backorder_quantity: 0,
+},
     ],
   }));
 };
@@ -547,17 +566,42 @@ if (
 
 const updateItemFlags = (index, field, checked) => {
   const updatedItems = [...po.items];
-  updatedItems[index][field] = checked;
+  const row = { ...updatedItems[index] };
 
-  // mutually exclusive
+  row[field] = checked;
+
   if (field === "rcvd" && checked) {
-    updatedItems[index].bo = false;
+    row.bo = false;
+    row.received_quantity = Number(row.quantity || 0);
+    row.backorder_quantity = 0;
   }
 
   if (field === "bo" && checked) {
-    updatedItems[index].rcvd = false;
+    row.rcvd = false;
+
+    if (!Number(row.received_quantity) && !Number(row.backorder_quantity)) {
+      row.received_quantity = 0;
+      row.backorder_quantity = 0;
+    }
   }
 
+  if (field === "bo" && !checked) {
+    row.received_quantity = 0;
+    row.backorder_quantity = 0;
+  }
+
+  if (field === "rcvd" && !checked && !row.bo) {
+    row.received_quantity = 0;
+    row.backorder_quantity = 0;
+  }
+
+  updatedItems[index] = row;
+  setPo({ ...po, items: updatedItems });
+};
+
+const updateItemQtyField = (index, field, value) => {
+  const updatedItems = [...po.items];
+  updatedItems[index][field] = value === "" ? "" : Number(value);
   setPo({ ...po, items: updatedItems });
 };
 
@@ -686,7 +730,7 @@ const updateItemFlags = (index, field, checked) => {
         status: "Draft",
         received_by: po.received_by || "",
         received_on: po.received_on || "",
-    items: po.items.map((i, index) => ({
+   items: po.items.map((i, index) => ({
   id: null,
   part_id: Number(i.partId),
   line_no: index + 1,
@@ -696,6 +740,8 @@ const updateItemFlags = (index, field, checked) => {
   description: i.description || "",
   received_complete: !!i.rcvd,
   back_ordered: !!i.bo,
+  received_quantity: String(i.received_quantity || 0),
+  backorder_quantity: String(i.backorder_quantity || 0),
 })),
       });
 
@@ -795,6 +841,8 @@ const updateItemFlags = (index, field, checked) => {
   description: i.description || "",
   received_complete: !!i.rcvd,
   back_ordered: !!i.bo,
+  received_quantity: String(i.received_quantity || 0),
+  backorder_quantity: String(i.backorder_quantity || 0),
 })),
     };
 
@@ -1191,15 +1239,16 @@ const updateItemFlags = (index, field, checked) => {
       {/* --- Items Table --- */}
       <table className="w-full border mb-4 text-sm">
         <thead className="bg-gray-100">
-          <tr>
-  <th className="p-2 border">#</th>
-  <th className="p-2 border">Part</th>
-  <th className="p-2 border">Qty</th>
-  <th className="p-2 border">Unit Price</th>
-  <th className="p-2 border text-right">Total</th>
-  <th className="p-2 border text-center">Rcvd</th>
-  <th className="p-2 border text-center">BO</th>
-  <th className="p-2 border text-center">Remove</th>
+         <tr>
+  <th className="p-2 border w-10">#</th>
+  <th className="p-2 border w-[34%]">Part</th>
+  <th className="p-2 border w-24">Qty</th>
+  <th className="p-2 border w-28">Unit Price</th>
+  <th className="p-2 border w-24 text-right">Total</th>
+  <th className="p-2 border w-16 text-center">Rcvd</th>
+  <th className="p-2 border w-16 text-center">BO</th>
+  <th className="p-2 border w-40 text-center">BO Details</th>
+  <th className="p-2 border w-16 text-center">Remove</th>
 </tr>
         </thead>
 
@@ -1347,8 +1396,10 @@ const updateItemFlags = (index, field, checked) => {
 
                 <td className="border p-2">
                   <input
-                    type="number"
-                    value={item.quantity}
+  type="number"
+  min="0"
+  step="1"
+  value={item.quantity}
                     className={`border p-1 rounded w-full ${
                       errors[`items[${i}].quantity`] ? "border-red-500" : ""
                     }`}
@@ -1385,6 +1436,9 @@ const updateItemFlags = (index, field, checked) => {
                   )}
                 </td>
 
+
+
+
 <td className="border p-2 text-right">{money(item.totalPrice)}</td>
 
 <td className="border p-2 text-center">
@@ -1406,6 +1460,44 @@ const updateItemFlags = (index, field, checked) => {
 </td>
 
 <td className="border p-2 text-center">
+  {item.bo ? (
+    <div className="flex flex-col gap-1 items-center">
+      <input
+        type="number"
+        min="0"
+        step="1"
+        value={item.received_quantity ?? 0}
+        onChange={(e) =>
+          updateItemQtyField(i, "received_quantity", e.target.value)
+        }
+        className="border p-1 rounded w-20 text-right"
+        placeholder="Rcvd"
+        disabled={submitting || saved}
+      />
+      <input
+        type="number"
+        min="0"
+        step="1"
+        value={item.backorder_quantity ?? 0}
+        onChange={(e) =>
+          updateItemQtyField(i, "backorder_quantity", e.target.value)
+        }
+        className="border p-1 rounded w-20 text-right"
+        placeholder="BO"
+        disabled={submitting || saved}
+      />
+      {errors[`items[${i}].boQty`] && (
+        <div className="text-xs text-red-600 text-center">
+          {errors[`items[${i}].boQty`]}
+        </div>
+      )}
+    </div>
+  ) : (
+    <div className="text-xs text-gray-400"></div>
+  )}
+</td>
+
+<td className="border p-2 text-center">
   <button
     type="button"
     onClick={() => removeItemRow(i)}
@@ -1414,7 +1506,8 @@ const updateItemFlags = (index, field, checked) => {
   >
     ✕
   </button>
-</td>              </tr>
+</td>
+              </tr>
             );
           })}
         </tbody>
@@ -1526,7 +1619,7 @@ const updateItemFlags = (index, field, checked) => {
             <option value="Shiney">Shiney</option>
             <option value="Brian">Brian</option>
             <option value="Pam">Pam</option>
-            <option value="Dave">Dave</option>
+            <option value="David">David</option>
             <option value="Chris">Chris</option>
             <option value="Anushka">Anushka</option>
           </select>

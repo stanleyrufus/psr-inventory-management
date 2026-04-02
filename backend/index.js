@@ -18,6 +18,7 @@ import purchaseOrdersReportRoutes from "./routes/purchase_orders_report.js";
 import rfqRouter from "./routes/purchase_orders_rfq.js";   // ✅ ADD THIS
 import permissionsRoute from "./routes/permissions.js";
 import monitoringRoutes from "./routes/monitoring.js";
+import productBomUploadRoutes from "./routes/product_bom_upload.js";
 
 
 import usersRoute from "./routes/users.js";
@@ -69,6 +70,7 @@ app.use("/api/po_import", poImportRoutes);
 app.use("/api/purchase_orders_report", purchaseOrdersReportRoutes);
 
 // --- Other modules ---
+app.use("/api/products/:id/bom", productBomUploadRoutes);
 app.use("/api/products", productsRoutes);
 
 app.use("/api/monitoring", monitoringRoutes);

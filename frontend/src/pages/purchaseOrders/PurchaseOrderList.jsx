@@ -860,7 +860,7 @@ export default function PurchaseOrderList() {
                   <option value="Brian Ramnarain">Brian</option>
                   <option value="Anushka Ramnarain">Anushka</option>
                   <option value="Chris Ramnarain">Chris</option>
-                  <option value="Dave Ramnarain">Dave</option>
+                  <option value="David Ramnarain">David</option>
                 </select>
               </div>
 

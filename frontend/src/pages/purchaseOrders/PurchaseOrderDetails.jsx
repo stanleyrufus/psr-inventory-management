@@ -530,14 +530,24 @@ return (
   style={isBackOrdered ? { backgroundColor: "#fecaca" } : {}}
 >
   {isBackOrdered ? (
-    <span className="px-2 py-1 rounded bg-red-600 text-white text-[11px] font-semibold">
-      BO
+    <div className="flex flex-col items-center gap-1">
+      <span className="px-2 py-1 rounded bg-red-600 text-white text-[11px] font-semibold">
+        BO
+      </span>
+
+      {Number(it.backorder_quantity || 0) > 0 && (
+        <span className="text-[11px] font-medium text-red-800">
+          Qty: {Number(it.backorder_quantity)}
+        </span>
+      )}
+    </div>
+  ) : it.received_complete ? (
+    <span className="px-2 py-1 bg-green-600 text-white rounded text-xs font-semibold">
+      RCV
     </span>
-) : it.received_complete ? (
-  <span className="px-2 py-1 bg-green-600 text-white rounded text-xs font-semibold">
-    RCV
-  </span>
-) : "—"}
+  ) : (
+    "—"
+  )}
 </td>
   </tr>
 );

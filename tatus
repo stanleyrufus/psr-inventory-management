@@ -1,0 +1,3 @@
+[33m5a597d6[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m Temporarily disable BOM import pending safe rework
+[33m1bb8bd7[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Fix migration order: remove early FK and add later constraints
+[33m6822951[m Fix products route and product detail/purchase order details UI

@@ -136,6 +136,76 @@ router.get("/:id/bom", async (req, res) => {
 });
 
 /**
+ * DELETE /api/products/:id/bom/rows/:rowId
+ */
+router.delete("/:id/bom/rows/:rowId", async (req, res) => {
+  try {
+    const productId = Number(req.params.id);
+    const rowId = Number(req.params.rowId);
+
+    const existing = await db("product_parts")
+      .where({ id: rowId, product_id: productId })
+      .first();
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: "BOM row not found",
+      });
+    }
+
+    await db("product_parts")
+      .where({ id: rowId, product_id: productId })
+      .del();
+
+    return res.json({
+      success: true,
+      message: "BOM row deleted successfully",
+      deletedRowId: rowId,
+    });
+  } catch (err) {
+    console.error("❌ Error deleting BOM row:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete BOM row",
+    });
+  }
+});
+
+/**
+ * DELETE /api/products/:id/bom/section/:section
+ */
+router.delete("/:id/bom/section/:section", async (req, res) => {
+  try {
+    const productId = Number(req.params.id);
+    const section = String(req.params.section || "").trim().toLowerCase();
+
+    if (!["mechanical", "electrical", "other"].includes(section)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid BOM section",
+      });
+    }
+
+    const deletedCount = await db("product_parts")
+      .where({ product_id: productId, section })
+      .del();
+
+    return res.json({
+      success: true,
+      message: `${section} BOM rows deleted successfully`,
+      deletedCount,
+    });
+  } catch (err) {
+    console.error("❌ Error deleting BOM section:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete BOM section",
+    });
+  }
+});
+
+/**
  * POST /api/products/:id/bom/import
  * TEMP DISABLED
  */
@@ -146,6 +216,167 @@ router.post("/:id/bom/import", async (req, res) => {
   });
 });
 
+/**
+ * POST /api/products/:id/bom/rows
+ */
+router.post("/:id/bom/rows", async (req, res) => {
+  try {
+    const productId = Number(req.params.id);
+    const {
+      part_number,
+      part_name,
+      qty_required,
+      section,
+      unit_price,
+      source_description,
+    } = req.body;
+
+    if (!productId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid product id",
+      });
+    }
+
+    if (!String(part_number || "").trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Part number is required",
+      });
+    }
+
+    if (!String(part_name || "").trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Part name is required",
+      });
+    }
+
+    const normalizedSection = String(section || "").trim().toLowerCase();
+    if (!["mechanical", "electrical", "other"].includes(normalizedSection)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid section is required",
+      });
+    }
+
+    const qty = Number(qty_required || 0);
+    if (!qty || qty <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Quantity must be greater than 0",
+      });
+    }
+
+    const cleanPartNumber = String(part_number).trim();
+    const cleanPartName = String(part_name).trim();
+    const cleanDescription = String(source_description || part_name || "").trim();
+    const price = Number(unit_price || 0);
+
+    let part = await db("inventory")
+      .whereRaw("trim(part_number) = ?", [cleanPartNumber])
+      .first();
+
+    let inventoryCreated = false;
+    let inventoryUpdated = false;
+
+    if (!part) {
+      const [newPart] = await db("inventory")
+        .insert({
+          part_number: cleanPartNumber,
+          part_name: cleanPartName,
+          description: cleanDescription,
+          current_unit_price: price || 0,
+          last_unit_price: price || 0,
+          uom: "EA",
+          status: "Active",
+        })
+        .returning("*");
+
+      part = newPart;
+      inventoryCreated = true;
+    } else {
+      const updatePayload = {};
+      const existingCurrent = Number(part.current_unit_price || 0);
+
+      if (price > 0 && price !== existingCurrent) {
+        updatePayload.last_unit_price = existingCurrent;
+        updatePayload.current_unit_price = price;
+      }
+
+      if (!String(part.part_name || "").trim() && cleanPartName) {
+        updatePayload.part_name = cleanPartName;
+      }
+
+      if (!String(part.description || "").trim() && cleanDescription) {
+        updatePayload.description = cleanDescription;
+      }
+
+      if (Object.keys(updatePayload).length > 0) {
+        const [updatedPart] = await db("inventory")
+          .where({ part_id: part.part_id })
+          .update(updatePayload)
+          .returning("*");
+
+        part = updatedPart || part;
+        inventoryUpdated = true;
+      }
+    }
+
+    const existingBom = await db("product_parts")
+      .where({
+        product_id: productId,
+        part_id: part.part_id,
+      })
+      .first();
+
+    const bomPayload = {
+      product_id: productId,
+      part_id: part.part_id,
+      section: normalizedSection,
+      qty_required: qty,
+      source_part_number: cleanPartNumber,
+      source_description: cleanDescription,
+    };
+
+    if (existingBom) {
+      await db("product_parts")
+        .where({ id: existingBom.id })
+        .update(bomPayload);
+
+      return res.json({
+        success: true,
+        message: "BOM row updated successfully",
+        action: "updated",
+        inventoryCreated,
+        inventoryUpdated,
+        data: {
+          bomRowId: existingBom.id,
+          part_id: part.part_id,
+        },
+      });
+    }
+
+    const [createdBomRow] = await db("product_parts")
+      .insert(bomPayload)
+      .returning("*");
+
+    return res.json({
+      success: true,
+      message: "BOM row added successfully",
+      action: "inserted",
+      inventoryCreated,
+      inventoryUpdated,
+      data: createdBomRow,
+    });
+  } catch (err) {
+    console.error("❌ Error adding BOM row:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to add BOM row",
+    });
+  }
+});
 
 
 /**
