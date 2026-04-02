@@ -330,13 +330,13 @@ export default function DashboardPage() {
              <Bar dataKey="qty">
   {partsMonthly.map((entry, index) => {
     const colors = [
-      "#10B981",
-      "#059669",
-      "#34D399",
-      "#22C55E",
-      "#16A34A",
-      "#14B8A6",
-    ];
+  "#EC4899",  // pink-500
+  "#DB2777",  // pink-600
+  "#F472B6",  // pink-400
+  "#BE185D",  // pink-700
+  "#F9A8D4",  // pink-300
+  "#9D174D",  // pink-800
+];
     return (
       <Cell
         key={`cell-parts-${index}`}
