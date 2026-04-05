@@ -6,6 +6,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { connectDB } from "./db.js";
 
+import { authenticateJWT, requirePermission, requireAdmin } from "./middleware/auth.js";
+
 // ✅ Import all route files
 import systemPreferencesRoute from "./routes/system_preferences.js";
 import inventoryRoutes from "./routes/inventory.js";
@@ -51,28 +53,23 @@ connectDB();
 // ✅ Mount API routes (clean separation, no overlaps)
 app.use("/api/parts", inventoryRoutes);
 app.use("/api/vendors", vendorRoutes);
-app.use("/api/users", usersRoute);
-app.use("/api/roles", rolesRoute);
-app.use("/api/system-preferences", systemPreferencesRoute);
-app.use("/api/permissions", permissionsRoute);
+app.use("/api/users", usersRoute); // login route usually stays open
 
+app.use("/api/users", usersRoute); // keep login/open routes here
 
+app.use("/api/parts", authenticateJWT, inventoryRoutes);
+app.use("/api/vendors", authenticateJWT, vendorRoutes);
+app.use("/api/roles", authenticateJWT, rolesRoute);
+app.use("/api/system-preferences", authenticateJWT, systemPreferencesRoute);
+app.use("/api/permissions", authenticateJWT, permissionsRoute);
 
-// --- Purchase Orders core + bulk ---
 app.use("/api/purchase_orders", purchaseOrdersRoutes);
 app.use("/api/purchase_orders", rfqRouter);
 app.use("/api/purchase_orders_bulk", purchaseOrdersBulkRouter);
-
-// --- Dedicated Import routes (now safe, isolated path) ---
 app.use("/api/po_import", poImportRoutes);
-
-// Reports PO
 app.use("/api/purchase_orders_report", purchaseOrdersReportRoutes);
-
-// --- Other modules ---
 app.use("/api/products/:id/bom", productBomUploadRoutes);
 app.use("/api/products", productsRoutes);
-
 app.use("/api/monitoring", monitoringRoutes);
 
 

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import api from "../../utils/api";
+import { hasPermission } from "../../utils/permissions";
 
 export default function VendorForm({ initial = {}, onCancel, onSaved }) {
   const safeInitial = initial || {};
   const topRef = useRef(null);
+  const canEditVendors = hasPermission("edit_vendors");
 
   const [formData, setFormData] = useState({
     vendor_name: "",
@@ -113,6 +115,11 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!canEditVendors) {
+      setMessage("❌ You do not have permission to save vendors.");
+      scrollTop();
+      return;
+    }
 
     if (!validate()) {
       setMessage("⚠️ Please fix the highlighted fields.");
@@ -331,13 +338,19 @@ export default function VendorForm({ initial = {}, onCancel, onSaved }) {
             Cancel
           </button>
 
-          {!isSubmitted && (
+                   {!isSubmitted && (
             <button
               type="submit"
-              className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+              disabled={!canEditVendors}
+              className={`px-4 py-2 rounded ${
+                canEditVendors
+                  ? "bg-blue-600 text-white hover:bg-blue-700"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
             >
               {safeInitial.vendor_id ? "Update" : "Add Vendor"}
             </button>
+          
           )}
         </div>
       </form>

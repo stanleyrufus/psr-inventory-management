@@ -264,118 +264,118 @@ export default function AppRoutes() {
         )}
       />
 
+  <Route
+  path="/reports"
+  element={Protected(
+    <AdminRoute permission="view_reports" message="Reports access required.">
+      <PrivateLayout>
+        <ReportsIndex />
+      </PrivateLayout>
+    </AdminRoute>
+  )}
+/>
       <Route
-        path="/reports"
-        element={Protected(
-          <AdminRoute>
-            <PrivateLayout>
-              <ReportsIndex />
-            </PrivateLayout>
-          </AdminRoute>
-        )}
-      />
-      <Route
-        path="/reports/low-stock"
-        element={Protected(
-          <AdminRoute>
-            <PrivateLayout>
-              <LowStockReport />
-            </PrivateLayout>
-          </AdminRoute>
-        )}
-      />
-      <Route
-        path="/reports/purchase-orders"
-        element={Protected(
-          <AdminRoute>
-            <PrivateLayout>
-              <PurchaseOrderReport />
-            </PrivateLayout>
-          </AdminRoute>
-        )}
-      />
-      <Route
-        path="/reports/vendor-summary"
-        element={Protected(
-          <AdminRoute>
-            <PrivateLayout>
-              <VendorPurchaseSummary />
-            </PrivateLayout>
-          </AdminRoute>
-        )}
-      />
-      <Route
-        path="/reports/part-summary"
-        element={Protected(
-          <AdminRoute>
-            <PrivateLayout>
-              <PartPurchaseSummary />
-            </PrivateLayout>
-          </AdminRoute>
-        )}
-      />
-      <Route
-        path="/reports/stock-movement"
-        element={Protected(
-          <AdminRoute>
-            <PrivateLayout>
-              <StockMovementReport />
-            </PrivateLayout>
-          </AdminRoute>
-        )}
-      />
+  path="/reports/low-stock"
+  element={Protected(
+    <AdminRoute permission="view_reports" message="Reports access required.">
+      <PrivateLayout>
+        <LowStockReport />
+      </PrivateLayout>
+    </AdminRoute>
+  )}
+/>
+     <Route
+  path="/reports/purchase-orders"
+  element={Protected(
+    <AdminRoute permission="view_reports" message="Reports access required.">
+      <PrivateLayout>
+        <PurchaseOrderReport />
+      </PrivateLayout>
+    </AdminRoute>
+  )}
+/>
+     <Route
+  path="/reports/vendor-summary"
+  element={Protected(
+    <AdminRoute permission="view_reports" message="Reports access required.">
+      <PrivateLayout>
+        <VendorPurchaseSummary />
+      </PrivateLayout>
+    </AdminRoute>
+  )}
+/>
+     <Route
+  path="/reports/part-summary"
+  element={Protected(
+    <AdminRoute permission="view_reports" message="Reports access required.">
+      <PrivateLayout>
+        <PartPurchaseSummary />
+      </PrivateLayout>
+    </AdminRoute>
+  )}
+/>
+   <Route
+  path="/reports/stock-movement"
+  element={Protected(
+    <AdminRoute permission="view_reports" message="Reports access required.">
+      <PrivateLayout>
+        <StockMovementReport />
+      </PrivateLayout>
+    </AdminRoute>
+  )}
+/>
 
       <Route
-        path="/settings"
-        element={Protected(
-          <AdminRoute>
-            <PrivateLayout>
-              <SettingsIndex />
-            </PrivateLayout>
-          </AdminRoute>
-        )}
-      />
+  path="/settings"
+  element={Protected(
+    <AdminRoute permission="manage_settings" message="Settings access required.">
+      <PrivateLayout>
+        <SettingsIndex />
+      </PrivateLayout>
+    </AdminRoute>
+  )}
+/>
       <Route
-        path="/settings/users"
-        element={Protected(
-          <AdminRoute>
-            <PrivateLayout>
-              <UserManagement />
-            </PrivateLayout>
-          </AdminRoute>
-        )}
-      />
+  path="/settings/users"
+  element={Protected(
+    <AdminRoute permission="manage_settings" message="Settings access required.">
+      <PrivateLayout>
+        <UserManagement />
+      </PrivateLayout>
+    </AdminRoute>
+  )}
+/>
+     <Route
+  path="/settings/roles"
+  element={Protected(
+    <AdminRoute permission="manage_settings" message="Settings access required.">
+      <PrivateLayout>
+        <RolesManagement />
+      </PrivateLayout>
+    </AdminRoute>
+  )}
+/>
       <Route
-        path="/settings/roles"
-        element={Protected(
-          <AdminRoute>
-            <PrivateLayout>
-              <RolesManagement />
-            </PrivateLayout>
-          </AdminRoute>
-        )}
-      />
-      <Route
-        path="/settings/system"
-        element={Protected(
-          <AdminRoute>
-            <PrivateLayout>
-              <SystemPreferences />
-            </PrivateLayout>
-          </AdminRoute>
-        )}
-      />
+  path="/settings/system"
+  element={Protected(
+    <AdminRoute permission="manage_settings" message="Settings access required.">
+      <PrivateLayout>
+        <SystemPreferences />
+      </PrivateLayout>
+    </AdminRoute>
+  )}
+/>
 
       <Route
-        path="/settings/monitoring"
-        element={Protected(
-          <AdminRoute>
-            <PrivateLayout>
-              <MonitoringPage />
-            </PrivateLayout>
-          </AdminRoute>
-        )}
-      />
+  path="/settings/monitoring"
+  element={Protected(
+    <AdminRoute permission="manage_settings" message="Settings access required.">
+      <PrivateLayout>
+        <MonitoringPage />
+      </PrivateLayout>
+    </AdminRoute>
+  )}
+/>
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

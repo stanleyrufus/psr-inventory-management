@@ -1,6 +1,7 @@
 // backend/routes/vendors.js
 import express from "express";
 import { db } from "../db.js";
+import { requirePermission } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -119,8 +120,7 @@ router.get("/:id", async (req, res) => {
 });
 
 /** ✅ Add vendor */
-router.post("/", async (req, res) => {
-  try {
+router.post("/", requirePermission("edit_vendors"), async (req, res) => {  try {
     const { vendor_name } = req.body;
     if (!vendor_name)
       return res.status(400).json({ success: 0, message: "Vendor name is required." });
@@ -152,7 +152,7 @@ router.post("/", async (req, res) => {
 });
 
 /** ✅ Update vendor */
-router.put("/:id", async (req, res) => {
+router.put("/:id", requirePermission("edit_vendors"), async (req, res) => {
   try {
     const normalized = normalizeVendor(req.body);
     const [updated] = await db("vendors")
@@ -173,7 +173,7 @@ router.put("/:id", async (req, res) => {
 });
 
 /** ✅ Delete vendor */
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requirePermission("delete_vendors"), async (req, res) => {
   try {
     const deleted = await db("vendors").where({ vendor_id: req.params.id }).del();
     if (!deleted)
@@ -189,7 +189,7 @@ router.delete("/:id", async (req, res) => {
 });
 
 /** ✅ Bulk upload vendors */
-router.post("/bulk-upload", async (req, res) => {
+router.post("/bulk-upload", requirePermission("edit_vendors"), async (req, res) => {
   try {
     const vendors = req.body.vendors || req.body;
     if (!Array.isArray(vendors) || vendors.length === 0)

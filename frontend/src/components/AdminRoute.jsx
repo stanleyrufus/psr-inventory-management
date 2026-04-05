@@ -1,8 +1,8 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { AuthContext } from "../context/AuthContext";
+import { hasPermission } from "../utils/permissions";
 
-function AdminRequiredModal({ open, onClose }) {
+function PermissionRequiredModal({ open, onClose, message }) {
   if (!open) return null;
 
   return (
@@ -11,10 +11,10 @@ function AdminRequiredModal({ open, onClose }) {
 
       <div className="relative bg-white rounded-lg shadow-lg w-[92%] max-w-md p-5">
         <div className="text-lg font-bold text-gray-900">
-          Admin privileges required
+          Access denied
         </div>
         <div className="mt-2 text-sm text-gray-700">
-          You need admin access to view this page.
+          {message || "You do not have permission to view this page."}
         </div>
 
         <div className="mt-5 flex justify-end">
@@ -31,24 +31,28 @@ function AdminRequiredModal({ open, onClose }) {
   );
 }
 
-export default function AdminRoute({ children }) {
-  const { user } = useContext(AuthContext);
-  const isAdmin = String(user?.role || "").toLowerCase() === "admin";
+export default function AdminRoute({
+  children,
+  permission,
+  message = "You do not have permission to view this page.",
+}) {
+  const allowed = permission ? hasPermission(permission) : false;
 
   const [show, setShow] = useState(false);
   const [redirect, setRedirect] = useState(false);
 
   useEffect(() => {
-    if (!isAdmin) setShow(true);
-  }, [isAdmin]);
+    if (!allowed) setShow(true);
+  }, [allowed]);
 
-  if (isAdmin) return children;
+  if (allowed) return children;
 
   if (redirect) return <Navigate to="/" replace />;
 
   return (
-    <AdminRequiredModal
+    <PermissionRequiredModal
       open={show}
+      message={message}
       onClose={() => {
         setShow(false);
         setRedirect(true);

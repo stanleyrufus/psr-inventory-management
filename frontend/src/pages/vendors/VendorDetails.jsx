@@ -1,14 +1,18 @@
 // src/pages/vendors/VendorDetails.jsx
 import React, { useState } from "react";
 import { deleteVendor } from "../../utils/api";
+import { hasPermission } from "../../utils/permissions";
 
 export default function VendorDetails({ vendor, onClose, onDeleted, onEdit }) {
   const [deleting, setDeleting] = useState(false);
+  const canEditVendors = hasPermission("edit_vendors");
+  const canDeleteVendors = hasPermission("delete_vendors");
 
   if (!vendor) return null;
 
   const handleDelete = async () => {
     if (deleting) return;
+    if (!canDeleteVendors) return;
 
     const ok = window.confirm(
       `Are you sure you want to delete vendor "${vendor.vendor_name}"?`
@@ -138,17 +142,28 @@ export default function VendorDetails({ vendor, onClose, onDeleted, onEdit }) {
 
         {/* Actions */}
         <div className="flex justify-end gap-3 mt-6 border-t pt-4">
-          <button
-            className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-60"
-            disabled={deleting}
-            onClick={() => onEdit?.(vendor)}
+                  <button
+            className={`px-4 py-2 rounded ${
+              canEditVendors
+                ? "bg-blue-600 text-white"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
+            disabled={deleting || !canEditVendors}
+            onClick={() => {
+              if (!canEditVendors) return;
+              onEdit?.(vendor);
+            }}
           >
             Edit Vendor
           </button>
 
-          <button
-            className="px-4 py-2 bg-red-600 text-white rounded disabled:opacity-60"
-            disabled={deleting}
+                    <button
+            className={`px-4 py-2 rounded ${
+              canDeleteVendors
+                ? "bg-red-600 text-white"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
+            disabled={deleting || !canDeleteVendors}
             onClick={handleDelete}
           >
             {deleting ? "Deleting..." : "Delete Vendor"}

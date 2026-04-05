@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { hasPermission } from "../../utils/permissions";
 
 const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 const FILE_BASE = BASE.replace(/\/api$/, "");
@@ -15,6 +16,18 @@ if (!id || isNaN(Number(id))) {
   return <div className="p-6">Invalid Purchase Order</div>;
 }
   const navigate = useNavigate();
+  const canViewPOs = hasPermission("view_purchase_orders");
+  const canEditPOs = hasPermission("edit_purchase_orders");
+const canDeletePOs = hasPermission("delete_purchase_orders");
+
+if (!canViewPOs) {
+  return (
+    <div className="p-6 text-red-600 font-medium">
+      You do not have permission to view purchase orders.
+    </div>
+  );
+}
+
 
     const [fetchedOrder, setFetchedOrder] = useState(null);
   const [vendorInfo, setVendorInfo] = useState(null);
@@ -182,7 +195,7 @@ if (!id || isNaN(Number(id))) {
             🖨 Print
           </button>
 
-                    {po.status !== "Paid" && (
+                             {po.status !== "Paid" && hasPermission("mark_po_paid") && (
             <button
               className="px-3 h-10 bg-green-700 hover:bg-green-800 text-white text-sm rounded shadow flex items-center"
               onClick={() => setShowPaymentModal(true)}
@@ -191,7 +204,7 @@ if (!id || isNaN(Number(id))) {
             </button>
           )}
 
-          {po.status === "Paid" && (
+                    {po.status === "Paid" && hasPermission("mark_po_unpaid") && (
             <button
               className="px-3 h-10 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded shadow flex items-center"
               onClick={async () => {
@@ -215,22 +228,36 @@ if (!id || isNaN(Number(id))) {
             </button>
           )}
 
-          <button
-  className="px-3 h-10 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded shadow flex items-center"
-  onClick={() => navigate(`/purchase-orders/edit/${po.id}`)}
->
-  ✏️ Edit
-</button>
+           <button
+            type="button"
+            disabled={!canEditPOs}
+            className={`px-3 h-10 text-sm rounded shadow flex items-center ${
+              canEditPOs
+                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
+            onClick={() => {
+              if (!canEditPOs) return;
+              navigate(`/purchase-orders/edit/${po.id}`);
+            }}
+          >
+            ✏️ Edit
+          </button>
 
-          <button
-            className="px-3 h-10 bg-red-600 hover:bg-red-700 text-white text-sm rounded shadow flex items-center"
+                             <button
+            type="button"
+            disabled={!canDeletePOs}
+            className={`px-3 h-10 text-sm rounded shadow flex items-center ${
+              canDeletePOs
+                ? "bg-red-600 hover:bg-red-700 text-white"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
             onClick={async () => {
-              if (
-                !window.confirm(
-                  `Delete PO "${po.psr_po_number}" permanently?`
-                )
-              )
+              if (!canDeletePOs) return;
+
+              if (!window.confirm(`Delete PO "${po.psr_po_number}" permanently?`)) {
                 return;
+              }
 
               try {
                 await axios.delete(`${BASE}/purchase_orders/${po.id}`);
@@ -244,6 +271,7 @@ if (!id || isNaN(Number(id))) {
           >
             🗑 Delete
           </button>
+          
 
           <button
             onClick={handleClose}

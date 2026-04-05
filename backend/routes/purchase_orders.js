@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import nodemailer from "nodemailer";
 import { makeSafeUploader } from "../middleware/uploads.js";
 import { createRequire } from "module";
+import { requirePermission } from "../middleware/auth.js";
 
 // ---------------------------------------------
 // ---------------------------------------------
@@ -341,7 +342,11 @@ router.get("/vendors/top-spend", async (req, res) => {
 //
 const uploadPdf = multer({ dest: "uploads/tmp" });
 
-router.post("/import-from-pdf", uploadPdf.array("files"), async (req, res) => {
+router.post(
+  "/import-from-pdf",
+  requirePermission("edit_purchase_orders"),
+  uploadPdf.array("files"),
+  async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
@@ -467,7 +472,7 @@ router.get("/next-number", async (req, res) => {
 //  - NO items required
 // =============================================
 //
-router.post("/reserve", async (req, res) => {
+router.post("/reserve", requirePermission("edit_purchase_orders"), async (req, res) => {
   try {
     const body = req.body || {};
 
@@ -560,7 +565,7 @@ if (!vendorId || Number.isNaN(vendorId)) {
 //   - quantity > 0
 // =====================================================
 //
-router.post("/", async (req, res) => {
+router.post("/", requirePermission("edit_purchase_orders"), async (req, res) => {
   try {
     const body = req.body || {};
     const items = Array.isArray(body.items) ? body.items : [];
@@ -741,7 +746,7 @@ if (
 // - If status becomes Paid, sets date_paid to system date
 // =====================================================
 //
-router.put("/:id", async (req, res) => {
+router.put("/:id", requirePermission("edit_purchase_orders"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) {
     return res.status(400).json({ success: 0, message: "Invalid PO id" });
@@ -906,7 +911,11 @@ return res.status(400).json({
 //  2) Some DBs have uploaded_at (default now). We do not insert uploaded_on.
 // =====================================================
 //
-router.post("/:id/upload", resolvePoUploadMiddleware(), async (req, res) => {
+router.post(
+  "/:id/upload",
+  requirePermission("edit_purchase_orders"),
+  resolvePoUploadMiddleware(),
+  async (req, res) => {
   try {
     const poId = Number(req.params.id);
     if (!Number.isInteger(poId)) {
@@ -983,7 +992,7 @@ router.post("/:id/upload", resolvePoUploadMiddleware(), async (req, res) => {
 // DELETE /api/purchase_orders/:id
 // =====================================================
 //
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requirePermission("delete_purchase_orders"), async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) {
     return res.status(400).json({ success: 0, message: "Invalid PO id" });

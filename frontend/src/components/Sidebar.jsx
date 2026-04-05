@@ -2,6 +2,7 @@
 import React, { useContext, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+import { hasPermission } from "../utils/permissions";
 
 const NavItem = ({ to, children, onClick, active }) => (
   <Link
@@ -17,7 +18,7 @@ const NavItem = ({ to, children, onClick, active }) => (
   </Link>
 );
 
-function AdminToast({ show, onClose }) {
+function AdminToast({ show, onClose, message }) {
   useEffect(() => {
     if (!show) return;
     const t = setTimeout(() => onClose(), 2000);
@@ -29,7 +30,7 @@ function AdminToast({ show, onClose }) {
   return (
     <div className="fixed top-5 right-5 z-50">
       <div className="bg-gray-900 text-white text-sm px-4 py-3 rounded-lg shadow-lg border border-gray-700">
-        Admin privileges required
+        {message}
       </div>
     </div>
   );
@@ -39,20 +40,23 @@ export default function Sidebar() {
   const location = useLocation();
   const { user } = useContext(AuthContext);
 
-  const [showToast, setShowToast] = useState(false);
+    const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("Access denied");
 
-  const isAdmin = String(user?.role || "").toLowerCase() === "admin";
-
-  const guardAdminClick = (e) => {
-    if (isAdmin) return;
-    e.preventDefault(); // block navigation
-    setShowToast(true); // show toast
+  const guardPermissionClick = (permName, message) => (e) => {
+    if (hasPermission(permName)) return;
+    e.preventDefault();
+    setToastMessage(message || "Access denied");
+    setShowToast(true);
   };
 
   return (
     <aside className="w-64 bg-psr-primary text-white flex flex-col h-screen overflow-hidden">
-      <AdminToast show={showToast} onClose={() => setShowToast(false)} />
-
+      <AdminToast
+        show={showToast}
+        onClose={() => setShowToast(false)}
+        message={toastMessage}
+      />
       {/* ⭐ REDUCED HEADER HEIGHT */}
       <div className="px-5 py-4 border-b border-white/10 shrink-0">
         <div className="text-lg font-bold">PSR Automation Inc.</div>
@@ -91,18 +95,26 @@ export default function Sidebar() {
         </NavItem>
 
         {/* ✅ Admin-only: block click for non-admin */}
-        <NavItem
-          to="/reports"
-          onClick={guardAdminClick}
+                <NavItem
+          to={hasPermission("view_reports") ? "/reports" : "#"}
+          onClick={
+            hasPermission("view_reports")
+              ? undefined
+              : guardPermissionClick("view_reports", "Reports access required")
+          }
           active={location.pathname.startsWith("/reports")}
         >
           Reports
         </NavItem>
 
         {/* ✅ Admin-only: block click for non-admin */}
-        <NavItem
-          to="/settings"
-          onClick={guardAdminClick}
+                <NavItem
+          to={hasPermission("manage_settings") ? "/settings" : "#"}
+          onClick={
+            hasPermission("manage_settings")
+              ? undefined
+              : guardPermissionClick("manage_settings", "Settings access required")
+          }
           active={location.pathname.startsWith("/settings")}
         >
           Settings

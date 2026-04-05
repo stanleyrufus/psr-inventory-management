@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
+import { hasPermission } from "../../utils/permissions";
 
 // AG Grid
 import { AgGridReact } from "ag-grid-react";
@@ -27,6 +28,8 @@ export default function PurchaseOrderList() {
   const gridRef = useRef();
 
   const savedState = getSavedPOListState();
+  const canViewPOs = hasPermission("view_purchase_orders");
+  const canEditPOs = hasPermission("edit_purchase_orders");
 
   const [orders, setOrders] = useState([]);
   const [rfqStatusMap, setRfqStatusMap] = useState({}); // kept (existing)
@@ -341,6 +344,10 @@ export default function PurchaseOrderList() {
   // ✅ Reserve PO submit
   const submitReserve = async () => {
     setReserveErr("");
+    if (!canEditPOs) {
+      setReserveErr("You do not have permission to reserve purchase orders.");
+      return;
+    }
 
     const poNumber = reservePreview.psr_po_number || "";
     if (!poNumber) {
@@ -506,10 +513,18 @@ export default function PurchaseOrderList() {
   ];
 
   // -------------------------------------------------------------
-  // RENDER
-  // -------------------------------------------------------------
+// RENDER
+// -------------------------------------------------------------
+if (!canViewPOs) {
   return (
-    <div className="p-6">
+    <div className="p-6 text-red-600 font-medium">
+      You do not have permission to view purchase orders.
+    </div>
+  );
+}
+
+return (
+  <div className="p-6">
       {/* AG Grid style tuning */}
       <style>{`
         .ag-theme-quartz .ag-header-cell-text {
@@ -536,38 +551,83 @@ export default function PurchaseOrderList() {
         </div>
 
         <div className="flex gap-2">
-          <button
-            onClick={() => setShowReserve(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 text-sm rounded shadow"
+                  <button
+            type="button"
+            disabled={!canEditPOs}
+            onClick={() => {
+              if (!canEditPOs) return;
+              setShowReserve(true);
+            }}
+            className={`px-3 py-1.5 text-sm rounded shadow ${
+              canEditPOs
+                ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
             title="Reserve a PO number (creates placeholder)"
           >
             📌 Reserve PO
           </button>
 
-          <button
-            onClick={() => navigate("/purchase-orders/bulk-upload")}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-sm rounded shadow"
+                    <button
+            type="button"
+            disabled={!canEditPOs}
+            onClick={() => {
+              if (!canEditPOs) return;
+              navigate("/purchase-orders/bulk-upload");
+            }}
+            className={`px-3 py-1.5 text-sm rounded shadow ${
+              canEditPOs
+                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
           >
             📤 Bulk Upload
           </button>
 
-          <button
-            onClick={() => navigate("/purchase-orders/import-from-pdf")}
-            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 text-sm rounded shadow"
+                    <button
+            type="button"
+            disabled={!canEditPOs}
+            onClick={() => {
+              if (!canEditPOs) return;
+              navigate("/purchase-orders/import-from-pdf");
+            }}
+            className={`px-3 py-1.5 text-sm rounded shadow ${
+              canEditPOs
+                ? "bg-green-600 hover:bg-green-700 text-white"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
           >
             📄 Import PDF
           </button>
 
           <button
-            onClick={() => navigate("/purchase-orders/import-from-excel")}
-            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 text-sm rounded shadow"
+            type="button"
+            disabled={!canEditPOs}
+            onClick={() => {
+              if (!canEditPOs) return;
+              navigate("/purchase-orders/import-from-excel");
+            }}
+            className={`px-3 py-1.5 text-sm rounded shadow ${
+              canEditPOs
+                ? "bg-green-600 hover:bg-green-700 text-white"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
           >
             📊 Import Excel
           </button>
 
-          <button
-            onClick={() => navigate("/purchase-orders/new")}
-            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 text-sm rounded shadow"
+                   <button
+            type="button"
+            disabled={!canEditPOs}
+            onClick={() => {
+              if (!canEditPOs) return;
+              navigate("/purchase-orders/new");
+            }}
+            className={`px-3 py-1.5 text-sm rounded shadow ${
+              canEditPOs
+                ? "bg-green-600 hover:bg-green-700 text-white"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
           >
             ➕ Create PO
           </button>

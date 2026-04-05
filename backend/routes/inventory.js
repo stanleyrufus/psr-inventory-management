@@ -7,8 +7,7 @@ import path from "path";
 import fs from "fs";
 import { makeBasicUploader, resolveUploadPath } from "../middleware/uploads.js";
 const upload = makeBasicUploader("parts");
-
-
+import { requirePermission } from "../middleware/auth.js";
 const router = express.Router();
 
 // ⭐ Helpers for image path normalization on backend
@@ -477,7 +476,7 @@ router.put("/:id", upload.array("images", 10), async (req, res) => {
 /* --------------------------------------------------------
    DELETE PART  ->  DELETE /api/parts/:id
 ---------------------------------------------------------*/
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requirePermission("delete_parts"), async (req, res) => {
   const id = Number(req.params.id);
 
   try {
@@ -486,7 +485,33 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json({ success: 0, message: "Part not found" });
     }
 
-    // ⭐ Delete all images (supports JSON array)
+    // 1) Block delete if used in BOM
+    const bomUsage = await db("product_parts")
+      .where({ part_id: id })
+      .count("* as count")
+      .first();
+
+    if (Number(bomUsage?.count || 0) > 0) {
+      return res.status(400).json({
+        success: 0,
+        message: "Cannot delete part because it is used in one or more BOM records.",
+      });
+    }
+
+    // 2) Block delete if used in Purchase Orders
+    const poUsage = await db("purchase_order_items")
+      .where({ part_id: id })
+      .count("* as count")
+      .first();
+
+    if (Number(poUsage?.count || 0) > 0) {
+      return res.status(400).json({
+        success: 0,
+        message: "Cannot delete part because it is used in one or more Purchase Orders.",
+      });
+    }
+
+    // Delete all images
     if (exists.image_url) {
       try {
         const images = JSON.parse(exists.image_url || "[]");
@@ -509,7 +534,7 @@ router.delete("/:id", async (req, res) => {
     console.error("❌ DELETE /api/parts/:id error:", err);
     res.status(500).json({ success: 0, message: "Failed to delete part" });
   }
-});
+});     
 
 
 export default router;

@@ -1,4 +1,5 @@
 // frontend/src/pages/PartsPage.jsx
+import { hasPermission } from "../utils/permissions";
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { AgGridReact } from "ag-grid-react";
@@ -254,33 +255,57 @@ const normalizeImageUrl = (raw) => {
   };
 
   const ActionsRenderer = (props) => {
-    const row = props.data;
-    return (
-      <div className="flex gap-2 justify-start">
-        <button
-          className="text-blue-600 text-sm underline"
-          onClick={() => setViewingPart(row)}
-        >
-          View
-        </button>
-        <button
-          className="text-gray-700 text-sm underline"
-          onClick={() => {
-            setEditingPart(row);
-            setShowForm(true);
-          }}
-        >
-          Edit
-        </button>
-        <button
-          className="text-red-600 text-sm underline"
-          onClick={() => handleDelete(row.part_id, row.part_name)}
-        >
-          Delete
-        </button>
-      </div>
-    );
-  };
+  const row = props.data;
+
+  return (
+    <div className="flex gap-2 justify-start">
+
+      {/* VIEW always allowed if page loaded */}
+      <button
+        className="text-blue-600 text-sm underline"
+        onClick={() => setViewingPart(row)}
+      >
+        View
+      </button>
+
+      {/* EDIT */}
+<button
+  type="button"
+  disabled={!canEditParts}
+  className={`text-sm underline ${
+    canEditParts
+      ? "text-gray-700"
+      : "text-gray-400 cursor-not-allowed opacity-60"
+  }`}
+  onClick={() => {
+    if (!canEditParts) return;
+    setEditingPart(row);
+    setShowForm(true);
+  }}
+>
+  Edit
+</button>
+
+      {/* DELETE */}
+<button
+  type="button"
+  disabled={!canDeleteParts}
+  className={`text-sm underline ${
+    canDeleteParts
+      ? "text-red-600"
+      : "text-gray-400 cursor-not-allowed opacity-60"
+  }`}
+  onClick={() => {
+    if (!canDeleteParts) return;
+    handleDelete(row.part_id, row.part_name);
+  }}
+>
+  Delete
+</button>
+
+    </div>
+  );
+};
 
   /*************************************
    ✅ AG GRID COLUMNS 
@@ -327,9 +352,30 @@ const normalizeImageUrl = (raw) => {
     { headerName: "Status", field: "status", width: 110, cellRenderer: StatusRenderer },
   ];
 
+
+const canViewParts = hasPermission("view_parts");
+const canEditParts = hasPermission("edit_parts");
+const canDeleteParts = hasPermission("delete_parts");
+
+console.log("Parts permissions:", {
+  canViewParts,
+  canEditParts,
+  canDeleteParts,
+});
+
+if (!canViewParts) {
   return (
-    <div className="p-6">
-      {/* Header */}
+    <div className="p-6 text-red-600 font-medium">
+      You do not have permission to view parts.
+    </div>
+  );
+}
+
+return (
+  <div className="p-6">
+
+
+        {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
 <h2 className="text-2xl font-semibold text-gray-800">
@@ -342,14 +388,22 @@ const normalizeImageUrl = (raw) => {
 
         <div className="flex gap-3">
           <button
-            onClick={() => {
-              setEditingPart(null);
-              setShowForm(true);
-            }}
-            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 text-sm rounded shadow"
-          >
-            ➕ Add Part
-          </button>
+  onClick={() => {
+    if (!canEditParts) {
+      alert("You do not have permission to add parts.");
+      return;
+    }
+    setEditingPart(null);
+    setShowForm(true);
+  }}
+  className={`px-3 py-1.5 text-sm rounded shadow ${
+    canEditParts
+      ? "bg-green-600 hover:bg-green-700 text-white"
+      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+  }`}
+>
+  ➕ Add Part
+</button>
 
           <button
             onClick={() => setShowBulk(true)}

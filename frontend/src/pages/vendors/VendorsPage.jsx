@@ -1,6 +1,7 @@
 // src/pages/vendors/VendorsPage.jsx
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { fetchVendors, deleteVendor } from "../../utils/api";
+import { hasPermission } from "../../utils/permissions";
 
 import VendorForm from "./VendorForm";
 import VendorDetails from "./VendorDetails";
@@ -15,6 +16,13 @@ export default function VendorsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
+  const canViewVendors = hasPermission("view_vendors");
+  const canEditVendors = hasPermission("edit_vendors");
+  console.log("Vendor page permissions:", {
+    canViewVendors,
+    canEditVendors,
+  });
+
 
   // Modals
   const [showForm, setShowForm] = useState(false);
@@ -169,6 +177,15 @@ export default function VendorsPage() {
     [onView]
   );
 
+  // ✅ ADD THIS BLOCK HERE
+  if (!canViewVendors) {
+    return (
+      <div className="p-6 text-red-600 font-medium text-xl">
+        VENDORS PAGE BLOCKED
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
       <style>{`.ag-theme-quartz .ag-header-cell-text{font-weight:600;}`}</style>
@@ -183,22 +200,36 @@ export default function VendorsPage() {
         </div>
 
         <div className="flex gap-2">
-          <button
+               <button
+            type="button"
+            disabled={!canEditVendors}
             onClick={() => {
+              if (!canEditVendors) return;
               setShowBulk(true);
             }}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-sm rounded shadow"
+            className={`px-3 py-1.5 text-sm rounded shadow ${
+              canEditVendors
+                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
           >
             ⬆️ Bulk Upload
           </button>
 
-          <button
+                    <button
+            type="button"
+            disabled={!canEditVendors}
             onClick={() => {
+              if (!canEditVendors) return;
               setViewingVendor(null);
               setEditingVendor(null);
               setShowForm(true);
             }}
-            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 text-sm rounded shadow"
+            className={`px-3 py-1.5 text-sm rounded shadow ${
+              canEditVendors
+                ? "bg-green-600 hover:bg-green-700 text-white"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
           >
             ➕ Add Vendor
           </button>

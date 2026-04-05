@@ -5,6 +5,7 @@ const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 const FILE_BASE = BASE.replace(/\/api$/, "");
 import React, { useState, useEffect } from "react";
 import api, { apiRaw } from "../../utils/api";
+import { hasPermission } from "../../utils/permissions";
 
 // ⭐ Helper: parse image_url from DB (string OR JSON array)
 // Returns array of normalized paths like "/uploads/parts/xxx.jpg"
@@ -77,6 +78,7 @@ function buildImageUrl(path) {
 
 export default function PartForm({ initial = {}, onSaved, onCancel }) {
   const safeInitial = initial || {};
+const canEditParts = hasPermission("edit_parts");
 
   const [vendors, setVendors] = useState([]);
 
@@ -189,6 +191,11 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
   // ----------------------------------------------------
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+if (!canEditParts) {
+  alert("You do not have permission to save parts.");
+  return;
+}
 
     const newErrors = {};
     if (!formData.part_number.trim()) newErrors.part_number = "Required";
@@ -568,7 +575,7 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
         />
       </label>
 
-      {/* Buttons */}
+            {/* Buttons */}
       <div className="flex justify-end gap-2 pt-3">
         <button
           type="button"
@@ -579,7 +586,12 @@ export default function PartForm({ initial = {}, onSaved, onCancel }) {
         </button>
         <button
           type="submit"
-          className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+          disabled={!canEditParts}
+          className={`px-4 py-2 rounded ${
+            canEditParts
+              ? "bg-blue-600 text-white hover:bg-blue-700"
+              : "bg-gray-300 text-gray-500 cursor-not-allowed"
+          }`}
         >
           {safeInitial?.part_id ? "Update" : "Add Part"}
         </button>

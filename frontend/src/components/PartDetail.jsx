@@ -1,5 +1,6 @@
 // frontend/src/components/PartDetail.jsx
 import React, { useState } from "react";
+import { hasPermission } from "../utils/permissions";
 
 function getLatestPO(relatedPOs) {
   if (!Array.isArray(relatedPOs) || relatedPOs.length === 0) return null;
@@ -33,6 +34,8 @@ function makeAbsoluteUrl(relativePath) {
 
 export default function PartDetail({ part, onClose }) {
   if (!part) return null;
+const canEditParts = hasPermission("edit_parts");
+const canDeleteParts = hasPermission("delete_parts");
 
   const imagePaths = getPartImagePaths(part.image_url);
   const imageUrls = imagePaths.map(makeAbsoluteUrl).filter(Boolean);
@@ -61,19 +64,34 @@ fetch(`${BASE}/parts/${part.part_id}/purchase-orders`)
 
         {/* ACTION BAR */}
         <div className="absolute top-3 right-3 flex items-center gap-2">
-          <button
-            className="bg-blue-600 text-white px-3 h-8 rounded text-xs"
-            onClick={() => {
-              onClose();
-              window.dispatchEvent(new CustomEvent("edit-part", { detail: part }));
-            }}
-          >
-            Edit
-          </button>
+<button
+  type="button"
+  disabled={!canEditParts}
+  className={`px-3 h-8 rounded text-xs ${
+    canEditParts
+      ? "bg-blue-600 text-white"
+      : "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
+  }`}
+  onClick={() => {
+    if (!canEditParts) return;
+    onClose();
+    window.dispatchEvent(new CustomEvent("edit-part", { detail: part }));
+  }}
+>
+  Edit
+</button>
 
 <button
-  className="bg-red-600 text-white px-3 h-8 rounded text-xs"
+  type="button"
+  disabled={!canDeleteParts}
+  className={`px-3 h-8 rounded text-xs ${
+    canDeleteParts
+      ? "bg-red-600 text-white"
+      : "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
+  }`}
   onClick={async () => {
+    if (!canDeleteParts) return;
+
     if (!window.confirm("Delete this part permanently?")) return;
 
     try {
@@ -81,19 +99,25 @@ fetch(`${BASE}/parts/${part.part_id}/purchase-orders`)
         method: "DELETE",
       });
 
-      if (!res.ok) throw new Error("Delete failed");
+      if (!res.ok) {
+        let msg = "Failed to delete part.";
+        try {
+          const data = await res.json();
+          msg = data?.message || msg;
+        } catch {}
+        throw new Error(msg);
+      }
 
       window.dispatchEvent(new Event("reload-parts"));
       alert("Deleted successfully.");
       onClose();
-    } catch {
-      alert("Delete failed.");
+    } catch (err) {
+      alert(err.message || "Failed to delete part.");
     }
   }}
 >
   Delete
 </button>
-
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-800 text-xl font-bold px-2"
