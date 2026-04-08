@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import axios from "axios";
+import api from "../../utils/api";
 import { hasPermission } from "../../utils/permissions";
 
 // AG Grid
@@ -75,7 +75,7 @@ export default function PurchaseOrderList() {
 
   const loadOrders = async () => {
     try {
-      const res = await axios.get(`${BASE}/purchase_orders`);
+      const res = await api.get(`/purchase_orders`);
       const data = Array.isArray(res.data) ? res.data : [];
       setOrders(data);
     } catch (err) {
@@ -130,7 +130,7 @@ export default function PurchaseOrderList() {
   // ✅ Load vendors for Reserve modal
   const loadVendors = async () => {
     try {
-      const res = await axios.get(`${BASE}/vendors`);
+      const res = await api.get(`/vendors`);
       const raw = res.data?.data || res.data || [];
       setVendors(Array.isArray(raw) ? raw : []);
     } catch {
@@ -152,7 +152,7 @@ export default function PurchaseOrderList() {
         setReserveLoading(true);
         setReservePreview({ psr_po_number: "", order_date: "" });
 
-        const res = await axios.get(`${BASE}/purchase_orders/next-number`);
+        const res = await api.get(`/purchase_orders/next-number`);
         setReservePreview({
           psr_po_number: res.data?.psr_po_number || "",
           order_date: res.data?.order_date || "",
@@ -283,7 +283,7 @@ export default function PurchaseOrderList() {
       setReserveLoading(true);
       setReservePreview({ psr_po_number: "", order_date: "" });
 
-      const res = await axios.get(`${BASE}/purchase_orders/next-number`);
+      const res = await api.get(`/purchase_orders/next-number`);
       setReservePreview({
         psr_po_number: res.data?.psr_po_number || "",
         order_date: res.data?.order_date || "",
@@ -306,7 +306,7 @@ export default function PurchaseOrderList() {
       setReserveErr("");
       setReserveSubmitting(true);
 
-      const res = await axios.post(`${BASE}/vendors`, {
+      const res = await api.post(`/vendors`, {
         ...newVendor,
         is_active: true,
       });
@@ -379,7 +379,7 @@ export default function PurchaseOrderList() {
         remarks: reserveForm.remarks || "",
       };
 
-      const res = await axios.post(`${BASE}/purchase_orders/reserve`, payload);
+      const res = await api.post(`/purchase_orders/reserve`, payload);
 
       const newId = res.data?.data?.id;
 

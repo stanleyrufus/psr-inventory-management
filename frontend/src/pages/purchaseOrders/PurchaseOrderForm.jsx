@@ -1,6 +1,6 @@
 // src/pages/purchaseOrders/PurchaseOrderForm.jsx
 import React, { useState, useEffect, useRef } from "react";
-import axios from "axios";
+import api from "../../utils/api";
 import { useNavigate } from "react-router-dom";
 
 /* ===========================================================
@@ -475,7 +475,7 @@ const items = rawItems.map((i) => ({
     }
 
     try {
-      const res = await axios.post(`${BASE}/parts`, {
+      const res = await api.post(`/parts`, {
         part_number: draft.part_number,
         part_name: draft.part_name || "",
         description: draft.description || "",
@@ -612,7 +612,7 @@ const updateItemQtyField = (index, field, value) => {
       return;
     }
     try {
-      const res = await axios.post(`${BASE}/parts`, {
+      const res = await api.post(`/parts`, {
         part_number: globalPart.part_number,
         part_name: globalPart.part_name || "",
         description: globalPart.description || "",
@@ -660,7 +660,7 @@ const updateItemQtyField = (index, field, value) => {
       return;
     }
     try {
-      const res = await axios.post(`${BASE}/vendors`, {
+      const res = await api.post(`/vendors`, {
         ...newVendor,
         is_active: true,
       });
@@ -703,7 +703,7 @@ const updateItemQtyField = (index, field, value) => {
 
     try {
       setDeletingFileIds((prev) => [...prev, fileId]);
-      await axios.delete(`${BASE}/purchase_orders/${initialPo.id}/file/${fileId}`);
+      await api.delete(`/purchase_orders/${initialPo.id}/file/${fileId}`);
       setExistingFiles((prev) => prev.filter((f) => f.id !== fileId));
     } catch (err) {
       console.error("❌ File delete error:", err);
@@ -725,7 +725,7 @@ const updateItemQtyField = (index, field, value) => {
     try {
       setSubmitting(true);
 
-      const res = await axios.post(`${BASE}/purchase_orders`, {
+      const res = await api.post(`/purchase_orders`, {
         ...po,
         status: "Draft",
         received_by: po.received_by || "",
@@ -757,7 +757,7 @@ const updateItemQtyField = (index, field, value) => {
           formData.append("files", file);
         });
 
-        const uploadRes = await axios.post(
+        const uploadRes = await api.post(
           `${BASE}/purchase_orders/${newId}/upload`,
           formData,
           { headers: { "Content-Type": "multipart/form-data" } }
@@ -848,24 +848,24 @@ const updateItemQtyField = (index, field, value) => {
 
     try {
       if (initialPo?.id) {
-        await axios.put(`${BASE}/purchase_orders/${initialPo.id}`, payload);
+        await api.put(`/purchase_orders/${initialPo.id}`, payload);
 
         if (attachments.length > 0) {
           const fd = new FormData();
           attachments.forEach((f) => fd.append("files", f));
-          await axios.post(`${BASE}/purchase_orders/${initialPo.id}/upload`, fd);
+          await api.post(`/purchase_orders/${initialPo.id}/upload`, fd);
         }
 
         alert("PO updated successfully.");
       } else {
-        const res = await axios.post(`${BASE}/purchase_orders`, payload);
+        const res = await api.post(`/purchase_orders`, payload);
 
         const poId = res.data?.po_id;
 
         if (poId && attachments.length) {
           const fd = new FormData();
           attachments.forEach((f) => fd.append("files", f));
-          await axios.post(`${BASE}/purchase_orders/${poId}/upload`, fd);
+          await api.post(`/purchase_orders/${poId}/upload`, fd);
         }
 
         alert("PO created successfully.");
@@ -892,7 +892,7 @@ const updateItemQtyField = (index, field, value) => {
     if (!initialPo?.id) return;
     if (!window.confirm("Cancel this PO?")) return;
 
-    await axios.put(`${BASE}/purchase_orders/${initialPo.id}`, {
+    await api.put(`/purchase_orders/${initialPo.id}`, {
       ...po,
       status: "Cancelled",
     });
@@ -1689,3 +1689,5 @@ const updateItemQtyField = (index, field, value) => {
     </form>
   );
 }
+
+

@@ -1,6 +1,6 @@
 // src/pages/purchaseOrders/PoImportFromExcelPage.jsx
 import React, { useMemo, useRef, useState } from "react";
-import axios from "axios";
+import api from "../../utils/api";
 import { useNavigate } from "react-router-dom";
 
 const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
@@ -104,7 +104,7 @@ export default function PoImportFromExcelPage() {
       setError("");
       setResult(null);
 
-      const res = await axios.post(`${BASE}/po_import/excel`, formData, {
+      const res = await api.post(`/po_import/excel`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
@@ -395,3 +395,4 @@ export default function PoImportFromExcelPage() {
     </div>
   );
 }
+

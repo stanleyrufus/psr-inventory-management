@@ -103,6 +103,33 @@ export const deleteVendor = async (id) => (await apiClient.delete(`/vendors/${id
 export const bulkUploadVendors = async (vendorsArray) =>
   (await apiClient.post("/vendors/bulk-upload", { vendors: vendorsArray })).data;
 
-export const apiRaw = apiClient;
-export default apiClient;
+const api = apiClient;
 
+// attach helper methods to the same default export
+api.fetchParts = fetchParts;
+api.createPart = createPart;
+api.updatePart = updatePart;
+api.deletePart = deletePart;
+api.bulkUploadParts = bulkUploadParts;
+
+api.fetchProducts = fetchProducts;
+api.createProduct = createProduct;
+api.updateProduct = updateProduct;
+api.deleteProduct = deleteProduct;
+
+api.fetchPurchaseOrders = fetchPurchaseOrders;
+api.fetchPurchaseOrderById = fetchPurchaseOrderById;
+api.createPurchaseOrder = createPurchaseOrder;
+api.updatePurchaseOrder = updatePurchaseOrder;
+api.updatePurchaseOrderStatus = updatePurchaseOrderStatus;
+api.uploadPurchaseOrderFiles = uploadPurchaseOrderFiles;
+api.fetchPurchaseOrdersReport = fetchPurchaseOrdersReport;
+
+api.fetchVendors = fetchVendors;
+api.createVendor = createVendor;
+api.updateVendor = updateVendor;
+api.deleteVendor = deleteVendor;
+api.bulkUploadVendors = bulkUploadVendors;
+
+export const apiRaw = apiClient;
+export default api;

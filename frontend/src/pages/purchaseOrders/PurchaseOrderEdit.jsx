@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../../utils/api";
 import { useParams, Link } from "react-router-dom";
 import PurchaseOrderForm from "./PurchaseOrderForm";
 
@@ -17,7 +17,7 @@ if (!id || isNaN(Number(id))) {
 
   const loadPo = async () => {
     try {
-      const res = await axios.get(`${BASE}/purchase_orders/${id}`);
+      const res = await api.get(`/purchase_orders/${id}`);
 
       const normalized =
         res.data?.data && typeof res.data.data === "object"

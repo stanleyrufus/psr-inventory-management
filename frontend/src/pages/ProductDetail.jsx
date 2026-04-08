@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
+import api from "../utils/api";
 import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
 import PartDetail from "../components/PartDetail";
 
 const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
@@ -214,8 +214,8 @@ const [newBomRow, setNewBomRow] = useState({
         setImageFailed(false);
 
         const [productRes, bomRes] = await Promise.all([
-          axios.get(`${BASE}/products/${id}`),
-          axios.get(`${BASE}/products/${id}/bom`),
+          api.get(`${BASE}/products/${id}`),
+          api.get(`${BASE}/products/${id}/bom`),
         ]);
 
         if (cancelled) return;
@@ -258,7 +258,7 @@ const [newBomRow, setNewBomRow] = useState({
 
       // Try to enrich the BOM row with full part details.
       // If this endpoint is not available, the modal will still open with BOM row data.
-      const res = await axios.get(`${BASE}/parts/${row.part_id}`);
+      const res = await api.get(`${BASE}/parts/${row.part_id}`);
       const resolvedPart = res?.data?.data || res?.data || row;
       setSelectedPart(resolvedPart);
     } catch (err) {
@@ -285,7 +285,7 @@ const sendUpload = async (confirmMachineMismatch = false) => {
   );
   formData.append("file", file);
 
-  return axios.post(`${BASE}/products/${id}/bom/upload`, formData);
+  return api.post(`${BASE}/products/${id}/bom/upload`, formData);
 };
 
     let uploadRes;
@@ -326,7 +326,7 @@ try {
       }
     }
 
-    const bomRes = await axios.get(`${BASE}/products/${id}/bom`);
+    const bomRes = await api.get(`${BASE}/products/${id}/bom`);
     const resolvedBom = bomRes?.data?.data || bomRes?.data || null;
     setBom(resolvedBom);
 
@@ -370,7 +370,7 @@ try {
 };
 
 const reloadBom = async () => {
-  const bomRes = await axios.get(`${BASE}/products/${id}/bom`);
+  const bomRes = await api.get(`${BASE}/products/${id}/bom`);
   const resolvedBom = bomRes?.data?.data || bomRes?.data || null;
   setBom(resolvedBom);
 };
@@ -384,7 +384,7 @@ const handleDeleteBomRow = async (row) => {
   if (!confirmed) return;
 
   try {
-    await axios.delete(`${BASE}/products/${id}/bom/rows/${row.id}`);
+    await api.delete(`${BASE}/products/${id}/bom/rows/${row.id}`);
     await reloadBom();
   } catch (err) {
     console.error("Delete BOM row failed:", err);
@@ -405,7 +405,7 @@ const handleDeleteBomSection = async (title) => {
   if (!confirmed) return;
 
   try {
-    await axios.delete(`${BASE}/products/${id}/bom/section/${section}`);
+    await api.delete(`${BASE}/products/${id}/bom/section/${section}`);
     await reloadBom();
   } catch (err) {
     console.error("Delete BOM section failed:", err);
@@ -439,7 +439,7 @@ const handleAddBomRow = async () => {
       source_description: newBomRow.source_description.trim(),
     };
 
-    const res = await axios.post(`${BASE}/products/${id}/bom/rows`, payload);
+    const res = await api.post(`${BASE}/products/${id}/bom/rows`, payload);
 
     await reloadBom();
 
@@ -776,3 +776,4 @@ const handlePrintBom = () => {
     </div>
   );
 }
+

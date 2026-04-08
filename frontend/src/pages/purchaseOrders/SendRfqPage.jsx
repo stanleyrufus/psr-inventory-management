@@ -1,7 +1,7 @@
 // src/pages/purchaseOrders/SendRfqPage.jsx
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../utils/api";
 
 const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
@@ -184,20 +184,20 @@ export default function SendRfqPage() {
         setLoading(true);
 
         // 1) Load vendors (same as POForm source)
-        const vRes = await axios.get(`${BASE}/vendors`);
+        const vRes = await api.get(`/vendors`);
         if (!cancelled) {
           const arr = vRes.data?.data || vRes.data || [];
           setVendorsRaw(Array.isArray(arr) ? arr : []);
         }
 
         // 2) Load PO header info
-        const poRes = await axios.get(`${BASE}/purchase_orders/${id}`);
+        const poRes = await api.get(`/purchase_orders/${id}`);
         const poData = poRes.data?.data || poRes.data;
         if (!poData) throw new Error("PO not found");
         if (!cancelled) setPo(poData);
 
         // 3) Load RFQ preview (includes main vendor email & subject)
-        const prevRes = await axios.get(
+        const prevRes = await api.get(
           `${BASE}/purchase_orders/${id}/rfq/preview`
         );
         const data = prevRes.data;
@@ -282,7 +282,7 @@ export default function SendRfqPage() {
     try {
       setSending(true);
 
-      await axios.post(`${BASE}/purchase_orders/${id}/rfq/send`, {
+      await api.post(`/purchase_orders/${id}/rfq/send`, {
         to: parsedTo,
         cc: parsedCc,
         bcc: parsedBcc,
@@ -420,3 +420,4 @@ export default function SendRfqPage() {
     </div>
   );
 }
+

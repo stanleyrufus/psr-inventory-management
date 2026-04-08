@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import axios from "axios";
+import api from "../../utils/api";
 import { Link } from "react-router-dom";
 import { CloudArrowUpIcon } from "@heroicons/react/24/solid";
 
@@ -20,7 +20,7 @@ export default function PurchaseOrderBulkUpload() {
       const fd = new FormData();
       fd.append("file", file);
 
-      const res = await axios.post(`${BASE}/po_import/import`, fd);
+      const res = await api.post(`/po_import/import`, fd);
       setResult(res.data);
     } catch (e) {
       setError(e.response?.data?.message || e.message);
@@ -83,3 +83,4 @@ export default function PurchaseOrderBulkUpload() {
     </div>
   );
 }
+
