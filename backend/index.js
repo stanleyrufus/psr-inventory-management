@@ -55,22 +55,24 @@ const BACKUP_CONFIG = {
   },
 };
 
-function getLatestFileFromDir(dirPath) {
+function getLatestEntryFromDir(dirPath) {
   if (!fs.existsSync(dirPath)) {
     return null;
   }
 
   const entries = fs
     .readdirSync(dirPath, { withFileTypes: true })
-    .filter((entry) => entry.isFile())
+    .filter((entry) => entry.isFile() || entry.isDirectory())
     .map((entry) => {
       const fullPath = path.join(dirPath, entry.name);
       const stat = fs.statSync(fullPath);
+
       return {
         name: entry.name,
         fullPath,
         mtime: stat.mtime,
-        size: stat.size,
+        size: stat.isFile() ? stat.size : 0,
+        entryType: entry.isDirectory() ? "directory" : "file",
       };
     })
     .sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
@@ -80,7 +82,7 @@ function getLatestFileFromDir(dirPath) {
 
 function buildBackupHealth(configKey) {
   const cfg = BACKUP_CONFIG[configKey];
-  const latest = getLatestFileFromDir(cfg.dir);
+  const latest = getLatestEntryFromDir(cfg.dir);
 
   if (!latest) {
     return {
@@ -108,6 +110,7 @@ function buildBackupHealth(configKey) {
       directory: cfg.dir,
       latestFile: latest.name,
       latestFilePath: latest.fullPath,
+      entryType: latest.entryType,
       lastModified: latest.mtime,
       ageHours: Number(ageHours.toFixed(2)),
       maxAgeHours: cfg.maxAgeHours,
