@@ -20,12 +20,13 @@ function levelFromCounts({ critical, warning }) {
 
 router.get("/overview", async (req, res) => {
   try {
+    const routeStartedAt = Date.now(); // ✅ ADD THIS
     // ------------------------------------------------------------------
     // 1️⃣ SYSTEM HEALTH
     // ------------------------------------------------------------------
 
     // DB HEALTH + LATENCY + SLOW QUERY CHECK
-    let dbStatus = "ok";
+    let dbStatus = "up";
     let dbLatencyMs = null;
     let dbSlow = false;
 
@@ -39,7 +40,7 @@ router.get("/overview", async (req, res) => {
     }
 
     // API HEALTH
-    const apiStatus = "ok";
+    const apiStatus = "up";
 
     // NODE PROCESS METRICS
     const nodeCpu = os.loadavg()[0]; // 1 min load avg
@@ -54,26 +55,27 @@ router.get("/overview", async (req, res) => {
     let lowStockCount = 0;
 
     try {
-      lowStockParts = await db("parts")
-        .whereNotNull("reorder_level")
-        .andWhere("reorder_level", ">", 0)
-        .andWhere("quantity_on_hand", "<", db.ref("reorder_level"))
-        .limit(5);
+      lowStockParts = await db("inventory")
+  .whereNotNull("minimum_stock_level")
+  .andWhere("minimum_stock_level", ">", 0)
+  .andWhere("quantity_on_hand", "<", db.ref("minimum_stock_level"))
+  .select("part_id", "part_number", "part_name", "quantity_on_hand", "minimum_stock_level")
+  .orderBy("quantity_on_hand", "asc")
+  .limit(5);
 
-      const r = await db("parts")
-        .whereNotNull("reorder_level")
-        .andWhere("reorder_level", ">", 0)
-        .andWhere("quantity_on_hand", "<", db.ref("reorder_level"))
-        .count({ count: "*" });
+const r = await db("inventory")
+  .whereNotNull("minimum_stock_level")
+  .andWhere("minimum_stock_level", ">", 0)
+  .andWhere("quantity_on_hand", "<", db.ref("minimum_stock_level"))
+  .count({ count: "*" });
 
       lowStockCount = safeCount(r[0]);
     } catch {}
 
-    const pendingStatuses = ["Draft", "Submitted", "Awaiting Approval"];
+const pendingStatuses = ["Reserved", "Ordered"];
     let pendingPoCount = 0;
     let stalePoCount = 0;
-    let inactiveVendorsCount = 0;
-
+let staleVendorRecordsCount = 0;
     try {
       pendingPoCount = safeCount(
         (await db("purchase_orders")
@@ -94,7 +96,7 @@ router.get("/overview", async (req, res) => {
     } catch {}
 
     try {
-      inactiveVendorsCount = safeCount(
+staleVendorRecordsCount = safeCount(
         (await db("vendors")
           .andWhereRaw(
             `COALESCE(updated_at, created_at, NOW()) < NOW() - INTERVAL '6 months'`
@@ -108,7 +110,7 @@ router.get("/overview", async (req, res) => {
     // ------------------------------------------------------------------
 
     const businessCritical = lowStockCount > 0 || stalePoCount > 0;
-    const businessWarning = pendingPoCount > 0 || inactiveVendorsCount > 0;
+const businessWarning = pendingPoCount > 0 || staleVendorRecordsCount > 0;
 
     const businessLevel = levelFromCounts({
       critical: businessCritical ? 1 : 0,
@@ -126,8 +128,9 @@ router.get("/overview", async (req, res) => {
       businessAlerts.push(`${pendingPoCount} pending PO(s).`);
     if (stalePoCount > 0)
       businessAlerts.push(`${stalePoCount} stale PO(s).`);
-    if (inactiveVendorsCount > 0)
-      businessAlerts.push(`${inactiveVendorsCount} inactive vendor(s).`);
+ if (staleVendorRecordsCount > 0)
+  businessAlerts.push(`${staleVendorRecordsCount} vendor record(s) stale for 6+ months.`);
+
 
     if (businessAlerts.length === 0)
       businessAlerts.push("Everything looks good.");
@@ -165,27 +168,28 @@ router.get("/overview", async (req, res) => {
     // ------------------------------------------------------------------
     // 6️⃣ FINAL RETURN
     // ------------------------------------------------------------------
-
+const apiLatencyMs = Date.now() - routeStartedAt; // ✅ ADD THIS
     res.json({
       generatedAt: new Date().toISOString(),
 
       system: {
-        level: dbStatus === "down" ? "critical" : dbSlow ? "warning" : "ok",
-        apiStatus,
-        dbStatus,
-        dbLatencyMs,
-        nodeCpu,
-        nodeMemory,
-        uptimeSeconds,
-        nginx: nginxStats,
-      },
+  level: dbStatus === "down" ? "critical" : dbSlow ? "warning" : "ok",
+  apiStatus,
+  apiLatencyMs,   // ✅ ADD THIS
+  dbStatus,
+  dbLatencyMs,
+  nodeCpu,
+  nodeMemory,
+  uptimeSeconds,
+  nginx: nginxStats,
+},
 
       business: {
         level: businessLevel,
         lowStockCount,
         pendingPoCount,
         stalePoCount,
-        inactiveVendorsCount,
+staleVendorRecordsCount,
         lowStockParts,
         messages: businessAlerts,
       },

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, Title, Button, TextInput, Badge } from "@tremor/react";
-import { apiRaw as api } from "../../utils/api";
+import api from "../../utils/api";
 import { PlusIcon } from "@heroicons/react/24/outline";
 
 

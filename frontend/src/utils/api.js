@@ -104,27 +104,5 @@ export const bulkUploadVendors = async (vendorsArray) =>
   (await apiClient.post("/vendors/bulk-upload", { vendors: vendorsArray })).data;
 
 export const apiRaw = apiClient;
+export default apiClient;
 
-export default {
-  fetchParts,
-  createPart,
-  updatePart,
-  deletePart,
-  bulkUploadParts,
-  fetchProducts,
-  createProduct,
-  updateProduct,
-  deleteProduct,
-  fetchPurchaseOrders,
-  fetchPurchaseOrderById,
-  createPurchaseOrder,
-  updatePurchaseOrder,
-  updatePurchaseOrderStatus,
-  uploadPurchaseOrderFiles,
-  fetchPurchaseOrdersReport,
-  fetchVendors,
-  createVendor,
-  updateVendor,
-  deleteVendor,
-  bulkUploadVendors,
-};

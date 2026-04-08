@@ -1,7 +1,7 @@
 // frontend/src/pages/settings/SystemPreferences.jsx
 import { useEffect, useState } from "react";
 import { Card, Title, Button } from "@tremor/react";
-import { apiRaw as api } from "../../utils/api";
+import api from "../../utils/api";
 
 export default function SystemPreferences() {
   const [settings, setSettings] = useState({

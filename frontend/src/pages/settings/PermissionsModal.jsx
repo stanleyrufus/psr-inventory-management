@@ -1,7 +1,7 @@
 // frontend/src/pages/settings/PermissionsModal.jsx
 import { useEffect, useState } from "react";
 import { Button } from "@tremor/react";
-import { apiRaw as api } from "../../utils/api";
+import api from "../../utils/api";
 
 export default function PermissionsModal({ role, open, onClose }) {
   const [allPerms, setAllPerms] = useState([]);

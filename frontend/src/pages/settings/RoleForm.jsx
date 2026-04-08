@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom";
 import { useState, useEffect } from "react";
 import { Button, TextInput, Textarea } from "@tremor/react";
-import { apiRaw as api } from "../../utils/api";
+import api from "../../utils/api";
 
 /* Custom modal (fixed overlay) to guarantee proper centering/z-index */
 export default function RoleForm({ open, onClose, onSaved, initial = {} }) {

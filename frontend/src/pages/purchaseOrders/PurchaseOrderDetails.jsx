@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../../utils/api";
 import { hasPermission } from "../../utils/permissions";
 
 const BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
@@ -53,8 +53,8 @@ if (!canViewPOs) {
     if (!id) return;
 
     setLoading(true);
-    axios
-      .get(`${BASE}/purchase_orders/${id}`)
+    api
+  .get(`/purchase_orders/${id}`)
       .then((res) => setFetchedOrder(res.data?.data || res.data || null))
       .catch((err) => {
         console.error("❌ Error loading PO:", err);
@@ -92,8 +92,8 @@ if (!canViewPOs) {
   useEffect(() => {
     if (!po?.vendor_id) return;
 
-    axios
-      .get(`${BASE}/vendors/${po.vendor_id}`)
+    api
+  .get(`/vendors/${po.vendor_id}`)
       .then((res) => setVendorInfo(res.data?.data || res.data || null))
       .catch((err) => console.error("❌ Failed to load vendor info:", err));
   }, [po?.vendor_id]);
@@ -102,8 +102,8 @@ if (!canViewPOs) {
   //  Load ALL PARTS (for part number + images)
   // -------------------------------
   useEffect(() => {
-    axios
-      .get(`${BASE}/parts`)
+    api
+  .get(`/parts`)
       .then((res) => {
         const raw = res.data?.data || res.data || [];
         const normalized = raw.map((p) => ({
@@ -136,7 +136,7 @@ if (!canViewPOs) {
     try {
       setPaymentSaving(true);
 
-      await axios.put(`${BASE}/purchase_orders/${po.id}`, {
+await api.put(`/purchase_orders/${po.id}`, {
         ...po,
         status: "Paid",
         payment_method: paymentForm.payment_method || null,
@@ -211,7 +211,7 @@ if (!canViewPOs) {
                 if (!window.confirm("Revert this PO to UNPAID status?")) return;
 
                 try {
-                  await axios.put(`${BASE}/purchase_orders/${po.id}`, {
+await api.put(`/purchase_orders/${po.id}`, {
                     ...po,
                     status: "Received", // revert to previous state
                   });
@@ -260,7 +260,7 @@ if (!canViewPOs) {
               }
 
               try {
-                await axios.delete(`${BASE}/purchase_orders/${po.id}`);
+await api.delete(`/purchase_orders/${po.id}`);
                 alert("✅ Purchase Order deleted");
                 handleClose();
               } catch (err) {

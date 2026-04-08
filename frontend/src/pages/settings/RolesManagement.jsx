@@ -1,7 +1,7 @@
 // frontend/src/pages/settings/RolesManagement.jsx
 import { useEffect, useState } from "react";
 import { Card, Title, Button, TextInput } from "@tremor/react";
-import { apiRaw as api } from "../../utils/api";
+import api from "../../utils/api";
 import PermissionsModal from "./PermissionsModal";
 import {
   PencilIcon,

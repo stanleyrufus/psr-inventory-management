@@ -16,22 +16,13 @@ export default function SettingsIndex() {
       desc: "Create roles and assign permissions.",
       path: "/settings/roles",
     },
-    {
-      title: "System Preferences",
-      desc: "Configure application defaults and behaviour.",
-      path: "/settings/system",
-    },
+
 // ✅ NEW TILE — PSR Monitoring Dashboard
   {
     title: "System Health",
     desc: "Monitor server, API, database, and business-level health.",
     path: "/settings/monitoring",
   },
-    {
-      title: "Backup & Data Import",
-      desc: "Database backup and CSV import tools (future).",
-      path: "/settings/backup",
-    },
     {
       title: "Audit Logs",
       desc: "Track login events and system changes (future).",
