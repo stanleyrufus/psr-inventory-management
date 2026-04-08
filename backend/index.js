@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { connectDB } from "./db.js";
+import { connectDB, db } from "./db.js";
 
 import { authenticateJWT, requirePermission, requireAdmin } from "./middleware/auth.js";
 
@@ -220,6 +220,58 @@ app.get("/api/client-health/:clientName", (req, res) => {
     status: "OK",
     ageMinutes: Number(ageMinutes.toFixed(2)),
   });
+});
+
+// ✅ API health for NGINX / Kuma
+app.get("/api/health", async (req, res) => {
+  try {
+    const startedAt = Date.now();
+
+    let dbStatus = "up";
+    let dbLatencyMs = null;
+
+    try {
+      const t0 = Date.now();
+      await db.raw("SELECT 1");
+      dbLatencyMs = Date.now() - t0;
+    } catch {
+      dbStatus = "down";
+    }
+
+    const apiLatencyMs = Date.now() - startedAt;
+
+    if (dbStatus !== "up") {
+      return res.status(500).json({
+        ok: false,
+        status: "DOWN",
+        message: "API unhealthy",
+        apiStatus: "up",
+        dbStatus,
+        apiLatencyMs,
+        dbLatencyMs,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      status: "OK",
+      message: "API healthy",
+      apiStatus: "up",
+      dbStatus,
+      apiLatencyMs,
+      dbLatencyMs,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("API HEALTH ERROR:", err);
+    return res.status(500).json({
+      ok: false,
+      status: "ERROR",
+      message: "API health check failed",
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 // ✅ Backup health endpoints
