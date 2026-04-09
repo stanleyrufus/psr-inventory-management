@@ -356,24 +356,23 @@ const items = rawItems.map((i) => ({
 
     let cancelled = false;
 
-    axios
-      .get(`${BASE}/purchase_orders/next-number`)
-      .then((res) => {
-        if (cancelled) return;
+api
+  .get(`/purchase_orders/next-number`)
+  .then((res) => {
+    if (cancelled) return;
 
-        const next = res.data?.psr_po_number;
-        const od = res.data?.order_date;
+    const next = res.data?.psr_po_number;
+    const od = res.data?.order_date;
 
-        setPo((prev) => ({
-          ...prev,
-          psr_po_number: next || prev.psr_po_number,
-          order_date: od || prev.order_date,
-        }));
-      })
-      .catch((err) => {
-        console.error("❌ Failed to auto-generate PO number:", err);
-      });
-
+    setPo((prev) => ({
+      ...prev,
+      psr_po_number: next || prev.psr_po_number,
+      order_date: od || prev.order_date,
+    }));
+  })
+  .catch((err) => {
+    console.error("❌ Failed to auto-generate PO number:", err);
+  });
     return () => {
       cancelled = true;
     };
@@ -381,16 +380,16 @@ const items = rawItems.map((i) => ({
 
   // Load vendors + parts
   useEffect(() => {
-        axios
-      .get(`${BASE}/vendors`)
-      .then((res) => {
-        const raw = res.data?.data || res.data || [];
-        setVendors(Array.isArray(raw) ? raw : []);
-      })
-      .catch(() => setVendors([]));
+     api
+  .get(`/vendors`)
+  .then((res) => {
+    const raw = res.data?.data || res.data || [];
+    setVendors(Array.isArray(raw) ? raw : []);
+  })
+  .catch(() => setVendors([]));
 
-        axios
-      .get(`${BASE}/parts`)
+        api
+  .get(`/parts`)
       .then((res) => {
         const raw = res.data?.data || res.data || [];
         const safeRaw = Array.isArray(raw) ? raw : [];
