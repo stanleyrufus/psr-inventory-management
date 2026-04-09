@@ -756,11 +756,11 @@ const updateItemQtyField = (index, field, value) => {
           formData.append("files", file);
         });
 
-        const uploadRes = await api.post(
-          `${BASE}/purchase_orders/${newId}/upload`,
-          formData,
-          { headers: { "Content-Type": "multipart/form-data" } }
-        );
+     const uploadRes = await api.post(
+  `/purchase_orders/${newId}/upload`,
+  formData,
+  { headers: { "Content-Type": "multipart/form-data" } }
+);
 
         const uploaded = uploadRes.data?.files || [];
         setExistingFiles((prev) => [...prev, ...uploaded]);
