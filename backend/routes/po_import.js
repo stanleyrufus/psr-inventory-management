@@ -135,22 +135,69 @@ async function ensureVendor(trx, vendor) {
   return inserted.vendor_id;
 }
 
-async function ensurePart(trx, line) {
+async function ensurePart(trx, line, meta = {}) {
   if (!line.partNumber) throw new Error("Line item missing partNumber");
 
-  const pn = line.partNumber.trim();
+  const pn = String(line.partNumber || "").trim();
+  const incomingPartName = String(line.partName || line.description || "").trim();
+  const incomingDescription = String(line.description || "").trim();
+
+  const parsedUnitPrice =
+    line.unitPrice === null || line.unitPrice === undefined || line.unitPrice === ""
+      ? null
+      : Number(line.unitPrice);
+
+  const hasValidUnitPrice =
+    parsedUnitPrice !== null && !Number.isNaN(parsedUnitPrice);
 
   const existing = await trx("inventory").where({ part_number: pn }).first();
-  if (existing) return existing.part_id;
+
+  if (existing) {
+    const patch = {};
+
+    if (hasValidUnitPrice) {
+      patch.current_unit_price = parsedUnitPrice;
+      patch.last_unit_price = parsedUnitPrice;
+    }
+
+    const existingPartName = String(existing.part_name || "").trim();
+    const existingDescription = String(existing.description || "").trim();
+
+    if (!existingPartName && incomingPartName) {
+      patch.part_name = incomingPartName;
+    }
+
+    if (!existingDescription && incomingDescription) {
+      patch.description = incomingDescription;
+    }
+
+    patch.last_po_number = meta.psrPoNumber || null;
+    patch.last_vendor_id = meta.vendorId || null;
+    patch.last_po_date = meta.orderDate || null;
+    patch.updated_at = trx.fn.now();
+    patch.updated_on = trx.fn.now();
+
+    await trx("inventory")
+      .where({ part_id: existing.part_id })
+      .update(patch);
+
+    return existing.part_id;
+  }
+
+  const insertRow = {
+    part_number: pn,
+    part_name: incomingPartName || "",
+    description: incomingDescription || "",
+    current_unit_price: hasValidUnitPrice ? parsedUnitPrice : 0,
+    last_unit_price: hasValidUnitPrice ? parsedUnitPrice : 0,
+    last_po_number: meta.psrPoNumber || null,
+    last_vendor_id: meta.vendorId || null,
+    last_po_date: meta.orderDate || null,
+    status: "Active",
+  };
 
   const [inserted] = await trx("inventory")
-    .insert({
-      part_number: pn,
-      part_name: line.partName || line.description || "",
-      description: line.description || "",
-      current_unit_price: line.unitPrice ?? 0,
-      status: "Active",
-    })
+    .insert(insertRow)
     .returning(["part_id"]);
 
   return inserted.part_id;
@@ -267,11 +314,15 @@ console.log(
 
         const vendorId = await ensureVendor(trx, extracted.vendor);
 
-        const lineItems = [];
-        for (const li of extracted.items || []) {
-          const partId = await ensurePart(trx, li);
-          lineItems.push({ ...li, part_id: partId });
-        }
+const lineItems = [];
+for (const li of extracted.items || []) {
+  const partId = await ensurePart(trx, li, {
+    psrPoNumber: extracted.psrPoNumber,
+    vendorId,
+    orderDate: extracted.orderDate || null,
+  });
+  lineItems.push({ ...li, part_id: partId });
+}
 
         if (!lineItems.length) {
           throw new Error("Could not extract line items from PDF");
@@ -458,11 +509,15 @@ router.post("/excel", uploadExcel.array("files", 10), async (req, res) => {
 
         const vendorId = await ensureVendor(trx, extracted.vendor);
 
-        const lineItems = [];
-        for (const li of extracted.items || []) {
-          const partId = await ensurePart(trx, li);
-          lineItems.push({ ...li, part_id: partId });
-        }
+const lineItems = [];
+for (const li of extracted.items || []) {
+  const partId = await ensurePart(trx, li, {
+    psrPoNumber: extracted.psrPoNumber,
+    vendorId,
+    orderDate: extracted.orderDate || null,
+  });
+  lineItems.push({ ...li, part_id: partId });
+}
 
         if (!lineItems.length) {
           throw new Error("Could not extract line items from Excel (AI)");
