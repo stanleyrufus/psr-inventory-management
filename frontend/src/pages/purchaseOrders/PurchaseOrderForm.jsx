@@ -852,7 +852,9 @@ const updateItemQtyField = (index, field, value) => {
         if (attachments.length > 0) {
           const fd = new FormData();
           attachments.forEach((f) => fd.append("files", f));
-          await api.post(`/purchase_orders/${initialPo.id}/upload`, fd);
+await api.post(`/purchase_orders/${initialPo.id}/upload`, fd, {
+  headers: { "Content-Type": "multipart/form-data" },
+});
         }
 
         alert("PO updated successfully.");
@@ -864,7 +866,9 @@ const updateItemQtyField = (index, field, value) => {
         if (poId && attachments.length) {
           const fd = new FormData();
           attachments.forEach((f) => fd.append("files", f));
-          await api.post(`/purchase_orders/${poId}/upload`, fd);
+await api.post(`/purchase_orders/${poId}/upload`, fd, {
+  headers: { "Content-Type": "multipart/form-data" },
+});
         }
 
         alert("PO created successfully.");
