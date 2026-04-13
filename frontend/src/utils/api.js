@@ -27,7 +27,11 @@ export const fetchParts = async () => {
 
 export const createPart = async (data) => (await apiClient.post("/parts", data)).data;
 export const updatePart = async (id, data) => (await apiClient.put(`/parts/${id}`, data)).data;
-export const deletePart = async (id) => (await apiClient.delete(`/parts/${id}`)).data;
+export const deletePart = async (id) => {
+  const token = localStorage.getItem("token");
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  return (await apiClient.delete(`/parts/${id}`, { headers })).data;
+};
 export const bulkUploadParts = async (partsArray) =>
   (await apiClient.post("/parts/bulk-upload", { parts: partsArray })).data;
 
