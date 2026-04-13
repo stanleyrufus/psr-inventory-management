@@ -1,6 +1,7 @@
 // frontend/src/components/PartDetail.jsx
 import React, { useState } from "react";
 import { hasPermission } from "../utils/permissions";
+import api, { deletePart } from "../utils/api";
 
 function getLatestPO(relatedPOs) {
   if (!Array.isArray(relatedPOs) || relatedPOs.length === 0) return null;
@@ -49,11 +50,10 @@ const canDeleteParts = hasPermission("delete_parts");
   React.useEffect(() => {
     if (!part?.part_id) return;
 
-fetch(`${BASE}/parts/${part.part_id}/purchase-orders`)
-      .then((res) => res.json())
-      .then((json) => setRelatedPOs(json.data || []))
-      .catch(() => setRelatedPOs([]));
-  }, [part?.part_id]);
+api
+  .get(`/parts/${part.part_id}/purchase-orders`)
+  .then((res) => setRelatedPOs(res.data?.data || []))
+  .catch(() => setRelatedPOs([]));  }, [part?.part_id]);
 
   const latestPO = getLatestPO(relatedPOs);
   const mainImageUrl = hasImages ? imageUrls[mainIndex] : null;
@@ -89,32 +89,24 @@ fetch(`${BASE}/parts/${part.part_id}/purchase-orders`)
       ? "bg-red-600 text-white"
       : "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
   }`}
-  onClick={async () => {
-    if (!canDeleteParts) return;
+ onClick={async () => {
+  if (!canDeleteParts) return;
 
-    if (!window.confirm("Delete this part permanently?")) return;
+  if (!window.confirm("Delete this part permanently?")) return;
 
-    try {
-      const res = await fetch(`${BASE}/parts/${part.part_id}`, {
-        method: "DELETE",
-      });
-
-      if (!res.ok) {
-        let msg = "Failed to delete part.";
-        try {
-          const data = await res.json();
-          msg = data?.message || msg;
-        } catch {}
-        throw new Error(msg);
-      }
-
-      window.dispatchEvent(new Event("reload-parts"));
-      alert("Deleted successfully.");
-      onClose();
-    } catch (err) {
-      alert(err.message || "Failed to delete part.");
-    }
-  }}
+  try {
+const data = await deletePart(part.part_id);
+    window.dispatchEvent(new Event("reload-parts"));
+    alert(data?.message || "Deleted successfully.");
+    onClose();
+  } catch (err) {
+    const msg =
+      err?.response?.data?.message ||
+      err?.message ||
+      "Failed to delete part.";
+    alert(msg);
+  }
+}}
 >
   Delete
 </button>
