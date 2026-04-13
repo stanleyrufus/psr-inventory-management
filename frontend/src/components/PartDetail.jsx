@@ -89,22 +89,39 @@ api
       ? "bg-red-600 text-white"
       : "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
   }`}
- onClick={async () => {
+onClick={async () => {
   if (!canDeleteParts) return;
 
   if (!window.confirm("Delete this part permanently?")) return;
 
   try {
-const data = await deletePart(part.part_id);
+    const token = localStorage.getItem("token");
+    if (!token) {
+      throw new Error("Not authenticated. Please log in again.");
+    }
+
+    const res = await fetch(`${BASE}/parts/${part.part_id}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    let data = {};
+    try {
+      data = await res.json();
+    } catch {}
+
+    if (!res.ok) {
+      throw new Error(data?.message || `Failed to delete part (${res.status})`);
+    }
+
     window.dispatchEvent(new Event("reload-parts"));
     alert(data?.message || "Deleted successfully.");
     onClose();
   } catch (err) {
-    const msg =
-      err?.response?.data?.message ||
-      err?.message ||
-      "Failed to delete part.";
-    alert(msg);
+    alert(err.message || "Failed to delete part.");
   }
 }}
 >
