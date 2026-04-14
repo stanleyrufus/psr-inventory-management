@@ -62,10 +62,24 @@ const uploadExcel = multer({
 function normalizeVendorName(s) {
   return String(s || "")
     .toLowerCase()
-    .replace(/[\.\,\'\"\-]/g, " ")
-    .replace(/\b(inc|llc|l\.l\.c|co|company|corp|corporation|ltd|limited)\b/g, "")
+    .replace(/[.,'"-]/g, " ")
+    .replace(/\b(inc|incorporated|llc|ltd|limited|corp|corporation|co|company)\b/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function normalizePoNumberForMatch(value) {
+  const raw = String(value || "").trim().toUpperCase();
+  if (!raw) return "";
+
+  const compact = raw.replace(/\s+/g, "");
+
+  // If vendor omitted the PO prefix: 260413-02 -> PO260413-02
+  if (/^\d{6}-\d+$/.test(compact)) {
+    return `PO${compact}`;
+  }
+
+  return compact;
 }
 
 async function ensureVendor(trx, vendor) {
@@ -289,9 +303,13 @@ console.log(
         }
 
         // ✅ Check existing PO by PO# (Reserved-aware)
-        const existing = await trx("purchase_orders")
-          .where({ psr_po_number: extracted.psrPoNumber })
-          .first();
+ const normalizedPoNumber = normalizePoNumberForMatch(extracted.psrPoNumber);
+
+const existing = normalizedPoNumber
+  ? await trx("purchase_orders")
+      .whereRaw("upper(psr_po_number) = ?", [normalizedPoNumber])
+      .first()
+  : null;
 
         let targetPoId = null;
         let mode = "INSERT_NEW";
@@ -317,7 +335,7 @@ console.log(
 const lineItems = [];
 for (const li of extracted.items || []) {
   const partId = await ensurePart(trx, li, {
-    psrPoNumber: extracted.psrPoNumber,
+psrPoNumber: normalizedPoNumber,
     vendorId,
     orderDate: extracted.orderDate || null,
   });
@@ -356,7 +374,7 @@ for (const li of extracted.items || []) {
         } else {
           const inserted = await trx("purchase_orders")
             .insert({
-              psr_po_number: extracted.psrPoNumber,
+psr_po_number: normalizedPoNumber,
               order_date: extracted.orderDate,
               expected_delivery_date: extracted.expectedDeliveryDate,
               created_by: extracted.orderedBy || uploaderName,
@@ -487,9 +505,13 @@ router.post("/excel", uploadExcel.array("files", 10), async (req, res) => {
         sanitizeVendorContact(extracted);
 
         // Duplicate / Reserved-aware
-        const existing = await trx("purchase_orders")
-          .where({ psr_po_number: extracted.psrPoNumber })
-          .first();
+const normalizedPoNumber = normalizePoNumberForMatch(extracted.psrPoNumber);
+
+const existing = normalizedPoNumber
+  ? await trx("purchase_orders")
+      .whereRaw("upper(psr_po_number) = ?", [normalizedPoNumber])
+      .first()
+  : null;
 
         let targetPoId = null;
         let mode = "INSERT_NEW";
@@ -512,7 +534,7 @@ router.post("/excel", uploadExcel.array("files", 10), async (req, res) => {
 const lineItems = [];
 for (const li of extracted.items || []) {
   const partId = await ensurePart(trx, li, {
-    psrPoNumber: extracted.psrPoNumber,
+psrPoNumber: normalizedPoNumber,
     vendorId,
     orderDate: extracted.orderDate || null,
   });
@@ -551,7 +573,7 @@ for (const li of extracted.items || []) {
         } else {
           const inserted = await trx("purchase_orders")
             .insert({
-              psr_po_number: extracted.psrPoNumber,
+psr_po_number: normalizedPoNumber,
               order_date: extracted.orderDate,
               expected_delivery_date: extracted.expectedDeliveryDate,
               created_by: extracted.orderedBy || uploaderName,
