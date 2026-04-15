@@ -5,12 +5,13 @@ import path from "path";
 import fs from "fs";
 import { db } from "../db.js";
 
-import { extractPoHybrid } from "../services/poHybridExtractor.js"; // ✅ PDF route uses this (keep)
-import { extractPoWithAzureAi } from "../services/poAzureAiExtractor.js"; // ✅ Excel route uses AI directly
-import { convertOfficeToPdf } from "../utils/officeToPdf.js"; // ✅ you created this
+import { extractPoHybrid } from "../services/poHybridExtractor.js";
+import { extractPoWithAzureAi } from "../services/poAzureAiExtractor.js";
+import { convertOfficeToPdf } from "../utils/officeToPdf.js";
 
 const router = express.Router();
 const IMPORT_FINAL_STATUS = "Placed";
+const BUSINESS_TIMEZONE = "America/New_York";
 
 /* ---------------- Upload config ---------------- */
 
@@ -57,13 +58,16 @@ const uploadExcel = multer({
   },
 });
 
-/* ---------------- Helpers: ensure vendor & part ---------------- */
+/* ---------------- Helpers ---------------- */
 
-function normalizeVendorName(s) {
-  return String(s || "")
+function normalizeVendorName(value) {
+  return String(value || "")
     .toLowerCase()
     .replace(/[.,'"-]/g, " ")
-    .replace(/\b(inc|incorporated|llc|ltd|limited|corp|corporation|co|company)\b/g, "")
+    .replace(
+      /\b(inc|incorporated|llc|ltd|limited|corp|corporation|co|company)\b/g,
+      ""
+    )
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -74,7 +78,7 @@ function normalizePoNumberForMatch(value) {
 
   const compact = raw.replace(/\s+/g, "");
 
-  // If vendor omitted the PO prefix: 260413-02 -> PO260413-02
+  // 260413-02 -> PO260413-02
   if (/^\d{6}-\d+$/.test(compact)) {
     return `PO${compact}`;
   }
@@ -82,23 +86,77 @@ function normalizePoNumberForMatch(value) {
   return compact;
 }
 
+function normalizeDateOnly(value) {
+  if (!value) return null;
+
+  if (typeof value === "string") {
+    const raw = value.trim();
+    if (!raw) return null;
+
+    // YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      return raw;
+    }
+
+    // MM/DD/YYYY
+    const m = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) {
+      const mm = String(m[1]).padStart(2, "0");
+      const dd = String(m[2]).padStart(2, "0");
+      const yyyy = m[3];
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    // ISO-ish datetime string -> keep calendar date part
+    const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+    if (iso) {
+      return `${iso[1]}-${iso[2]}-${iso[3]}`;
+    }
+  }
+
+  // JS Date object -> preserve UTC calendar date
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const yyyy = value.getUTCFullYear();
+    const mm = String(value.getUTCMonth() + 1).padStart(2, "0");
+    const dd = String(value.getUTCDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  return null;
+}
+
+function asBusinessTimestamp(trx, dateOnly) {
+  if (!dateOnly) return null;
+  return trx.raw(
+    "((?::date)::timestamp AT TIME ZONE ?)",
+    [dateOnly, BUSINESS_TIMEZONE]
+  );
+}
+
 async function ensureVendor(trx, vendor) {
   if (!vendor?.name) throw new Error("Vendor name missing in extracted document");
 
-  const name = vendor.name.trim();
+  const name = String(vendor.name || "").trim();
   const norm = normalizeVendorName(name);
 
-  // ✅ 1) Try exact-ish match first (keeps old behavior)
   let existing = await trx("vendors").where("vendor_name", "ilike", name).first();
 
-  // ✅ 2) If not found, try normalized match (punctuation/suffix safe)
   if (!existing) {
     existing = await trx("vendors")
       .whereRaw(
         `
-        regexp_replace(
-          regexp_replace(lower(vendor_name), '[^a-z0-9 ]', '', 'g'),
-          '\\s+', ' ', 'g'
+        trim(
+          regexp_replace(
+            regexp_replace(
+              regexp_replace(lower(vendor_name), '[.,''"-]', ' ', 'g'),
+              '\\m(inc|incorporated|llc|ltd|limited|corp|corporation|co|company)\\M',
+              '',
+              'g'
+            ),
+            '\\s+',
+            ' ',
+            'g'
+          )
         ) = ?
         `,
         [norm]
@@ -107,14 +165,18 @@ async function ensureVendor(trx, vendor) {
   }
 
   if (existing) {
-    // ✅ Update missing vendor fields (fill blanks only; do NOT overwrite existing values)
     const patch = {};
 
     const setIfEmpty = (dbCol, newVal) => {
       const cur = existing[dbCol];
-      const hasCur = cur !== null && cur !== undefined && String(cur).trim() !== "";
-      const hasNew = newVal !== null && newVal !== undefined && String(newVal).trim() !== "";
-      if (!hasCur && hasNew) patch[dbCol] = String(newVal).trim();
+      const hasCur =
+        cur !== null && cur !== undefined && String(cur).trim() !== "";
+      const hasNew =
+        newVal !== null && newVal !== undefined && String(newVal).trim() !== "";
+
+      if (!hasCur && hasNew) {
+        patch[dbCol] = String(newVal).trim();
+      }
     };
 
     setIfEmpty("contact_name", vendor.contactName);
@@ -157,7 +219,9 @@ async function ensurePart(trx, line, meta = {}) {
   const incomingDescription = String(line.description || "").trim();
 
   const parsedUnitPrice =
-    line.unitPrice === null || line.unitPrice === undefined || line.unitPrice === ""
+    line.unitPrice === null ||
+    line.unitPrice === undefined ||
+    line.unitPrice === ""
       ? null
       : Number(line.unitPrice);
 
@@ -187,14 +251,11 @@ async function ensurePart(trx, line, meta = {}) {
 
     patch.last_po_number = meta.psrPoNumber || null;
     patch.last_vendor_id = meta.vendorId || null;
-    patch.last_po_date = meta.orderDate || null;
+    patch.last_po_date = meta.orderDate ? String(meta.orderDate) : null;
     patch.updated_at = trx.fn.now();
     patch.updated_on = trx.fn.now();
 
-    await trx("inventory")
-      .where({ part_id: existing.part_id })
-      .update(patch);
-
+    await trx("inventory").where({ part_id: existing.part_id }).update(patch);
     return existing.part_id;
   }
 
@@ -206,7 +267,7 @@ async function ensurePart(trx, line, meta = {}) {
     last_unit_price: hasValidUnitPrice ? parsedUnitPrice : 0,
     last_po_number: meta.psrPoNumber || null,
     last_vendor_id: meta.vendorId || null,
-    last_po_date: meta.orderDate || null,
+    last_po_date: meta.orderDate ? String(meta.orderDate) : null,
     status: "Active",
   };
 
@@ -217,12 +278,9 @@ async function ensurePart(trx, line, meta = {}) {
   return inserted.part_id;
 }
 
-/* ---------------- Shared fix: vendor/contact poisoning ---------------- */
-
 function sanitizeVendorContact(extracted) {
   if (!extracted) return extracted;
 
-  // 1) Move "Attn: X" out of vendor.contactName -> orderedBy
   if (extracted?.vendor?.contactName) {
     const cn = String(extracted.vendor.contactName).trim();
     const m = cn.match(/\battn\b[:\-]?\s*(.+)$/i);
@@ -232,7 +290,6 @@ function sanitizeVendorContact(extracted) {
     }
   }
 
-  // 2) McMaster: any person-like vendor contact is really PSR orderedBy
   if (String(extracted?.vendor?.name || "").toLowerCase().includes("mcmaster")) {
     const cn = String(extracted?.vendor?.contactName || "").trim();
     if (cn && cn.split(/\s+/).length >= 2) {
@@ -241,7 +298,6 @@ function sanitizeVendorContact(extracted) {
     }
   }
 
-  // 3) Quality: remove known PSR names from vendor contact
   if (String(extracted?.vendor?.name || "").toLowerCase().includes("quality")) {
     const cnLower = String(extracted?.vendor?.contactName || "").toLowerCase();
     if (cnLower.includes("shiney") || cnLower.includes("ramnarain")) {
@@ -253,11 +309,174 @@ function sanitizeVendorContact(extracted) {
   return extracted;
 }
 
+async function processImportedPo({
+  trx,
+  extracted,
+  uploaderName,
+  originalFilename,
+  originalFilePath,
+  originalMimeType,
+  originalSize,
+  extraFileToAttach = null,
+}) {
+  if (!extracted || !extracted.psrPoNumber) {
+    throw new Error("Invalid extraction: PO number missing");
+  }
+
+  sanitizeVendorContact(extracted);
+
+  const normalizedPoNumber = normalizePoNumberForMatch(extracted.psrPoNumber);
+  const normalizedOrderDate = normalizeDateOnly(extracted.orderDate);
+  const normalizedExpectedDeliveryDate = normalizeDateOnly(
+    extracted.expectedDeliveryDate
+  );
+
+  const existing = normalizedPoNumber
+    ? await trx("purchase_orders")
+        .whereRaw("upper(psr_po_number) = ?", [normalizedPoNumber])
+        .first()
+    : null;
+
+  let targetPoId = null;
+  let mode = "INSERT_NEW";
+
+  if (existing) {
+    if (String(existing.status || "").toLowerCase() === "reserved") {
+      targetPoId = existing.id;
+      mode = "UPDATE_RESERVED";
+    } else {
+      throw new Error(
+        `Duplicate PO number ${normalizedPoNumber} already exists (PO ID: ${existing.id}, status: ${existing.status}).`
+      );
+    }
+  }
+
+  const vendorId = await ensureVendor(trx, extracted.vendor);
+
+  const lineItems = [];
+  for (const li of extracted.items || []) {
+    const partId = await ensurePart(trx, li, {
+      psrPoNumber: normalizedPoNumber,
+      vendorId,
+      orderDate: normalizedOrderDate || null,
+    });
+    lineItems.push({ ...li, part_id: partId });
+  }
+
+  if (!lineItems.length) {
+    throw new Error("Could not extract line items from imported document");
+  }
+
+  let poRow;
+
+  if (mode === "UPDATE_RESERVED") {
+    const updated = await trx("purchase_orders")
+      .where({ id: targetPoId })
+      .update({
+        order_date: normalizedOrderDate
+          ? asBusinessTimestamp(trx, normalizedOrderDate)
+          : existing.order_date,
+        expected_delivery_date: normalizedExpectedDeliveryDate
+          ? asBusinessTimestamp(trx, normalizedExpectedDeliveryDate)
+          : null,
+        created_by: existing.created_by || extracted.orderedBy || uploaderName,
+        vendor_id: vendorId,
+        payment_terms: extracted.paymentTerms || null,
+        currency: extracted.currency || "USD",
+        remarks: extracted.remarks || "",
+        tax_percent: extracted.taxPercent ?? 0,
+        shipping_charges: extracted.shipping ?? 0,
+        subtotal: extracted.subtotal ?? 0,
+        tax_amount: extracted.taxAmount ?? 0,
+        grand_total: extracted.grandTotal ?? 0,
+        status: IMPORT_FINAL_STATUS,
+        updated_at: trx.fn.now(),
+      })
+      .returning(["id", "psr_po_number"]);
+
+    poRow = updated[0];
+    await trx("purchase_order_items").where({ po_id: targetPoId }).del();
+  } else {
+    const inserted = await trx("purchase_orders")
+      .insert({
+        psr_po_number: normalizedPoNumber,
+        order_date: normalizedOrderDate
+          ? asBusinessTimestamp(trx, normalizedOrderDate)
+          : null,
+        expected_delivery_date: normalizedExpectedDeliveryDate
+          ? asBusinessTimestamp(trx, normalizedExpectedDeliveryDate)
+          : null,
+        created_by: extracted.orderedBy || uploaderName,
+        vendor_id: vendorId,
+        payment_terms: extracted.paymentTerms || null,
+        currency: extracted.currency || "USD",
+        remarks: extracted.remarks || "",
+        tax_percent: extracted.taxPercent ?? 0,
+        shipping_charges: extracted.shipping ?? 0,
+        subtotal: extracted.subtotal ?? 0,
+        tax_amount: extracted.taxAmount ?? 0,
+        grand_total: extracted.grandTotal ?? 0,
+        status: IMPORT_FINAL_STATUS,
+      })
+      .returning(["id", "psr_po_number"]);
+
+    poRow = inserted[0];
+  }
+
+  const poId = poRow.id;
+
+  const itemsToInsert = lineItems.map((li, idx) => ({
+    po_id: poId,
+    line_no: idx + 1,
+    part_id: li.part_id,
+    quantity: String(li.quantity ?? 0),
+    unit_price: String(li.unitPrice ?? 0),
+    total_price: String(
+      li.totalPrice ?? (Number(li.quantity) || 0) * (Number(li.unitPrice) || 0)
+    ),
+    description: li.description || "",
+  }));
+
+  await trx("purchase_order_items").insert(itemsToInsert);
+
+  const storedFilename = path.basename(originalFilePath);
+  const relativePath = path.join(IMPORT_SUBFOLDER, storedFilename).replace(/\\/g, "/");
+
+  await trx("purchase_order_files").insert({
+    po_id: poId,
+    original_filename: originalFilename,
+    stored_filename: storedFilename,
+    filepath: `/uploads/${relativePath}`,
+    mime_type: originalMimeType,
+    size_bytes: originalSize,
+  });
+
+  if (extraFileToAttach) {
+    const extraStoredFilename = path.basename(extraFileToAttach.filePath);
+    const extraRelativePath = path
+      .join(IMPORT_SUBFOLDER, extraStoredFilename)
+      .replace(/\\/g, "/");
+
+    await trx("purchase_order_files").insert({
+      po_id: poId,
+      original_filename: extraFileToAttach.originalFilename,
+      stored_filename: extraStoredFilename,
+      filepath: `/uploads/${extraRelativePath}`,
+      mime_type: extraFileToAttach.mimeType,
+      size_bytes: extraFileToAttach.sizeBytes,
+    });
+  }
+
+  return {
+    po_id: poId,
+    psr_po_number: poRow.psr_po_number,
+    filename: originalFilename,
+    mode,
+  };
+}
+
 /* ---------------- Main import endpoints ---------------- */
 
-/**
- * PDF Import (KEEP AS-IS)
- */
 router.post("/pdf", upload.array("files", 10), async (req, res) => {
   if (!req.files || req.files.length === 0) {
     return res.status(400).json({ success: 0, message: "No PDF files uploaded" });
@@ -271,163 +490,34 @@ router.post("/pdf", upload.array("files", 10), async (req, res) => {
   try {
     for (const file of req.files) {
       try {
-        const filePath = file.path;
-   const extracted = await extractPoHybrid(filePath);
+        const extracted = await extractPoHybrid(file.path);
 
-console.log("=== PDF IMPORT DEBUG START ===");
-console.log("file:", file.originalname);
-console.log("extractionSource:", extracted?.extractionSource);
-console.log("psrPoNumber:", extracted?.psrPoNumber);
-console.log("vendor:", extracted?.vendor?.name);
-console.log("items length:", extracted?.items?.length || 0);
-console.log("items full:", JSON.stringify(extracted?.items || [], null, 2));
-console.log("=== PDF IMPORT DEBUG END ===");
+        console.log("RAW orderDate:", extracted?.orderDate);
+        console.log("RAW expectedDeliveryDate:", extracted?.expectedDeliveryDate);
+        console.log("orderDate typeof:", typeof extracted?.orderDate);
+        console.log(
+          "expectedDeliveryDate typeof:",
+          typeof extracted?.expectedDeliveryDate
+        );
+        console.log(
+          "orderDate instanceof Date:",
+          extracted?.orderDate instanceof Date,
+          extracted?.orderDate instanceof Date
+            ? extracted.orderDate.toISOString()
+            : null
+        );
 
-console.log("✅ Hybrid extraction source:", extracted?.extractionSource);
-console.log("✅ Hybrid PO:", extracted?.psrPoNumber);
-console.log("✅ Extracted item count:", extracted?.items?.length || 0);
-console.log(
-  "✅ Extracted items preview:",
-  (extracted?.items || []).map((x, i) => ({
-    line: i + 1,
-    partNumber: x.partNumber,
-    description: x.description,
-    quantity: x.quantity,
-    unitPrice: x.unitPrice,
-    totalPrice: x.totalPrice,
-  }))
-);
-
-        if (!extracted?.psrPoNumber) {
-          throw new Error("Could not detect PO number from PDF");
-        }
-
-        // ✅ Check existing PO by PO# (Reserved-aware)
- const normalizedPoNumber = normalizePoNumberForMatch(extracted.psrPoNumber);
-
-const existing = normalizedPoNumber
-  ? await trx("purchase_orders")
-      .whereRaw("upper(psr_po_number) = ?", [normalizedPoNumber])
-      .first()
-  : null;
-
-        let targetPoId = null;
-        let mode = "INSERT_NEW";
-
-        if (existing) {
-          if (String(existing.status || "").toLowerCase() === "reserved") {
-            targetPoId = existing.id;
-            mode = "UPDATE_RESERVED";
-          } else {
-            errors.push({
-              filename: file.originalname,
-              error: `Duplicate PO number ${extracted.psrPoNumber} already exists (PO ID: ${existing.id}, status: ${existing.status}). Skipped.`,
-            });
-            continue;
-          }
-        }
-
-        // ✅ run vendor sanitation BEFORE ensureVendor()
-        sanitizeVendorContact(extracted);
-
-        const vendorId = await ensureVendor(trx, extracted.vendor);
-
-const lineItems = [];
-for (const li of extracted.items || []) {
-  const partId = await ensurePart(trx, li, {
-psrPoNumber: normalizedPoNumber,
-    vendorId,
-    orderDate: extracted.orderDate || null,
-  });
-  lineItems.push({ ...li, part_id: partId });
-}
-
-        if (!lineItems.length) {
-          throw new Error("Could not extract line items from PDF");
-        }
-
-        let poRow;
-
-        if (mode === "UPDATE_RESERVED") {
-          const updated = await trx("purchase_orders")
-            .where({ id: targetPoId })
-            .update({
-              order_date: extracted.orderDate || existing.order_date,
-              expected_delivery_date: extracted.expectedDeliveryDate || null,
-              created_by: existing.created_by || extracted.orderedBy || uploaderName,
-              vendor_id: vendorId,
-              payment_terms: extracted.paymentTerms || null,
-              currency: extracted.currency || "USD",
-              remarks: extracted.remarks || "",
-              tax_percent: extracted.taxPercent ?? 0,
-              shipping_charges: extracted.shipping ?? 0,
-              subtotal: extracted.subtotal ?? 0,
-              tax_amount: extracted.taxAmount ?? 0,
-              grand_total: extracted.grandTotal ?? 0,
-              status: IMPORT_FINAL_STATUS,
-              updated_at: trx.fn.now(),
-            })
-            .returning(["id", "psr_po_number"]);
-
-          poRow = updated[0];
-          await trx("purchase_order_items").where({ po_id: targetPoId }).del();
-        } else {
-          const inserted = await trx("purchase_orders")
-            .insert({
-psr_po_number: normalizedPoNumber,
-              order_date: extracted.orderDate,
-              expected_delivery_date: extracted.expectedDeliveryDate,
-              created_by: extracted.orderedBy || uploaderName,
-              vendor_id: vendorId,
-              payment_terms: extracted.paymentTerms || null,
-              currency: extracted.currency || "USD",
-              remarks: extracted.remarks || "",
-              tax_percent: extracted.taxPercent ?? 0,
-              shipping_charges: extracted.shipping ?? 0,
-              subtotal: extracted.subtotal ?? 0,
-              tax_amount: extracted.taxAmount ?? 0,
-              grand_total: extracted.grandTotal ?? 0,
-              status: IMPORT_FINAL_STATUS,
-            })
-            .returning(["id", "psr_po_number"]);
-
-          poRow = inserted[0];
-        }
-
-        const poId = poRow.id;
-
-        const itemsToInsert = lineItems.map((li, idx) => ({
-          po_id: poId,
-          line_no: idx + 1,
-          part_id: li.part_id,
-          quantity: String(li.quantity ?? 0),
-          unit_price: String(li.unitPrice ?? 0),
-          total_price: String(
-            li.totalPrice ?? (Number(li.quantity) || 0) * (Number(li.unitPrice) || 0)
-          ),
-          description: li.description || "",
-        }));
-
-        await trx("purchase_order_items").insert(itemsToInsert);
-
-        const storedFilename = path.basename(file.path);
-        const relativePath = path.join(IMPORT_SUBFOLDER, storedFilename).replace(/\\/g, "/");
-
-        await trx("purchase_order_files").insert({
-          po_id: poId,
-          original_filename: file.originalname,
-          stored_filename: storedFilename,
-          filepath: `/uploads/${relativePath}`,
-          mime_type: file.mimetype,
-          size_bytes: file.size,
+        const result = await processImportedPo({
+          trx,
+          extracted,
+          uploaderName,
+          originalFilename: file.originalname,
+          originalFilePath: file.path,
+          originalMimeType: file.mimetype,
+          originalSize: file.size,
         });
 
-        created.push({
-          po_id: poId,
-          psr_po_number: poRow.psr_po_number,
-          filename: file.originalname,
-          mode,
-        });
+        created.push(result);
       } catch (err) {
         console.error("❌ PDF import failed for", file.originalname, err);
         errors.push({
@@ -442,7 +532,9 @@ psr_po_number: normalizedPoNumber,
 
       const allDup =
         errors.length > 0 &&
-        errors.every((e) => String(e.error || "").toLowerCase().includes("duplicate po number"));
+        errors.every((e) =>
+          String(e.error || "").toLowerCase().includes("duplicate po number")
+        );
 
       return res.status(allDup ? 409 : 400).json({
         success: 0,
@@ -466,9 +558,6 @@ psr_po_number: normalizedPoNumber,
   }
 });
 
-/**
- * Excel Import (UPDATED: Excel -> PDF -> Azure AI ONLY)
- */
 router.post("/excel", uploadExcel.array("files", 10), async (req, res) => {
   if (!req.files || req.files.length === 0) {
     return res.status(400).json({ success: 0, message: "No Excel files uploaded" });
@@ -477,176 +566,53 @@ router.post("/excel", uploadExcel.array("files", 10), async (req, res) => {
   const created = [];
   const errors = [];
   const uploaderName = req.user?.name || "Excel Import";
-
   const trx = await db.transaction();
 
   try {
     for (const file of req.files) {
       try {
         const excelPath = file.path;
-
-        // ✅ Convert Excel -> PDF (in same folder as the uploaded Excel file)
         const generatedPdfPath = await convertOfficeToPdf(excelPath);
 
-        // ✅ AI extract from the generated PDF (use 2 pages to be safe)
         const extracted = await extractPoWithAzureAi(generatedPdfPath, {
           pages: 2,
           debug: false,
         });
 
-        console.log("✅ Excel->PDF AI extraction source:", extracted?.extractionSource);
-        console.log("✅ Excel->PDF AI PO:", extracted?.psrPoNumber);
+        console.log("RAW orderDate:", extracted?.orderDate);
+        console.log("RAW expectedDeliveryDate:", extracted?.expectedDeliveryDate);
+        console.log("orderDate typeof:", typeof extracted?.orderDate);
+        console.log(
+          "expectedDeliveryDate typeof:",
+          typeof extracted?.expectedDeliveryDate
+        );
+        console.log(
+          "orderDate instanceof Date:",
+          extracted?.orderDate instanceof Date,
+          extracted?.orderDate instanceof Date
+            ? extracted.orderDate.toISOString()
+            : null
+        );
 
-        if (!extracted?.psrPoNumber) {
-          throw new Error("Could not detect PO number from Excel (AI)");
-        }
-
-        // ✅ run vendor sanitation BEFORE ensureVendor()
-        sanitizeVendorContact(extracted);
-
-        // Duplicate / Reserved-aware
-const normalizedPoNumber = normalizePoNumberForMatch(extracted.psrPoNumber);
-
-const existing = normalizedPoNumber
-  ? await trx("purchase_orders")
-      .whereRaw("upper(psr_po_number) = ?", [normalizedPoNumber])
-      .first()
-  : null;
-
-        let targetPoId = null;
-        let mode = "INSERT_NEW";
-
-        if (existing) {
-          if (String(existing.status || "").toLowerCase() === "reserved") {
-            targetPoId = existing.id;
-            mode = "UPDATE_RESERVED";
-          } else {
-            errors.push({
-              filename: file.originalname,
-              error: `Duplicate PO number ${extracted.psrPoNumber} already exists (PO ID: ${existing.id}, status: ${existing.status}). Skipped.`,
-            });
-            continue;
-          }
-        }
-
-        const vendorId = await ensureVendor(trx, extracted.vendor);
-
-const lineItems = [];
-for (const li of extracted.items || []) {
-  const partId = await ensurePart(trx, li, {
-psrPoNumber: normalizedPoNumber,
-    vendorId,
-    orderDate: extracted.orderDate || null,
-  });
-  lineItems.push({ ...li, part_id: partId });
-}
-
-        if (!lineItems.length) {
-          throw new Error("Could not extract line items from Excel (AI)");
-        }
-
-        let poRow;
-
-        if (mode === "UPDATE_RESERVED") {
-          const updated = await trx("purchase_orders")
-            .where({ id: targetPoId })
-            .update({
-              order_date: extracted.orderDate || existing.order_date,
-              expected_delivery_date: extracted.expectedDeliveryDate || null,
-              created_by: existing.created_by || extracted.orderedBy || uploaderName,
-              vendor_id: vendorId,
-              payment_terms: extracted.paymentTerms || null,
-              currency: extracted.currency || "USD",
-              remarks: extracted.remarks || "",
-              tax_percent: extracted.taxPercent ?? 0,
-              shipping_charges: extracted.shipping ?? 0,
-              subtotal: extracted.subtotal ?? 0,
-              tax_amount: extracted.taxAmount ?? 0,
-              grand_total: extracted.grandTotal ?? 0,
-              status: IMPORT_FINAL_STATUS,
-              updated_at: trx.fn.now(),
-            })
-            .returning(["id", "psr_po_number"]);
-
-          poRow = updated[0];
-          await trx("purchase_order_items").where({ po_id: targetPoId }).del();
-        } else {
-          const inserted = await trx("purchase_orders")
-            .insert({
-psr_po_number: normalizedPoNumber,
-              order_date: extracted.orderDate,
-              expected_delivery_date: extracted.expectedDeliveryDate,
-              created_by: extracted.orderedBy || uploaderName,
-              vendor_id: vendorId,
-              payment_terms: extracted.paymentTerms || null,
-              currency: extracted.currency || "USD",
-              remarks: extracted.remarks || "",
-              tax_percent: extracted.taxPercent ?? 0,
-              shipping_charges: extracted.shipping ?? 0,
-              subtotal: extracted.subtotal ?? 0,
-              tax_amount: extracted.taxAmount ?? 0,
-              grand_total: extracted.grandTotal ?? 0,
-              status: IMPORT_FINAL_STATUS,
-            })
-            .returning(["id", "psr_po_number"]);
-
-          poRow = inserted[0];
-        }
-
-        const poId = poRow.id;
-
-        const itemsToInsert = lineItems.map((li, idx) => ({
-          po_id: poId,
-          line_no: idx + 1,
-          part_id: li.part_id,
-          quantity: String(li.quantity ?? 0),
-          unit_price: String(li.unitPrice ?? 0),
-          total_price: String(
-            li.totalPrice ?? (Number(li.quantity) || 0) * (Number(li.unitPrice) || 0)
-          ),
-          description: li.description || "",
-        }));
-
-        await trx("purchase_order_items").insert(itemsToInsert);
-
-        // ✅ Attach ORIGINAL EXCEL
-        {
-          const storedFilename = path.basename(excelPath);
-          const relativePath = path.join(IMPORT_SUBFOLDER, storedFilename).replace(/\\/g, "/");
-
-          await trx("purchase_order_files").insert({
-            po_id: poId,
-            original_filename: file.originalname,
-            stored_filename: storedFilename,
-            filepath: `/uploads/${relativePath}`,
-            mime_type: file.mimetype,
-            size_bytes: file.size,
-          });
-        }
-
-        // ✅ Attach GENERATED PDF (helps debugging / proves what AI saw)
-        if (generatedPdfPath && fs.existsSync(generatedPdfPath)) {
-          const storedPdfFilename = path.basename(generatedPdfPath);
-          const relativePdfPath = path
-            .join(IMPORT_SUBFOLDER, storedPdfFilename)
-            .replace(/\\/g, "/");
-
-          await trx("purchase_order_files").insert({
-            po_id: poId,
-            original_filename: `${file.originalname}.pdf`,
-            stored_filename: storedPdfFilename,
-            filepath: `/uploads/${relativePdfPath}`,
-            mime_type: "application/pdf",
-            size_bytes: fs.statSync(generatedPdfPath).size,
-          });
-        }
-
-        created.push({
-          po_id: poId,
-          psr_po_number: poRow.psr_po_number,
-          filename: file.originalname,
-          mode,
+        const result = await processImportedPo({
+          trx,
+          extracted,
+          uploaderName,
+          originalFilename: file.originalname,
+          originalFilePath: excelPath,
+          originalMimeType: file.mimetype,
+          originalSize: file.size,
+          extraFileToAttach: generatedPdfPath && fs.existsSync(generatedPdfPath)
+            ? {
+                originalFilename: `${file.originalname}.pdf`,
+                filePath: generatedPdfPath,
+                mimeType: "application/pdf",
+                sizeBytes: fs.statSync(generatedPdfPath).size,
+              }
+            : null,
         });
+
+        created.push(result);
       } catch (err) {
         console.error("❌ Excel import failed for", file.originalname, err);
         errors.push({
@@ -661,7 +627,9 @@ psr_po_number: normalizedPoNumber,
 
       const allDup =
         errors.length > 0 &&
-        errors.every((e) => String(e.error || "").toLowerCase().includes("duplicate po number"));
+        errors.every((e) =>
+          String(e.error || "").toLowerCase().includes("duplicate po number")
+        );
 
       return res.status(allDup ? 409 : 400).json({
         success: 0,
