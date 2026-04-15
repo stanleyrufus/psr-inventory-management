@@ -181,10 +181,33 @@ const canEditParts = hasPermission("edit_parts");
     setExistingImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleFileChange = (e) => {
-    const files = Array.from(e.target.files || []);
-    setImageFiles(files);
-  };
+const handleRemoveNewImage = (index) => {
+  setImageFiles((prev) => prev.filter((_, i) => i !== index));
+};
+
+ const handleFileChange = (e) => {
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
+
+  setImageFiles((prev) => {
+    const combined = [...prev, ...files];
+
+    // de-duplicate by name + size + lastModified
+    return combined.filter(
+      (file, index, arr) =>
+        index ===
+        arr.findIndex(
+          (f) =>
+            f.name === file.name &&
+            f.size === file.size &&
+            f.lastModified === file.lastModified
+        )
+    );
+  });
+
+  // allow user to pick the same file again later if needed
+  e.target.value = "";
+};
 
   // ----------------------------------------------------
   // Submit handler
@@ -363,23 +386,32 @@ if (!canEditParts) {
         />
 
         {/* Previews of NEW images */}
-        {previewUrls.length > 0 && (
-          <>
-            <p className="text-xs text-gray-500 mt-2">
-              New images to upload (will be added):
-            </p>
-            <div className="flex gap-2 mt-1 flex-wrap">
-              {previewUrls.map((url, idx) => (
-                <img
-                  key={idx}
-                  src={url}
-                  alt={`new-${idx}`}
-                  className="w-20 h-20 object-cover rounded border"
-                />
-              ))}
-            </div>
-          </>
-        )}
+  {previewUrls.length > 0 && (
+  <>
+    <p className="text-xs text-gray-500 mt-2">
+      New images to upload (will be added):
+    </p>
+    <div className="flex gap-2 mt-1 flex-wrap">
+      {previewUrls.map((url, idx) => (
+        <div key={idx} className="relative inline-block">
+          <img
+            src={url}
+            alt={`new-${idx}`}
+            className="w-20 h-20 object-cover rounded border"
+          />
+          <button
+            type="button"
+            onClick={() => handleRemoveNewImage(idx)}
+            className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs shadow"
+            title="Remove this image"
+          >
+            ✖
+          </button>
+        </div>
+      ))}
+    </div>
+  </>
+)}
       </div>
 
       {/* Form fields */}
