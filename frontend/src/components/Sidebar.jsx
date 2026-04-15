@@ -51,16 +51,16 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-64 bg-psr-primary text-white flex flex-col h-screen overflow-hidden">
+<aside className="w-64 bg-psr-primary text-white flex flex-col h-screen overflow-hidden border-r border-white/10">
       <AdminToast
         show={showToast}
         onClose={() => setShowToast(false)}
         message={toastMessage}
       />
       {/* ⭐ REDUCED HEADER HEIGHT */}
-      <div className="px-5 py-4 border-b border-white/10 shrink-0">
-        <div className="text-lg font-bold">PSR Automation Inc.</div>
-      </div>
+<div className="px-5 py-4 border-b border-white/10 shrink-0">
+  <div className="text-lg font-bold">PSR Automation Inc.</div>
+</div>
 
       {/* NAV */}
       <nav className="p-4 space-y-1 flex-1 overflow-y-auto">

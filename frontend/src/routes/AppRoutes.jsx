@@ -1,3 +1,5 @@
+/* C:\Users\stanl\Documents\psr-inventory-management\frontend\src\routes\AppRoutes */
+
 import React, { useContext } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
@@ -53,47 +55,59 @@ export default function AppRoutes() {
     const { user, logout } = useContext(AuthContext);
 
     return (
-      <div className="flex h-screen bg-psr-sky overflow-hidden">
+<div className="flex h-screen overflow-hidden bg-psr-primary">
         <Sidebar />
 
-        <main className="flex-1 flex flex-col">
-          <header
-            className="
-              w-full
-              bg-blue-50
-              border-b border-white/10
-              px-6
-              py-3.5
-              flex
-              justify-between
-              items-center
-              shadow-sm
-            "
-          >
-            <div className="flex-1 text-center">
-              <h1
-                className="text-xl font-bold text-gray-700 tracking-wide"
-                style={{ fontFamily: "Times New Roman, serif" }}
-              >
-                Inventory & Purchase Order Management Portal
-              </h1>
-            </div>
+<main className="flex-1 flex flex-col min-w-0">
+<header
+  className="
+    w-full
+    bg-psr-primary
+    border-b border-white/10
+    px-6
+    py-3.5
+    flex
+    items-center
+    justify-between
+    shadow-sm
+  "
+>
+  {/* LEFT: Logo + Title */}
+  <div className="flex items-center gap-3">
+    
+    {/* Logo (same style as login) */}
+    <div className="h-9 w-16 flex items-center justify-center overflow-hidden rounded-md">
+      <img
+        src="/images/psr-logo.png"
+        alt="PSR Logo"
+        className="h-full w-full object-cover rounded-md shadow-[0_0_10px_rgba(59,130,246,0.4)]"
+      />
+    </div>
 
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-700 font-medium">
-                {user?.username} ({user?.role})
-              </span>
+    {/* Title */}
+    <h1 className="text-lg md:text-xl font-semibold text-white tracking-wide m-0">
+      Inventory &amp; Purchase Order Management Portal
+    </h1>
+  </div>
 
-              <button
-                onClick={logout}
-                className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded shadow"
-              >
-                Logout
-              </button>
-            </div>
-          </header>
+  {/* RIGHT: User + Logout */}
+  <div className="flex items-center gap-4">
+    <span className="text-sm text-white/90 font-medium whitespace-nowrap">
+      {user?.username} ({user?.role})
+    </span>
 
-          <div className="flex-1 pt-2 px-6 pb-6 overflow-y-auto">{children}</div>
+    <button
+      onClick={logout}
+      className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-sm rounded transition"
+    >
+      Logout
+    </button>
+  </div>
+</header>
+
+<div className="flex-1 pt-2 px-6 pb-6 overflow-y-auto bg-psr-sky">
+  {children}
+</div>
         </main>
       </div>
     );
