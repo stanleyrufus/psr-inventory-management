@@ -25,3 +25,6 @@ dist-ssr
 
 test-results/
 playwright-report/
+
+frontend/tests/
+frontend/test-results/
