@@ -23,10 +23,36 @@ test('PO Edit and Add Item flow', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/purchase-orders\/\d+$/i, { timeout: 15000 });
 
+  const detailUrl = page.url();
+  const poId = detailUrl.match(/\/purchase-orders\/(\d+)$/)?.[1];
+  console.log('DETAIL URL BEFORE EDIT =', detailUrl);
+  console.log('PO ID =', poId);
+
   await page.getByRole('button', { name: /edit/i }).click();
+  await expect(page).toHaveURL(/\/purchase-orders\/edit\/\d+$/i, { timeout: 15000 });
 
-  await page.waitForTimeout(2000);
+  await expect(page.getByText(/order items/i)).toBeVisible({ timeout: 15000 });
 
-  console.log('BUTTON TEXTS =', await page.getByRole('button').allInnerTexts());
-  console.log('BODY SNIPPET =', (await page.locator('body').innerText()).slice(0, 2500));
+  await page.getByRole('button', { name: /\+ add part/i }).click();
+
+  const searchPart = page.getByPlaceholder('Search part...').first();
+  await expect(searchPart).toBeVisible({ timeout: 15000 });
+  await searchPart.click();
+
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+
+  const numberInputs = page.locator('input[type="number"]');
+  await expect(numberInputs.nth(0)).toBeVisible();
+
+  await numberInputs.nth(0).fill('2');
+  await numberInputs.nth(1).fill('10');
+
+  const saveButton = page.getByRole('button', { name: /save|update/i }).first();
+  await saveButton.click();
+
+  await expect(page).toHaveURL(/\/purchase-orders$/i, { timeout: 15000 });
+  await expect(page.getByText(/purchase orders/i)).toBeVisible({ timeout: 15000 });
+
+  console.log('FINAL URL =', page.url());
 });
