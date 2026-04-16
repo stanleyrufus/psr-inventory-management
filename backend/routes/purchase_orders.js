@@ -10,6 +10,7 @@ import { makeSafeUploader } from "../middleware/uploads.js";
 import { createRequire } from "module";
 import { requirePermission } from "../middleware/auth.js";
 
+const BUSINESS_TIMEZONE = "America/New_York";
 // ---------------------------------------------
 // ---------------------------------------------
 // ---------------------------------------------
@@ -86,8 +87,20 @@ const __dirname = path.dirname(__filename);
 const normalizeDate = (d) => (d && String(d).trim() !== "" ? d : null);
 
 // ✅ Helper: system date in YYYY-MM-DD (server date)
-const systemDateYmd = () => new Date().toISOString().slice(0, 10);
+const systemDateYmd = () => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: BUSINESS_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
 
+  const yyyy = parts.find(p => p.type === "year").value;
+  const mm = parts.find(p => p.type === "month").value;
+  const dd = parts.find(p => p.type === "day").value;
+
+  return `${yyyy}-${mm}-${dd}`;
+};
 /**
  * ✅ Resolve uploader middleware safely
  *
@@ -492,19 +505,15 @@ router.post("/reserve", requirePermission("edit_purchase_orders"), async (req, r
       });
     }
 
-// ✅ vendor_id REQUIRED
-const vendorId = Number(body.vendor_id);
+    const vendorId = Number(body.vendor_id);
+    if (!vendorId || Number.isNaN(vendorId)) {
+      return res.status(400).json({
+        success: 0,
+        message: "vendor_id is required",
+      });
+    }
 
-if (!vendorId || Number.isNaN(vendorId)) {
-  return res.status(400).json({
-    success: 0,
-    message: "vendor_id is required",
-  });
-}
-    // ✅ system date (same rule you use elsewhere)
-    const orderDate = systemDateYmd();
-
-    // ✅ prevent duplicates
+    // prevent duplicates
     const exists = await db("purchase_orders")
       .where({ psr_po_number: psrPo })
       .first();
@@ -516,16 +525,21 @@ if (!vendorId || Number.isNaN(vendorId)) {
       });
     }
 
+    console.log("🔥 USING DB RAW DATE LOGIC - RESERVE");
+
     const inserted = await db("purchase_orders")
       .insert({
         psr_po_number: psrPo,
-        order_date: orderDate,
+
+    order_date: db.raw(`CURRENT_DATE`),
+
+        created_at: db.raw(`now()`),
+
         status: "Reserved",
         created_by: createdBy,
-        vendor_id: vendorId, // can be null
+        vendor_id: vendorId,
         remarks: body.remarks || null,
 
-        // safe defaults
         payment_method: null,
         payment_terms: null,
         currency: "USD",
@@ -541,13 +555,12 @@ if (!vendorId || Number.isNaN(vendorId)) {
       .returning(["id", "psr_po_number", "order_date", "status"]);
 
     return res.json({ success: 1, data: inserted[0] });
+
   } catch (err) {
     console.error("❌ RESERVE PO error:", err);
     return res.status(500).json({ success: 0, message: "Failed to reserve PO" });
   }
 });
-
-
 //
 // =====================================================
 // ✅ CREATE PO
@@ -669,15 +682,16 @@ if (
 
     // ✅ Transaction: PO + items together
     const result = await db.transaction(async (trx) => {
-      const inserted = await trx("purchase_orders")
-        .insert({
-          psr_po_number: psrPo,
-          order_date: orderDate,
-          expected_delivery_date: normalizeDate(body.expected_delivery_date),
+    const inserted = await trx("purchase_orders")
+  .insert({
+    psr_po_number: psrPo,
+order_date: db.raw(`CURRENT_DATE`),
+created_at: db.raw(`now()`),
+    expected_delivery_date: normalizeDate(body.expected_delivery_date),
 
-          // ✅ validated above
-          created_by: createdBy,
-          vendor_id: vendorId,
+    // ✅ validated above
+    created_by: createdBy,
+    vendor_id: vendorId,
 
                    payment_method: body.payment_method || null,
           payment_terms: body.payment_terms || null,
@@ -718,11 +732,10 @@ if (
 }));
       await trx("purchase_order_items").insert(rows);
 
-      return {
-        poId,
-        psr_po_number: inserted[0].psr_po_number,
-        order_date: orderDate,
-      };
+    return {
+  poId,
+  psr_po_number: inserted[0].psr_po_number,
+};
     });
 
     return res.json({

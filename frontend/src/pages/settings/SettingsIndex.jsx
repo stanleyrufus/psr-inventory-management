@@ -1,15 +1,5 @@
-// src/pages/settings/SettingsIndex.jsx
-
 import { useNavigate } from "react-router-dom";
-import { PageContainer, PageHeader, Card } from "../../components/ui";
 
-/**
- * SettingsIndex
- * Purpose:
- * - Main landing page for Settings
- * - Shows all settings sections as clickable cards
- * - Uses shared PSR design shell for consistent look and feel
- */
 export default function SettingsIndex() {
   const navigate = useNavigate();
 
@@ -42,12 +32,15 @@ export default function SettingsIndex() {
   ];
 
   return (
-    <PageContainer>
-      <PageHeader
-        title="Settings"
-        subtitle="Manage configuration, monitoring, access control, and administrative tools."
-      />
+    <div className="p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Settings</h1>
+        <p className="text-sm text-gray-500">
+          Manage configuration, monitoring, access control, and administrative tools.
+        </p>
+      </div>
 
+      {/* ✅ FIXED GRID WRAPPER */}
       <div
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
         role="list"
@@ -62,10 +55,7 @@ export default function SettingsIndex() {
             style={{ cursor: "pointer" }}
             aria-label={`Open ${section.title}`}
           >
-            <Card
-              className="h-full transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-              padding="lg"
-            >
+            <div className="bg-white rounded-lg p-4 shadow">
               <div className="psr-section-stack">
                 <div>
                   <h2
@@ -101,10 +91,10 @@ export default function SettingsIndex() {
                   Open section →
                 </div>
               </div>
-            </Card>
+            </div>
           </button>
         ))}
       </div>
-    </PageContainer>
+    </div>
   );
 }
