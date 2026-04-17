@@ -11,7 +11,9 @@ async function loadUserFromToken(req) {
   const authHeader = req.headers.authorization || req.headers.Authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return null;
+    const err = new Error("Missing bearer token");
+    err.code = "TOKEN_MISSING";
+    throw err;
   }
 
   const token = authHeader.split(" ")[1];
@@ -36,20 +38,48 @@ async function loadUserFromToken(req) {
 }
 
 /* ===========================================================
+   COMMON AUTH ERROR HANDLER
+=========================================================== */
+function handleAuthError(res, err) {
+  console.error("JWT auth error:", err?.name || "Error", err?.message || err);
+
+  if (err?.code === "TOKEN_MISSING") {
+    return res.status(401).json({
+      code: "TOKEN_MISSING",
+      message: "Not authenticated",
+    });
+  }
+
+  if (err?.name === "TokenExpiredError") {
+    return res.status(401).json({
+      code: "TOKEN_EXPIRED",
+      message: "Session expired. Please log in again.",
+    });
+  }
+
+  if (err?.name === "JsonWebTokenError") {
+    return res.status(401).json({
+      code: "TOKEN_INVALID",
+      message: "Invalid token",
+    });
+  }
+
+  return res.status(401).json({
+    code: "AUTH_FAILED",
+    message: "Authentication failed",
+  });
+}
+
+/* ===========================================================
    AUTHENTICATE JWT + ATTACH PERMISSIONS
 =========================================================== */
 export const authenticateJWT = async (req, res, next) => {
   try {
     const user = await loadUserFromToken(req);
-
-    if (!user) {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-
     req.user = user;
     next();
   } catch (err) {
-    return res.status(401).json({ message: "Invalid token" });
+    return handleAuthError(res, err);
   }
 };
 
@@ -61,9 +91,6 @@ export const requirePermission = (permName) => {
     try {
       if (!req.user) {
         const user = await loadUserFromToken(req);
-        if (!user) {
-          return res.status(401).json({ message: "Not authenticated" });
-        }
         req.user = user;
       }
 
@@ -78,13 +105,14 @@ export const requirePermission = (permName) => {
 
       if (!perms.includes(permName)) {
         return res.status(403).json({
+          code: "FORBIDDEN",
           message: `Forbidden: missing permission "${permName}"`,
         });
       }
 
       next();
     } catch (err) {
-      return res.status(401).json({ message: "Invalid token" });
+      return handleAuthError(res, err);
     }
   };
 };
@@ -96,19 +124,19 @@ export const requireAdmin = async (req, res, next) => {
   try {
     if (!req.user) {
       const user = await loadUserFromToken(req);
-      if (!user) {
-        return res.status(401).json({ message: "Not authenticated" });
-      }
       req.user = user;
     }
 
     const role = String(req.user.role || "").toLowerCase();
     if (role !== "admin") {
-      return res.status(403).json({ message: "Admin privileges required" });
+      return res.status(403).json({
+        code: "FORBIDDEN",
+        message: "Admin privileges required",
+      });
     }
 
     next();
   } catch (err) {
-    return res.status(401).json({ message: "Invalid token" });
+    return handleAuthError(res, err);
   }
 };
