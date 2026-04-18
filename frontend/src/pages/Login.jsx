@@ -10,6 +10,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [currentImage, setCurrentImage] = useState(0);
   const navigate = useNavigate();
+const [message, setMessage] = useState("");
 
   const bgImages = [
   "/images/filler.jpg",
@@ -24,6 +25,13 @@ export default function Login() {
     }, 6000);
     return () => clearInterval(interval);
   }, [bgImages.length]);
+
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("session") === "expired") {
+    setMessage("Session expired. Please log in again.");
+  }
+}, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -91,6 +99,12 @@ export default function Login() {
         >
           PSR Inventory & Purchase Order Management Portal
         </motion.h1>
+
+{message && (
+  <div className="mb-4 p-3 bg-yellow-100 text-yellow-800 rounded text-sm">
+    {message}
+  </div>
+)}
 
         {/* Form */}
         <motion.form

@@ -175,19 +175,39 @@ router.put("/:id", requirePermission("edit_vendors"), async (req, res) => {
 /** ✅ Delete vendor */
 router.delete("/:id", requirePermission("delete_vendors"), async (req, res) => {
   try {
-    const deleted = await db("vendors").where({ vendor_id: req.params.id }).del();
-    if (!deleted)
-      return res.status(404).json({ success: 0, message: "Vendor not found" });
+    const vendorId = req.params.id;
 
-    res.json({ success: 1, message: "✅ Vendor deleted successfully" });
+    // 🔴 BLOCK DELETE IF POs EXIST
+    const poExists = await db("purchase_orders")
+      .where({ vendor_id: vendorId })
+      .first();
+
+    if (poExists) {
+      return res.status(409).json({
+        success: 0,
+        message: "Cannot delete vendor. Linked purchase orders exist.",
+      });
+    }
+
+    const deleted = await db("vendors")
+      .where({ vendor_id: vendorId })
+      .del();
+
+    if (!deleted) {
+      return res.status(404).json({ success: 0, message: "Vendor not found" });
+    }
+
+    res.json({ success: 1, message: "Vendor deleted successfully" });
+
   } catch (err) {
     console.error("❌ Error deleting vendor:", err);
     res.status(500).json({
-      success: 0, message: "Error deleting vendor", error: err.message
+      success: 0,
+      message: "Error deleting vendor",
+      error: err.message
     });
   }
 });
-
 /** ✅ Bulk upload vendors */
 router.post("/bulk-upload", requirePermission("edit_vendors"), async (req, res) => {
   try {

@@ -1,4 +1,3 @@
-// frontend/src/utils/api.js
 import axios from "axios";
 
 // ✅ For Ubuntu/prod/pre-prod use VITE_API_URL=/api
@@ -17,6 +16,31 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+// 🔒 Auto-handle invalid / expired auth tokens
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const code = error?.response?.data?.code;
+
+    const shouldLogout =
+      status === 401 &&
+      ["TOKEN_MISSING", "TOKEN_EXPIRED", "TOKEN_INVALID", "AUTH_FAILED"].includes(code);
+
+    if (shouldLogout) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+
+      // avoid redirect loop if already on login
+      if (!window.location.pathname.includes("/login")) {
+window.location.href = "/login";
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
 /* --------------------------
    🧩 PARTS API
 --------------------------- */
@@ -28,9 +52,7 @@ export const fetchParts = async () => {
 export const createPart = async (data) => (await apiClient.post("/parts", data)).data;
 export const updatePart = async (id, data) => (await apiClient.put(`/parts/${id}`, data)).data;
 export const deletePart = async (id) => {
-  const token = localStorage.getItem("token");
-  const headers = token ? { Authorization: `Bearer ${token}` } : {};
-  return (await apiClient.delete(`/parts/${id}`, { headers })).data;
+  return (await apiClient.delete(`/parts/${id}`)).data;
 };
 export const bulkUploadParts = async (partsArray) =>
   (await apiClient.post("/parts/bulk-upload", { parts: partsArray })).data;
@@ -47,8 +69,13 @@ export const createProduct = async (data) => {
   try {
     return (await apiClient.post("/products", data)).data;
   } catch (err) {
-    if (err.response?.status === 409)
-      return { success: false, field: "product_code", message: "Product code already exists" };
+    if (err.response?.status === 409) {
+      return {
+        success: false,
+        field: "product_code",
+        message: "Product code already exists",
+      };
+    }
     throw err;
   }
 };
@@ -91,7 +118,6 @@ export const fetchPurchaseOrdersReport = async (params = {}) => {
   const res = await apiClient.get(`/purchase_orders_report${qs ? `?${qs}` : ""}`);
   return res.data?.data || [];
 };
-
 
 /* --------------------------
    🧩 VENDORS API
