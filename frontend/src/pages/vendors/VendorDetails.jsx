@@ -1,14 +1,35 @@
 // src/pages/vendors/VendorDetails.jsx
-import React, { useState } from "react";
-import { deleteVendor } from "../../utils/api";
+import React, { useState, useEffect } from "react";
+import { fetchVendorPurchaseOrders, deleteVendor } from "../../utils/api";
 import { hasPermission } from "../../utils/permissions";
 
 export default function VendorDetails({ vendor, onClose, onDeleted, onEdit }) {
   const [deleting, setDeleting] = useState(false);
+const [linkedPOs, setLinkedPOs] = useState([]);
+const [poLoading, setPoLoading] = useState(false);
   const canEditVendors = hasPermission("edit_vendors");
   const canDeleteVendors = hasPermission("delete_vendors");
 
   if (!vendor) return null;
+
+useEffect(() => {
+  const loadPOs = async () => {
+    try {
+      setPoLoading(true);
+      const res = await fetchVendorPurchaseOrders(vendor.vendor_id);
+      setLinkedPOs(res?.data || []);
+    } catch (err) {
+      console.error("❌ Error loading vendor POs:", err);
+      setLinkedPOs([]);
+    } finally {
+      setPoLoading(false);
+    }
+  };
+
+  if (vendor?.vendor_id) {
+    loadPOs();
+  }
+}, [vendor]);
 
   const handleDelete = async () => {
     if (deleting) return;
@@ -139,6 +160,59 @@ export default function VendorDetails({ vendor, onClose, onDeleted, onEdit }) {
             {vendor.remarks || "—"}
           </p>
         </div>
+
+{/* Linked Purchase Orders */}
+<div className="mt-6 border-t pt-4">
+  <h3 className="font-medium text-gray-800 mb-2">
+    Linked Purchase Orders
+  </h3>
+
+  {poLoading ? (
+    <p className="text-sm text-gray-500">Loading...</p>
+  ) : linkedPOs.length === 0 ? (
+    <p className="text-sm text-gray-500">No purchase orders found.</p>
+  ) : (
+    <div className="max-h-40 overflow-y-auto border rounded">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="p-2 text-left">PO #</th>
+<th className="p-2 text-left">Status</th>
+<th className="p-2 text-left">Order Date</th>
+<th className="p-2 text-left">Total</th>
+<th className="p-2 text-left">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+  {linkedPOs.map((po) => (
+    <tr key={po.id} className="border-t">
+      <td className="p-2">{po.psr_po_number}</td>
+
+      <td className="p-2">{po.status}</td>
+
+      <td className="p-2">
+        {po.order_date
+          ? new Date(po.order_date).toLocaleDateString()
+          : "—"}
+      </td>
+
+      <td className="p-2">{po.grand_total}</td>
+
+      <td className="p-2">
+        <button
+          className="text-blue-600 hover:underline"
+          onClick={() => window.location.href = `/purchase-orders/${po.id}`}
+        >
+          View
+        </button>
+      </td>
+    </tr>
+  ))}
+</tbody>
+      </table>
+    </div>
+  )}
+</div>
 
         {/* Actions */}
         <div className="flex justify-end gap-3 mt-6 border-t pt-4">

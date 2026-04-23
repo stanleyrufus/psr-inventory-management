@@ -78,6 +78,11 @@ function normalizePoNumberForMatch(value) {
 
   const compact = raw.replace(/\s+/g, "");
 
+  // Reject plain year-like values such as 2026
+  if (/^\d{4}$/.test(compact)) {
+    return "";
+  }
+
   // 260413-02 -> PO260413-02
   if (/^\d{6}-\d+$/.test(compact)) {
     return `PO${compact}`;
@@ -211,10 +216,55 @@ async function ensureVendor(trx, vendor) {
   return inserted.vendor_id;
 }
 
-async function ensurePart(trx, line, meta = {}) {
-  if (!line.partNumber) throw new Error("Line item missing partNumber");
+function isChargeOnlyLine(line) {
+  const desc = String(line?.description || "").toLowerCase().trim();
+  const partNumber = String(line?.partNumber || "").toLowerCase().trim();
+  const partName = String(line?.partName || "").toLowerCase().trim();
 
-  const pn = String(line.partNumber || "").trim();
+  const text = `${partNumber} ${partName} ${desc}`;
+
+  return (
+    text.includes("freight") ||
+    text.includes("shipping") ||
+    text.includes("ship-freight") ||
+    text.includes("ups express") ||
+    text.includes("ddp")
+  );
+}
+
+function derivePartNumber(line) {
+  console.log("🔎 derivePartNumber input:", JSON.stringify(line, null, 2));
+
+  const rawPartNumber = String(line?.partNumber || "").trim();
+  if (rawPartNumber) return rawPartNumber;
+  const desc = String(line?.description || "").trim();
+  if (!desc) return "";
+
+  const match = desc.match(
+    /\b([A-Z0-9]+(?:[-+][A-Z0-9]+)+|[A-Z]{2,}\d[A-Z0-9-+]*)\b/i
+  );
+
+  if (match?.[1]) {
+    return match[1].trim().toUpperCase();
+  }
+
+  return "";
+}
+
+function normalizePartNumber(value) {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+async function ensurePart(trx, line, meta = {}) {
+  const pn = derivePartNumber(line);
+if (!pn) {
+  const err = new Error("Line item missing partNumber");
+  err.debugLine = line;
+  throw err;
+}
+  const normalizedPn = normalizePartNumber(pn);
   const incomingPartName = String(line.partName || line.description || "").trim();
   const incomingDescription = String(line.description || "").trim();
 
@@ -228,7 +278,16 @@ async function ensurePart(trx, line, meta = {}) {
   const hasValidUnitPrice =
     parsedUnitPrice !== null && !Number.isNaN(parsedUnitPrice);
 
-  const existing = await trx("inventory").where({ part_number: pn }).first();
+  let existing = await trx("inventory").where({ part_number: pn }).first();
+
+  if (!existing && normalizedPn) {
+    existing = await trx("inventory")
+      .whereRaw(
+        "regexp_replace(upper(part_number), '[^A-Z0-9]', '', 'g') = ?",
+        [normalizedPn]
+      )
+      .first();
+  }
 
   if (existing) {
     const patch = {};
@@ -278,6 +337,7 @@ async function ensurePart(trx, line, meta = {}) {
   return inserted.part_id;
 }
 
+
 function sanitizeVendorContact(extracted) {
   if (!extracted) return extracted;
 
@@ -326,6 +386,14 @@ async function processImportedPo({
   sanitizeVendorContact(extracted);
 
   const normalizedPoNumber = normalizePoNumberForMatch(extracted.psrPoNumber);
+
+// 🔍 ADD THESE TWO LINES HERE
+console.log("🟨 Extracted raw PO:", extracted?.psrPoNumber);
+console.log("🟨 Normalized PO:", normalizedPoNumber);
+
+if (!normalizedPoNumber) {
+  throw new Error("Invalid extraction: PO number missing or malformed");
+}
   const normalizedOrderDate = normalizeDateOnly(extracted.orderDate);
   const normalizedExpectedDeliveryDate = normalizeDateOnly(
     extracted.expectedDeliveryDate
@@ -353,15 +421,27 @@ async function processImportedPo({
 
   const vendorId = await ensureVendor(trx, extracted.vendor);
 
-  const lineItems = [];
-  for (const li of extracted.items || []) {
-    const partId = await ensurePart(trx, li, {
-      psrPoNumber: normalizedPoNumber,
-      vendorId,
-      orderDate: normalizedOrderDate || null,
-    });
-    lineItems.push({ ...li, part_id: partId });
+const lineItems = [];
+for (const li of extracted.items || []) {
+  if (isChargeOnlyLine(li)) {
+    continue;
   }
+
+console.log("🧾 Raw imported line before mapping:", JSON.stringify(li, null, 2));
+
+const normalizedLi = {
+  ...li,
+  partNumber: derivePartNumber(li),
+};
+
+  const partId = await ensurePart(trx, normalizedLi, {
+    psrPoNumber: normalizedPoNumber,
+    vendorId,
+    orderDate: normalizedOrderDate || null,
+  });
+
+  lineItems.push({ ...normalizedLi, part_id: partId });
+}
 
   if (!lineItems.length) {
     throw new Error("Could not extract line items from imported document");

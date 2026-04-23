@@ -119,6 +119,13 @@ export const fetchPurchaseOrdersReport = async (params = {}) => {
   return res.data?.data || [];
 };
 
+export const fetchVendorPartsLatestReport = async (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  const res = await apiClient.get(
+    `/purchase_orders_report/vendor-parts-latest${qs ? `?${qs}` : ""}`
+  );
+  return res.data?.data || [];
+};
 /* --------------------------
    🧩 VENDORS API
 --------------------------- */
@@ -132,6 +139,9 @@ export const updateVendor = async (id, data) => (await apiClient.put(`/vendors/$
 export const deleteVendor = async (id) => (await apiClient.delete(`/vendors/${id}`)).data;
 export const bulkUploadVendors = async (vendorsArray) =>
   (await apiClient.post("/vendors/bulk-upload", { vendors: vendorsArray })).data;
+
+export const fetchVendorPurchaseOrders = async (vendorId) =>
+  (await apiClient.get(`/vendors/${vendorId}/purchase-orders`)).data;
 
 const api = apiClient;
 
@@ -160,6 +170,8 @@ api.createVendor = createVendor;
 api.updateVendor = updateVendor;
 api.deleteVendor = deleteVendor;
 api.bulkUploadVendors = bulkUploadVendors;
+api.fetchVendorPurchaseOrders = fetchVendorPurchaseOrders;
+api.fetchVendorPartsLatestReport = fetchVendorPartsLatestReport;
 
 export const apiRaw = apiClient;
 export default api;

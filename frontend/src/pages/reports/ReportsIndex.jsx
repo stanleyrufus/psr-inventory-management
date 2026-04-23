@@ -20,6 +20,12 @@ export default function ReportsIndex() {
       description: "Summarized total spend, PO count, and last order by vendor",
       path: "/reports/vendor-summary",
     },
+
+{
+  title: "Vendor Parts Latest Report",
+  description: "Show latest purchased part details for each vendor, with latest PO, qty, and price",
+  path: "/reports/vendor-parts-latest",
+},
     {
       title: "Part Purchase Summary",
       description: "Summarized purchase totals by part with quantities and spend",

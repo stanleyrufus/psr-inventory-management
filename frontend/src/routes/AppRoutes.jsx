@@ -2,6 +2,7 @@
 
 import React, { useContext } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import VendorPartsLatestReport from "../pages/reports/VendorPartsLatestReport";
 
 import DashboardPage from "../pages/DashboardPage";
 import ProductsPage from "../pages/ProductsPage";
@@ -307,6 +308,11 @@ export default function AppRoutes() {
       </PrivateLayout>
     </AdminRoute>
   )}
+/>
+
+<Route
+  path="/reports/vendor-parts-latest"
+  element={<VendorPartsLatestReport />}
 />
      <Route
   path="/reports/vendor-summary"
