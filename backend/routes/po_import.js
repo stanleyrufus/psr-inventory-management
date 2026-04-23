@@ -233,9 +233,10 @@ function isChargeOnlyLine(line) {
 }
 
 function derivePartNumber(line) {
+  console.log("🔎 derivePartNumber input:", JSON.stringify(line, null, 2));
+
   const rawPartNumber = String(line?.partNumber || "").trim();
   if (rawPartNumber) return rawPartNumber;
-
   const desc = String(line?.description || "").trim();
   if (!desc) return "";
 
@@ -258,8 +259,11 @@ function normalizePartNumber(value) {
 
 async function ensurePart(trx, line, meta = {}) {
   const pn = derivePartNumber(line);
-  if (!pn) throw new Error("Line item missing partNumber");
-
+if (!pn) {
+  const err = new Error("Line item missing partNumber");
+  err.debugLine = line;
+  throw err;
+}
   const normalizedPn = normalizePartNumber(pn);
   const incomingPartName = String(line.partName || line.description || "").trim();
   const incomingDescription = String(line.description || "").trim();
@@ -423,10 +427,12 @@ for (const li of extracted.items || []) {
     continue;
   }
 
-  const normalizedLi = {
-    ...li,
-    partNumber: derivePartNumber(li),
-  };
+console.log("🧾 Raw imported line before mapping:", JSON.stringify(li, null, 2));
+
+const normalizedLi = {
+  ...li,
+  partNumber: derivePartNumber(li),
+};
 
   const partId = await ensurePart(trx, normalizedLi, {
     psrPoNumber: normalizedPoNumber,
