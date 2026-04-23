@@ -106,6 +106,29 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.get("/:id/purchase-orders", async (req, res) => {
+  const vendorId = Number(req.params.id);
+
+  try {
+    const pos = await db("purchase_orders as po")
+      .where("po.vendor_id", vendorId)
+      .select(
+        "po.id",
+        "po.psr_po_number",
+        "po.status",
+        "po.order_date",
+        "po.grand_total",
+        "po.created_by"
+      )
+      .orderBy("po.id", "desc");
+
+    res.json({ success: true, data: pos });
+  } catch (err) {
+    console.error("❌ Vendor PO lookup error:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch vendor-linked POs" });
+  }
+});
+
 /** ✅ Get single vendor */
 router.get("/:id", async (req, res) => {
   try {

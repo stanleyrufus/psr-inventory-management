@@ -88,47 +88,81 @@ function looksValid(r) {
   return true;
 }
 
+function isRateLimitError(err) {
+  const status =
+    err?.response?.status ||
+    err?.status ||
+    err?.cause?.status ||
+    null;
+
+  const msg = String(err?.message || "").toLowerCase();
+
+  return status === 429 || msg.includes("429");
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /* ---------------- AI-FIRST extractor ---------------- */
 
 export async function extractPoHybrid(filePath) {
-  try {
-    const MAX_PAGES = Number(process.env.PO_IMPORT_MAX_PAGES || 4);
+  const MAX_PAGES = Number(process.env.PO_IMPORT_MAX_PAGES || 4);
+  const MAX_AI_RETRIES = Number(process.env.PO_IMPORT_AI_RETRIES || 3);
 
-    const ai = await extractAi(filePath, {
-      pages: MAX_PAGES,
-      debug: false,
-    });
+  let lastAiError = null;
 
-    console.log("🟦 AI pages used:", MAX_PAGES);
-    console.log("🟦 AI PO:", ai?.psrPoNumber);
-    console.log("🟦 AI vendor:", ai?.vendor?.name);
-    console.log("🟦 AI item count before sanitize:", ai?.items?.length || 0);
+  for (let attempt = 1; attempt <= MAX_AI_RETRIES; attempt++) {
+    try {
+      const ai = await extractAi(filePath, {
+        pages: MAX_PAGES,
+        debug: false,
+      });
 
-    sanitizeAttn(ai);
-    normalizeTotals(ai);
+      console.log("🟦 AI pages used:", MAX_PAGES);
+      console.log("🟦 AI PO:", ai?.psrPoNumber);
+      console.log("🟦 AI vendor:", ai?.vendor?.name);
+      console.log("🟦 AI item count before sanitize:", ai?.items?.length || 0);
 
-    console.log("🟦 AI item count after sanitize:", ai?.items?.length || 0);
-    console.log(
-      "🟦 AI items preview:",
-      (ai?.items || []).map((x, i) => ({
-        line: i + 1,
-        partNumber: x.partNumber,
-        description: x.description,
-        quantity: x.quantity,
-        unitPrice: x.unitPrice,
-        totalPrice: x.totalPrice,
-      }))
-    );
+      sanitizeAttn(ai);
+      normalizeTotals(ai);
 
-    if (looksValid(ai)) {
-      ai.extractionSource = "azure-ai";
-      ai.remarks = ai.remarks || "";
-      return ai;
+      console.log("🟦 AI item count after sanitize:", ai?.items?.length || 0);
+      console.log(
+        "🟦 AI items preview:",
+        (ai?.items || []).map((x, i) => ({
+          line: i + 1,
+          partNumber: x.partNumber,
+          description: x.description,
+          quantity: x.quantity,
+          unitPrice: x.unitPrice,
+          totalPrice: x.totalPrice,
+        }))
+      );
+
+      if (looksValid(ai) && !hasTooManyDuplicateItems(ai.items || [])) {
+        ai.extractionSource = "azure-ai";
+        ai.remarks = ai.remarks || "";
+        return ai;
+      }
+
+      console.log("🟨 AI output invalid or suspicious, falling back to classic");
+      break;
+    } catch (e) {
+      lastAiError = e;
+
+      if (isRateLimitError(e) && attempt < MAX_AI_RETRIES) {
+        const delayMs = attempt * 2000;
+        console.log(
+          `🟧 AI rate-limited (attempt ${attempt}/${MAX_AI_RETRIES}). Retrying in ${delayMs}ms...`
+        );
+        await sleep(delayMs);
+        continue;
+      }
+
+      console.log("🟥 AI extractor failed, falling back to classic:", e.message);
+      break;
     }
-
-    console.log("🟨 AI output invalid or suspicious, falling back to classic");
-  } catch (e) {
-    console.log("🟥 AI extractor failed, falling back to classic:", e.message);
   }
 
   const classic = await extractClassic(filePath);
@@ -155,6 +189,15 @@ export async function extractPoHybrid(filePath) {
 
   classic.extractionSource = classic.extractionSource || "classic";
   classic.remarks = classic.remarks || "";
+
+  if (lastAiError) {
+    classic.remarks = [
+      classic.remarks,
+      `AI fallback reason: ${lastAiError.message || "Unknown AI error"}`,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+  }
 
   return classic;
 }
