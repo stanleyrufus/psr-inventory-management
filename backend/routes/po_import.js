@@ -78,6 +78,11 @@ function normalizePoNumberForMatch(value) {
 
   const compact = raw.replace(/\s+/g, "");
 
+  // Reject plain year-like values such as 2026
+  if (/^\d{4}$/.test(compact)) {
+    return "";
+  }
+
   // 260413-02 -> PO260413-02
   if (/^\d{6}-\d+$/.test(compact)) {
     return `PO${compact}`;
@@ -377,6 +382,14 @@ async function processImportedPo({
   sanitizeVendorContact(extracted);
 
   const normalizedPoNumber = normalizePoNumberForMatch(extracted.psrPoNumber);
+
+// 🔍 ADD THESE TWO LINES HERE
+console.log("🟨 Extracted raw PO:", extracted?.psrPoNumber);
+console.log("🟨 Normalized PO:", normalizedPoNumber);
+
+if (!normalizedPoNumber) {
+  throw new Error("Invalid extraction: PO number missing or malformed");
+}
   const normalizedOrderDate = normalizeDateOnly(extracted.orderDate);
   const normalizedExpectedDeliveryDate = normalizeDateOnly(
     extracted.expectedDeliveryDate
