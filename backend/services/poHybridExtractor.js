@@ -140,8 +140,7 @@ export async function extractPoHybrid(filePath) {
         }))
       );
 
-      if (looksValid(ai) && !hasTooManyDuplicateItems(ai.items || [])) {
-        ai.extractionSource = "azure-ai";
+if (looksValid(ai)) {        ai.extractionSource = "azure-ai";
         ai.remarks = ai.remarks || "";
         return ai;
       }
