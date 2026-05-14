@@ -7,6 +7,7 @@ import { db } from "../db.js";
 
 import { extractPoHybrid } from "../services/poHybridExtractor.js";
 import { extractPoWithAzureAi } from "../services/poAzureAiExtractor.js";
+import { extractPoFromExcel } from "../services/poExcelExtractor.js";
 import { convertOfficeToPdf } from "../utils/officeToPdf.js";
 
 const router = express.Router();
@@ -233,7 +234,6 @@ function isChargeOnlyLine(line) {
 }
 
 function derivePartNumber(line) {
-  console.log("🔎 derivePartNumber input:", JSON.stringify(line, null, 2));
 
   const rawPartNumber = String(line?.partNumber || "").trim();
   if (rawPartNumber) return rawPartNumber;
@@ -369,6 +369,43 @@ function sanitizeVendorContact(extracted) {
   return extracted;
 }
 
+
+async function applyKnownVendorAlias(trx, extracted) {
+  if (!extracted?.vendor) return;
+
+  const currentVendor = String(extracted.vendor.name || "").trim();
+  const text = [
+    extracted.vendor.name,
+    extracted.vendor.phone,
+    extracted.vendor.city,
+    extracted.vendor.state,
+    extracted.vendor.country,
+    extracted.remarks,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const looksLikeBadVendor =
+    /^phone\s*:/i.test(currentVendor) ||
+    /\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}/.test(currentVendor) ||
+    /^\d+\s+/.test(currentVendor) ||
+    /^[A-Za-z .'-]+,\s*[A-Z]{2}\s*\d{5}/.test(currentVendor) ||
+    currentVendor.toLowerCase().includes("unknown");
+
+  const looksLikeLincoln =
+    text.includes("owatonna") ||
+    text.includes("507") ||
+    text.includes("lincoln");
+
+  if (!looksLikeBadVendor || !looksLikeLincoln) return;
+
+  const existing = await trx("vendors")
+    .where("vendor_name", "ilike", "%lincoln%")
+    .first();
+
+  extracted.vendor.name = existing?.vendor_name || "Lincoln Suppliers Inc";
+}
 async function processImportedPo({
   trx,
   extracted,
@@ -384,8 +421,9 @@ async function processImportedPo({
   }
 
   sanitizeVendorContact(extracted);
+await applyKnownVendorAlias(trx, extracted);
 
-  const normalizedPoNumber = normalizePoNumberForMatch(extracted.psrPoNumber);
+const normalizedPoNumber = normalizePoNumberForMatch(extracted.psrPoNumber);
 
 // 🔍 ADD THESE TWO LINES HERE
 console.log("🟨 Extracted raw PO:", extracted?.psrPoNumber);
@@ -427,7 +465,6 @@ for (const li of extracted.items || []) {
     continue;
   }
 
-console.log("🧾 Raw imported line before mapping:", JSON.stringify(li, null, 2));
 
 const normalizedLi = {
   ...li,
@@ -598,13 +635,14 @@ router.post("/pdf", upload.array("files", 10), async (req, res) => {
         });
 
         created.push(result);
-      } catch (err) {
-        console.error("❌ PDF import failed for", file.originalname, err);
-        errors.push({
-          filename: file.originalname,
-          error: err.message || "Unknown error",
-        });
-      }
+} catch (err) {
+  console.error("❌ PDF import failed for", file.originalname, err);
+  errors.push({
+    filename: file.originalname,
+    error: err.message || "Unknown error",
+    debug_line: err.debugLine || null,
+  });
+}
     }
 
     if (!created.length) {
@@ -651,13 +689,30 @@ router.post("/excel", uploadExcel.array("files", 10), async (req, res) => {
   try {
     for (const file of req.files) {
       try {
-        const excelPath = file.path;
-        const generatedPdfPath = await convertOfficeToPdf(excelPath);
+       const excelPath = file.path;
 
-        const extracted = await extractPoWithAzureAi(generatedPdfPath, {
-          pages: 2,
-          debug: false,
-        });
+let extracted;
+let generatedPdfPath = null;
+
+try {
+  extracted = await extractPoFromExcel(excelPath);
+
+  console.log("🟩 Excel extractor PO:", extracted?.psrPoNumber);
+  console.log("🟩 Excel extractor vendor:", extracted?.vendor?.name);
+  console.log("🟩 Excel extractor items:", extracted?.items?.length || 0);
+} catch (excelErr) {
+  console.log(
+    "🟨 Local Excel extraction failed, falling back to Azure AI:",
+    excelErr.message
+  );
+
+  generatedPdfPath = await convertOfficeToPdf(excelPath);
+
+  extracted = await extractPoWithAzureAi(generatedPdfPath, {
+    pages: 2,
+    debug: false,
+  });
+}
 
         console.log("RAW orderDate:", extracted?.orderDate);
         console.log("RAW expectedDeliveryDate:", extracted?.expectedDeliveryDate);
@@ -694,12 +749,13 @@ router.post("/excel", uploadExcel.array("files", 10), async (req, res) => {
 
         created.push(result);
       } catch (err) {
-        console.error("❌ Excel import failed for", file.originalname, err);
-        errors.push({
-          filename: file.originalname,
-          error: err.message || "Unknown error",
-        });
-      }
+  console.error("❌ Excel import failed for", file.originalname, err);
+  errors.push({
+    filename: file.originalname,
+    error: err.message || "Unknown error",
+    debug_line: err.debugLine || null,
+  });
+}
     }
 
     if (!created.length) {

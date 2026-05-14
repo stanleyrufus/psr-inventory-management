@@ -58,60 +58,36 @@ function sheetToMatrix(ws) {
 /* ---------------- PO number detection ---------------- */
 
 function findPoNumber(matrix) {
-  // Prefer label-based if present
-  const labelCandidates = [
-    "customer p.o. #",
-    "customer po #",
-    "po #",
-    "p.o. #",
-    "purchase order #",
-    "purchase order no",
-    "po number",
-    "po no",
-  ];
+  const scorePo = (val) => {
+    const t = s(val).replace(/\s+/g, "").toUpperCase();
 
-  // 1) label-based: if a cell equals label, take right cell
-  for (let r = 0; r < matrix.length; r++) {
-    for (let c = 0; c < (matrix[r] || []).length; c++) {
-      const cell = normKey(matrix[r][c]);
-      if (!cell) continue;
+    if (/^PO\d{6}-\d{2}$/.test(t)) return 120;
+    if (/^PO\d{8}-\d{4}$/.test(t)) return 110;
+    if (/^PSR-?\d{8}-\d{4}$/.test(t)) return 100;
+    if (/^105\d{3,6}$/.test(t)) return 70;
+    if (/^\d{5,7}$/.test(t)) return 5;
 
-      if (labelCandidates.includes(cell)) {
-        const v = s(matrix[r][c + 1]);
-        if (v) return v;
-      }
-    }
-  }
-
-  // 2) scan-based: find best-looking PO number anywhere
-  // Prefer formats like PO20260214-0001, else PSR-like numeric 5-7 digits (105xxx...)
-  let best = null;
-
-  const score = (val) => {
-    const t = s(val);
-
-    if (/^PO\d{8}-\d{4}$/i.test(t)) return 100;
-    if (/^PSR-?\d{8}-\d{4}$/i.test(t)) return 95;
-    if (/^105\d{3,6}$/.test(t)) return 90; // your PSR manual range
-    if (/^\d{5,7}$/.test(t)) return 70;    // generic PO-like
     return 0;
   };
+
+  let best = null;
 
   for (let r = 0; r < matrix.length; r++) {
     for (let c = 0; c < (matrix[r] || []).length; c++) {
       const v = s(matrix[r][c]);
       if (!v) continue;
 
-      const sc = score(v);
+      const sc = scorePo(v);
       if (sc <= 0) continue;
 
-      if (!best || sc > best.sc) best = { v, sc };
+      if (!best || sc > best.sc) {
+        best = { v: v.replace(/\s+/g, ""), sc };
+      }
     }
   }
 
   return best?.v || null;
 }
-
 /* ---------------- Vendor detection ---------------- */
 
 function looksLikeVendorName(val) {
@@ -119,6 +95,8 @@ function looksLikeVendorName(val) {
   if (!t) return false;
   if (t.length < 2) return false;
   if (t.length > 80) return false;
+
+  const low = t.toLowerCase();
 
   const bad = [
     "quantity",
@@ -142,18 +120,26 @@ function looksLikeVendorName(val) {
     "amount due",
     "freight",
     "shipping",
-    "vendor", // label word itself
+    "vendor",
   ];
 
-  const low = t.toLowerCase();
   if (bad.some((b) => low === b || low.includes(b))) return false;
 
-  // must contain at least one letter
-  if (!/[A-Za-z]/.test(t)) return false;
+ // reject address-looking rows like "1225 12th Ave. NW"
+if (/^\d+\s+/.test(t) && /\b(ave|avenue|st|street|rd|road|dr|drive|cir|circle|ln|lane|nw|ne|sw|se)\b/i.test(t)) {
+  return false;
+}
+
+// reject phone/contact rows
+if (/phone\s*:/i.test(t)) return false;
+if (/\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}/.test(t)) {
+  return false;
+}
+
+if (!/[A-Za-z]/.test(t)) return false;
 
   return true;
 }
-
 function findVendorName(matrix) {
   // label-based (best)
   const vendorLabels = ["vendor", "supplier", "sold by", "from"];
@@ -245,6 +231,19 @@ function pickColumn(m, keys) {
   return undefined;
 }
 
+function derivePartNumberFromDescription(desc) {
+  const text = s(desc);
+  if (!text) return "";
+
+  const match = text.match(/\b([A-Z0-9]+(?:[-+][A-Z0-9]+)*|\d{6,})\b/i);
+  return match?.[1] ? match[1].trim().toUpperCase() : "";
+}
+
+function isWeakPartNumber(value) {
+  const t = s(value).toUpperCase();
+  return !t || t.length < 3 || ["FD", "EA", "PCS", "PC"].includes(t);
+}
+
 /* ---------------- main extractor ---------------- */
 
 export async function extractPoFromExcel(filePath) {
@@ -319,12 +318,17 @@ export async function extractPoFromExcel(filePath) {
 
     // ensurePart() requires partNumber, so we must produce one
     let partNumber = stock;
-    if (!partNumber || partNumber.length < 2) {
-      // fallback: derive stable-ish part number from description
-      partNumber = desc
-        ? desc.slice(0, 60).replace(/\s+/g, " ").toUpperCase()
-        : null;
-    }
+
+if (isWeakPartNumber(partNumber)) {
+  partNumber = derivePartNumberFromDescription(desc);
+}
+
+if (!partNumber) {
+  partNumber = desc
+    ? desc.slice(0, 60).replace(/\s+/g, " ").toUpperCase()
+    : null;
+}
+    
 
     items.push({
       partNumber,
