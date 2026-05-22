@@ -233,6 +233,21 @@ function isChargeOnlyLine(line) {
   );
 }
 
+function isNonPurchasableLine(line) {
+  const desc = String(line?.description || line?.partName || "").trim();
+  const qty = Number(line?.quantity ?? 0);
+  const unitPrice = Number(line?.unitPrice ?? 0);
+  const totalPrice = Number(line?.totalPrice ?? 0);
+
+  if (!desc) return true;
+
+  if (qty === 0 && unitPrice === 0 && totalPrice === 0) {
+    return true;
+  }
+
+  return false;
+}
+
 function derivePartNumber(line) {
 
   const rawPartNumber = String(line?.partNumber || "").trim();
@@ -461,9 +476,9 @@ if (!normalizedPoNumber) {
 
 const lineItems = [];
 for (const li of extracted.items || []) {
-  if (isChargeOnlyLine(li)) {
-    continue;
-  }
+if (isChargeOnlyLine(li) || isNonPurchasableLine(li)) {
+  continue;
+}
 
 
 const normalizedLi = {
