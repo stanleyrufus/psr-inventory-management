@@ -1001,6 +1001,56 @@ router.post(
 
 //
 // =====================================================
+
+//
+// =====================================================
+// ✅ DELETE PO ATTACHMENT
+// DELETE /api/purchase_orders/:id/file/:fileId
+// =====================================================
+router.delete(
+  "/:id/file/:fileId",
+  requirePermission("edit_purchase_orders"),
+  async (req, res) => {
+    const poId = Number(req.params.id);
+    const fileId = Number(req.params.fileId);
+
+    if (!Number.isInteger(poId) || !Number.isInteger(fileId)) {
+      return res.status(400).json({
+        success: 0,
+        message: "Invalid PO id or file id",
+      });
+    }
+
+    try {
+      const file = await db("purchase_order_files")
+        .where({ id: fileId, po_id: poId })
+        .first();
+
+      if (!file) {
+        return res.status(404).json({
+          success: 0,
+          message: "Attachment not found for this PO",
+        });
+      }
+
+      await db("purchase_order_files")
+        .where({ id: fileId, po_id: poId })
+        .del();
+
+      return res.json({
+        success: 1,
+        message: "Attachment deleted successfully",
+      });
+    } catch (err) {
+      console.error("❌ DELETE PO ATTACHMENT error:", err);
+      return res.status(500).json({
+        success: 0,
+        message: "Failed to delete attachment",
+      });
+    }
+  }
+);
+
 // ✅ DELETE PO
 // DELETE /api/purchase_orders/:id
 // =====================================================

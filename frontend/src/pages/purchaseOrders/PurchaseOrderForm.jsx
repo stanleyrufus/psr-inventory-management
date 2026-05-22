@@ -703,7 +703,8 @@ const updateItemQtyField = (index, field, value) => {
     try {
       setDeletingFileIds((prev) => [...prev, fileId]);
       await api.delete(`/purchase_orders/${initialPo.id}/file/${fileId}`);
-      setExistingFiles((prev) => prev.filter((f) => f.id !== fileId));
+setExistingFiles((prev) => prev.filter((f) => f.id !== fileId));
+alert("Attachment deleted successfully.");
     } catch (err) {
       console.error("❌ File delete error:", err);
       alert("Failed to delete file.");
