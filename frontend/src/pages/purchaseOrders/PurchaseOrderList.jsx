@@ -447,14 +447,15 @@ export default function PurchaseOrderList() {
 
   headerName: "Vendor",
   field: "vendor_name",
-  minWidth: 140,
+  width: 260,
+  minWidth: 220,
 },
 
 {
   headerName: "Ordered By",
   field: "created_by",
-  width: 130,
-  minWidth: 120,
+  width: 150,
+  minWidth: 140,
   valueGetter: (p) => p.data?.created_by || "-",
 },
 
@@ -708,13 +709,15 @@ return (
       {/* AG Grid Table */}
       <div className="ag-theme-quartz bg-white shadow-md rounded-lg p-2">
         <AgGridReact
-          ref={gridRef}
-          rowData={paginated}
-          columnDefs={columns}
-          defaultColDef={{ resizable: true }}
-          domLayout="autoHeight"
-          animateRows={true}
-        />
+  ref={gridRef}
+  rowData={paginated}
+  columnDefs={columns}
+  defaultColDef={{ resizable: true }}
+  domLayout="autoHeight"
+  animateRows={true}
+  onGridReady={(params) => params.api.sizeColumnsToFit()}
+  onFirstDataRendered={(params) => params.api.sizeColumnsToFit()}
+/>
       </div>
 
       {/* Pagination */}
