@@ -447,7 +447,6 @@ export default function PurchaseOrderList() {
 
   headerName: "Vendor",
   field: "vendor_name",
-  flex: 1,
   minWidth: 140,
 },
 
