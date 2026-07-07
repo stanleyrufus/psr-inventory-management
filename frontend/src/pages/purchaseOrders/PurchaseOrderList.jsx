@@ -449,9 +449,20 @@ export default function PurchaseOrderList() {
   flex: 1,
   minWidth: 150,
 },
+
+{
+  headerName: "Ordered By",
+  field: "created_by",
+  width: 150,
+  minWidth: 140,
+  tooltipField: "created_by",
+  valueFormatter: (p) => p.value || "-",
+},
     {
   headerName: "Grand Total",
   field: "grand_total",
+
+
   width: 120,
   minWidth: 115,
       valueFormatter: (p) =>
