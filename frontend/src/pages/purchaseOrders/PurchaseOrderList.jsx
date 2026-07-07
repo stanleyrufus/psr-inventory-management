@@ -444,27 +444,27 @@ export default function PurchaseOrderList() {
       },
     },
   {
+
   headerName: "Vendor",
   field: "vendor_name",
   flex: 1,
-  minWidth: 150,
+  minWidth: 140,
 },
 
 {
   headerName: "Ordered By",
   field: "created_by",
-  width: 150,
-  minWidth: 140,
-  tooltipField: "created_by",
-  valueFormatter: (p) => p.value || "-",
+  width: 130,
+  minWidth: 120,
+  valueGetter: (p) => p.data?.created_by || "-",
 },
-    {
+
+{
   headerName: "Grand Total",
   field: "grand_total",
-
-
   width: 120,
   minWidth: 115,
+
       valueFormatter: (p) =>
       p.value != null
         ? "$" +
