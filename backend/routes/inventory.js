@@ -149,45 +149,54 @@ router.get("/:id/purchase-orders", async (req, res) => {
 ---------------------------------------------------------*/
 router.get("/", async (req, res) => {
   try {
-    const rows = await db("inventory")
+    const rows = await db("inventory as inv")
+      .leftJoin("vendors as v", "inv.last_vendor_id", "v.vendor_id")
       .select(
-        "part_id",
-        "part_number",
-        "part_name",
-        "category",
-        "description",
-        "uom",
-        "quantity_on_hand",
-        "minimum_stock_level",
-        "current_unit_price",
-        "last_unit_price",
-        "location",
-        "status",
-        "lead_time_days",
-        "weight_kg",
-        "material",
-        "remarks",
-        "machine_name",
-        "last_po_number",
-        "last_po_id",
-        "last_po_date",
-        "last_vendor_id",
-        "last_vendor_name",
-        "last_quantity",
-        "last_currency_code",
-        "last_freight",
-        "last_payment_terms",
-        "last_payment_method",
-        "image_url",
-        "created_on",
-        "updated_on"
+        "inv.part_id",
+        "inv.part_number",
+        "inv.part_name",
+        "inv.category",
+        "inv.description",
+        "inv.uom",
+        "inv.quantity_on_hand",
+        "inv.minimum_stock_level",
+        "inv.current_unit_price",
+        "inv.last_unit_price",
+        "inv.location",
+        "inv.status",
+        "inv.lead_time_days",
+        "inv.weight_kg",
+        "inv.material",
+        "inv.remarks",
+        "inv.machine_name",
+        "inv.last_po_number",
+        "inv.last_po_id",
+        "inv.last_po_date",
+        "inv.last_vendor_id",
+        db.raw(`
+          COALESCE(
+            NULLIF(TRIM(inv.last_vendor_name), ''),
+            v.vendor_name
+          ) AS last_vendor_name
+        `),
+        "inv.last_quantity",
+        "inv.last_currency_code",
+        "inv.last_freight",
+        "inv.last_payment_terms",
+        "inv.last_payment_method",
+        "inv.image_url",
+        "inv.created_on",
+        "inv.updated_on"
       )
-      .orderBy("part_id", "desc");
+      .orderBy("inv.part_id", "desc");
 
     res.json({ success: 1, data: rows });
   } catch (err) {
     console.error("❌ GET /api/parts error:", err);
-    res.status(500).json({ success: 0, message: "Failed to fetch parts" });
+    res.status(500).json({
+      success: 0,
+      message: "Failed to fetch parts",
+    });
   }
 });
 
