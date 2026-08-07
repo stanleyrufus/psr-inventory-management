@@ -74,7 +74,10 @@ const normalizeImageUrl = (raw) => {
 
   const loadParts = async () => {
     try {
-      const data = await api.fetchParts();
+const data = await api.fetchParts();
+
+console.log("PARTS PAGE API DATA:", data);
+console.log("FIRST PART LAST VENDOR:", data?.[0]?.last_vendor_name);
       const sorted = Array.isArray(data)
         ? [...data].sort((a, b) => (b.part_id || b.id) - (a.part_id || a.id))
         : [];
@@ -109,10 +112,11 @@ const normalizeImageUrl = (raw) => {
     const f = parts.filter((p) => {
       const q = search.toLowerCase();
 
-      const matchSearch =
-        p.part_name?.toLowerCase().includes(q) ||
-        p.part_number?.toLowerCase().includes(q) ||
-        p.description?.toLowerCase().includes(q);
+const matchSearch =
+  p.part_name?.toLowerCase().includes(q) ||
+  p.part_number?.toLowerCase().includes(q) ||
+  p.description?.toLowerCase().includes(q) ||
+  p.last_vendor_name?.toLowerCase().includes(q);
 
       const matchCategory = categoryFilter ? p.category === categoryFilter : true;
       const matchStatus = statusFilter ? p.status === statusFilter : true;
@@ -231,7 +235,7 @@ const normalizeImageUrl = (raw) => {
     >
       <img
         src={url}
-        className="w-12 h-12 object-cover rounded border cursor-pointer"
+        className="w-12 h-12 object-contain rounded border cursor-pointer"
         onError={(e) => {
           e.currentTarget.src = "/no-image.png";
           e.currentTarget.onerror = null;
@@ -329,6 +333,14 @@ const normalizeImageUrl = (raw) => {
       ),
     },
 
+{
+  headerName: "Part Name",
+  field: "part_name",
+  minWidth: 250,
+  flex: 2,
+  filter: true,
+},
+
     // ⭐ NEW DESCRIPTION COLUMN
     {
       headerName: "Description",
@@ -347,9 +359,18 @@ const normalizeImageUrl = (raw) => {
       },
     },
 
-    { headerName: "Last Vendor", field: "last_vendor_name", width: 160, flex: 1 },
-
-    { headerName: "Status", field: "status", width: 110, cellRenderer: StatusRenderer },
+{
+  headerName: "Last Vendor",
+  field: "last_vendor_name",
+  width: 180,
+  minWidth: 150,
+},
+{
+  headerName: "Status",
+  field: "status",
+  width: 110,
+  cellRenderer: StatusRenderer,
+},
   ];
 
 
@@ -464,13 +485,19 @@ return (
      {/* AG Grid + Pagination */}
 <div className="bg-white shadow-md rounded-lg p-2">
 <div className="ag-theme-quartz" style={{ width: "100%" }}>
-  <AgGridReact
-    rowData={paginated}
-    columnDefs={columnDefs}
-    animateRows={true}
-    suppressMovableColumns={true}
-    domLayout="autoHeight"
-  />
+<AgGridReact
+  rowData={paginated}
+  columnDefs={columnDefs}
+  defaultColDef={{
+    resizable: true,
+    minWidth: 90,
+  }}
+  animateRows={true}
+  suppressMovableColumns={true}
+  domLayout="autoHeight"
+  onGridReady={(params) => params.api.sizeColumnsToFit()}
+  onFirstDataRendered={(params) => params.api.sizeColumnsToFit()}
+/>
 </div>
 
   {totalPages > 1 && (
