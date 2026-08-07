@@ -23,14 +23,40 @@ function getPartImagePaths(image_url) {
   return [];
 }
 
-function makeAbsoluteUrl(relativePath) {
-  if (!relativePath) return null;
-  let clean = relativePath.trim();
-  const idx = clean.indexOf("/uploads");
-  if (idx !== -1) clean = clean.substring(idx);
-  if (!clean.startsWith("/")) clean = "/" + clean;
+function makeAbsoluteUrl(imagePath) {
+  if (!imagePath || typeof imagePath !== "string") {
+    return null;
+  }
 
-  return `${FILE_BASE}${clean}`;
+  const clean = imagePath.trim();
+
+  if (!clean) {
+    return null;
+  }
+
+  // AI-enriched images may already be complete external URLs.
+  if (/^https?:\/\//i.test(clean)) {
+    return clean;
+  }
+
+  // Also preserve browser-supported inline/blob image URLs.
+  if (
+    clean.startsWith("data:") ||
+    clean.startsWith("blob:")
+  ) {
+    return clean;
+  }
+
+  // Existing locally uploaded images.
+  const uploadsIndex = clean.indexOf("/uploads");
+  const localPath =
+    uploadsIndex !== -1
+      ? clean.substring(uploadsIndex)
+      : clean.startsWith("/")
+        ? clean
+        : `/${clean}`;
+
+  return `${FILE_BASE}${localPath}`;
 }
 
 export default function PartDetail({ part, onClose }) {
@@ -147,11 +173,13 @@ onClick={async () => {
           <div className="flex flex-col items-center gap-2">
             {hasImages ? (
               <>
-                <img
-                  src={mainImageUrl}
-                  className="w-36 h-36 object-cover rounded-lg border cursor-pointer"
-                  onClick={() => setZoom(true)}
-                />
+<img
+  src={mainImageUrl}
+  referrerPolicy="no-referrer"
+className="w-36 h-36 object-contain rounded-lg border cursor-pointer bg-white"
+  onClick={() => setZoom(true)}
+  alt={part.part_name || part.part_number || "Part image"}
+/>
 
                 <button
                   className="bg-blue-600 text-white px-3 py-1 rounded text-xs"
@@ -163,14 +191,18 @@ onClick={async () => {
                 {imageUrls.length > 1 && (
                   <div className="flex gap-1 mt-2 flex-wrap justify-center">
                     {imageUrls.map((url, idx) => (
-                      <img
-                        key={idx}
-                        src={url}
-                        className={`w-10 h-10 object-cover rounded border cursor-pointer ${
-                          idx === mainIndex ? "ring-2 ring-blue-500" : "opacity-80 hover:opacity-100"
-                        }`}
-                        onClick={() => setMainIndex(idx)}
-                      />
+                     <img
+  key={idx}
+  src={url}
+  referrerPolicy="no-referrer"
+  alt={`Part image ${idx + 1}`}
+className={`w-10 h-10 object-contain rounded border cursor-pointer bg-white ${
+    idx === mainIndex
+      ? "ring-2 ring-blue-500"
+      : "opacity-80 hover:opacity-100"
+  }`}
+  onClick={() => setMainIndex(idx)}
+/>
                     ))}
                   </div>
                 )}
