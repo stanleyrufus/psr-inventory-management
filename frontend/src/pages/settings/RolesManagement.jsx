@@ -1,12 +1,10 @@
 // frontend/src/pages/settings/RolesManagement.jsx
 import { useEffect, useState } from "react";
-import { Card, Title, Button, TextInput } from "@tremor/react";
+import { useNavigate } from "react-router-dom";
+import { Button, TextInput } from "@tremor/react";
 import api from "../../utils/api";
 import PermissionsModal from "./PermissionsModal";
 import {
-  PencilIcon,
-  TrashIcon,
-  Cog6ToothIcon,
   PlusIcon,
 } from "@heroicons/react/24/outline";
 /* -------------------------------------------------------
@@ -102,6 +100,7 @@ function RoleForm({ open, initial, onSave, onClose }) {
    MAIN PAGE
 ------------------------------------------------------- */
 export default function RolesManagement() {
+  const navigate = useNavigate();
   const [roles, setRoles] = useState([]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -172,26 +171,42 @@ export default function RolesManagement() {
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   return (
-    <div className="space-y-6">
-      <Title className="text-xl font-bold">Roles & Permissions</Title>
+    <div className="p-4 md:p-6 lg:p-8">
 
-      <Card className="p-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+            Roles & Permissions
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
+            Create roles and assign permissions
+          </p>
+        </div>
 
-        {/* HEADER */}
-        <div className="flex justify-between items-center mb-4">
-          <div className="text-gray-700">Manage system roles</div>
-
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
           <button
             onClick={openAddRole}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded shadow flex items-center gap-2"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center gap-2"
           >
             <PlusIcon className="h-5 w-5 text-white" />
             <span>Add Role</span>
           </button>
+
+          <button
+            onClick={() => navigate("/settings")}
+            className="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors whitespace-nowrap"
+          >
+            ← Back to Settings
+          </button>
         </div>
+      </div>
+
+      {/* Content Card */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-5">
 
         {/* SEARCH + PAGINATION */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
           <TextInput
             placeholder="Search roles…"
             value={search}
@@ -200,49 +215,47 @@ export default function RolesManagement() {
           />
 
           <div className="flex items-center gap-3">
-            <Button
-              size="xs"
-              variant="secondary"
+            <button
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
             >
               Prev
-            </Button>
+            </button>
 
             <span className="text-sm text-gray-700">
               Page {page} of {totalPages}
             </span>
 
-            <Button
-              size="xs"
-              variant="secondary"
+            <button
               disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50"
             >
               Next
-            </Button>
+            </button>
           </div>
         </div>
 
         {/* TABLE */}
-        <table className="w-full text-sm border rounded overflow-hidden">
-          <thead className="bg-gray-100 text-gray-700">
+        <table className="w-full text-[13px] border-collapse">
+          <thead>
             <tr>
-              <th className="p-2 text-left">ID</th>
-              <th className="p-2 text-left">Role Name</th>
-              <th className="p-2 text-left">Description</th>
-              <th className="p-2 text-center">Actions</th>
+              <th className="h-9 px-3 py-0 text-left text-[13px] font-bold text-gray-900 bg-gray-50 align-middle leading-none whitespace-nowrap border-b border-gray-300 border-r border-gray-200 last:border-r-0">ID</th>
+              <th className="h-9 px-3 py-0 text-left text-[13px] font-bold text-gray-900 bg-gray-50 align-middle leading-none whitespace-nowrap border-b border-gray-300 border-r border-gray-200 last:border-r-0">Role Name</th>
+              <th className="h-9 px-3 py-0 text-left text-[13px] font-bold text-gray-900 bg-gray-50 align-middle leading-none whitespace-nowrap border-b border-gray-300 border-r border-gray-200 last:border-r-0">Description</th>
+              <th className="h-9 px-3 py-0 text-center text-[13px] font-bold text-gray-900 bg-gray-50 align-middle leading-none whitespace-nowrap border-b border-gray-300 border-r border-gray-200 last:border-r-0">Actions</th>
             </tr>
           </thead>
 
           <tbody>
             {paginated.map((r) => (
-              <tr key={r.id} className="border-t hover:bg-gray-50">
-                <td className="p-2">{r.id}</td>
-                <td className="p-2 capitalize">{r.name}</td>
-                <td className="p-2">{r.description || "-"}</td>
+              <tr key={r.id} className="hover:bg-gray-50 transition-colors">
+                <td className="h-9 px-3 py-0 text-[13px] text-gray-800 align-middle leading-none border-b border-gray-200 border-r border-gray-100 last:border-r-0">{r.id}</td>
+                <td className="h-9 px-3 py-0 text-[13px] text-gray-800 align-middle leading-none border-b border-gray-200 border-r border-gray-100 last:border-r-0 capitalize">{r.name}</td>
+                <td className="h-9 px-3 py-0 text-[13px] text-gray-800 align-middle leading-none border-b border-gray-200 border-r border-gray-100 last:border-r-0">{r.description || "-"}</td>
 
-                <td className="p-2 text-center">
+                <td className="h-9 px-3 py-0 text-[13px] text-gray-800 align-middle leading-none border-b border-gray-200 border-r border-gray-100 last:border-r-0 text-center">
                   <div className="flex justify-center gap-4">
 
                     {/* EDIT */}
@@ -258,15 +271,14 @@ export default function RolesManagement() {
 
                     {/* PERMISSIONS */}
                     <button
-  className="text-gray-700 flex items-center gap-1"
-  onClick={() => {
-    setPermRole(r);
-    setPermOpen(true);
-  }}
->
-  <Cog6ToothIcon className="h-4 w-4 inline-block" />
-  <span>Permissions</span>
-</button>
+                      className="text-gray-700 flex items-center gap-1"
+                      onClick={() => {
+                        setPermRole(r);
+                        setPermOpen(true);
+                      }}
+                    >
+                      <span>Permissions</span>
+                    </button>
 
                     {/* DELETE */}
                     <button
@@ -293,7 +305,7 @@ export default function RolesManagement() {
             )}
           </tbody>
         </table>
-      </Card>
+      </div>
 
       {/* ROLE EDIT / ADD MODAL */}
       <RoleForm

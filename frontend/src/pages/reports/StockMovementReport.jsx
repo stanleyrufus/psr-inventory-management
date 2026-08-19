@@ -1,8 +1,8 @@
 import { useState } from "react";
 import {
-  Title, Card, Table, TableBody, TableCell,
+  Table, TableBody, TableCell,
   TableHead, TableHeaderCell, TableRow,
-  TextInput, Button, DateRangePicker
+  TextInput, DateRangePicker
 } from "@tremor/react";
 import { useNavigate } from "react-router-dom";
 
@@ -23,61 +23,81 @@ export default function StockMovementReport() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 md:p-6 lg:p-8">
+
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <Title className="text-2xl font-bold">Stock Movement Log</Title>
-          <p className="text-gray-600 text-sm">Track incoming & outgoing inventory transactions</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+            Stock Movement Log
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
+            Track incoming & outgoing inventory transactions
+          </p>
         </div>
-        <Button onClick={() => navigate("/reports")}>← Back to Reports</Button>
+        <button
+          onClick={() => navigate("/reports")}
+          className="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors"
+        >
+          ← Back to Reports
+        </button>
       </div>
 
       {/* Filters */}
-      <Card className="p-4 space-y-3">
-        <div className="flex gap-4 items-center flex-wrap">
-          <TextInput
-            placeholder="Search part or movement type..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-64"
-          />
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 md:p-4 mb-5 flex flex-wrap gap-3 md:gap-4 items-center">
+        <TextInput
+          placeholder="Search part or movement type..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full md:w-64"
+        />
 
-          <DateRangePicker className="w-72" />
+        <DateRangePicker className="w-full md:w-72" />
 
-          <Button variant="secondary">Export CSV</Button>
-          <Button variant="secondary">Export PDF</Button>
-        </div>
-      </Card>
+        <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors">
+          Export CSV
+        </button>
+        <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors">
+          Export PDF
+        </button>
+      </div>
 
       {/* Table */}
-      <Card>
-        <Table>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 md:p-4">
+        <style>{`
+          .tremor-Table-table { width: 100%; font-size: 13px; }
+          .tremor-Table-root th, .tremor-Table-root .tremor-TableHeaderCell-root { height: 36px !important; padding: 0 12px !important; font-size: 13px !important; font-weight: 700 !important; line-height: 36px !important; color: #111827 !important; background-color: #f9fafb !important; border-bottom: 1px solid #d1d5db !important; border-right: 1px solid #e5e7eb !important; vertical-align: middle !important; }
+          .tremor-Table-root th:last-child, .tremor-Table-root .tremor-TableHeaderCell-root:last-child { border-right: 0 !important; }
+          .tremor-Table-root td, .tremor-Table-root .tremor-TableCell-root { height: 36px !important; padding: 0 12px !important; font-size: 13px !important; line-height: 36px !important; border-bottom: 1px solid #e5e7eb !important; border-right: 1px solid #f3f4f6 !important; vertical-align: middle !important; }
+          .tremor-Table-root td:last-child, .tremor-Table-root .tremor-TableCell-root:last-child { border-right: 0 !important; }
+          .tremor-Table-root tr { height: 36px; }
+        `}</style>
+        <Table className="w-full text-sm">
           <TableHead>
             <TableRow>
-              <TableHeaderCell>Part</TableHeaderCell>
-              <TableHeaderCell>Change</TableHeaderCell>
-              <TableHeaderCell>Type</TableHeaderCell>
-              <TableHeaderCell>Date</TableHeaderCell>
-              <TableHeaderCell>Reference</TableHeaderCell>
+              <TableHeaderCell className="text-left font-bold text-gray-700 align-middle">Part</TableHeaderCell>
+              <TableHeaderCell className="text-right font-bold text-gray-700 align-middle">Change</TableHeaderCell>
+              <TableHeaderCell className="text-left font-bold text-gray-700 align-middle">Type</TableHeaderCell>
+              <TableHeaderCell className="text-center font-bold text-gray-700 align-middle">Date</TableHeaderCell>
+              <TableHeaderCell className="text-left font-bold text-gray-700 align-middle">Reference</TableHeaderCell>
             </TableRow>
           </TableHead>
 
           <TableBody>
             {filteredData.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell>{row.part}</TableCell>
-                <TableCell className={row.change < 0 ? "text-red-600 font-bold" : "text-green-600 font-bold"}>
+              <TableRow key={row.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                <TableCell className="text-gray-700 align-middle">{row.part}</TableCell>
+                <TableCell className={`${row.change < 0 ? "text-red-600 font-bold" : "text-green-600 font-bold"} text-right align-middle`}>
                   {row.change}
                 </TableCell>
-                <TableCell>{row.type}</TableCell>
-                <TableCell>{row.date}</TableCell>
-                <TableCell className="font-medium">{row.ref}</TableCell>
+                <TableCell className="text-gray-700 align-middle">{row.type}</TableCell>
+                <TableCell className="text-gray-700 align-middle text-center">{row.date}</TableCell>
+                <TableCell className="font-medium text-gray-700 align-middle">{row.ref}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
-      </Card>
+      </div>
     </div>
   );
 }

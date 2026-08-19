@@ -55,6 +55,28 @@ export default function DashboardPage() {
   const money = (n) => `$${Number(n || 0).toLocaleString()}`;
 
   /* ---------------------------
+     Fill missing months with zeros
+     so charts always show N months
+  ---------------------------- */
+  const fillMonths = (rows, months, defaults) => {
+    const now = new Date();
+    const expected = [];
+    for (let i = months - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      expected.push(
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+      );
+    }
+    const byYm = {};
+    rows.forEach((r) => { byYm[r.ym] = r; });
+    return expected.map((ym) => ({
+      month: toShortMonth(ym),
+      ...defaults,
+      ...(byYm[ym] || {}),
+    }));
+  };
+
+  /* ---------------------------
      Label renderers
      - Keep labels simple to avoid congestion
   ---------------------------- */
@@ -142,16 +164,22 @@ export default function DashboardPage() {
       const vendorRows = vendorsRes.data?.data || vendorsRes.data || [];
 
       setPartsMonthly(
-        (Array.isArray(partsRows) ? partsRows : []).map((r) => ({
-          month: toShortMonth(r.ym),
+        fillMonths(Array.isArray(partsRows) ? partsRows : [], 6, {
+          qty: 0,
+          total: 0,
+        }).map((r) => ({
+          month: r.month,
           qty: Number(r.qty || r.count || 0),
           total: Number(r.total_value || r.total || 0),
         }))
       );
 
       setPoMonthly(
-        (Array.isArray(poRows) ? poRows : []).map((r) => ({
-          month: toShortMonth(r.ym),
+        fillMonths(Array.isArray(poRows) ? poRows : [], 6, {
+          count: 0,
+          total: 0,
+        }).map((r) => ({
+          month: r.month,
           count: Number(r.count || 0),
           total: Number(r.total_value || r.total || 0),
         }))
@@ -181,50 +209,50 @@ export default function DashboardPage() {
      Stat cards
   ---------------------------- */
   const StatCard = ({ title, value, color }) => (
-    <motion.div
+      <motion.div
       whileHover={{ scale: 1.01 }}
-      className="bg-white shadow-sm rounded-lg px-4 py-3 border"
+      className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-5"
     >
-      <h3 className="text-xs uppercase tracking-wide text-gray-800 font-semibold">
+      <h3 className="text-xs font-medium uppercase tracking-wide text-gray-500">
         {title}
       </h3>
-      <p className={`text-xl mt-1 font-semibold ${color}`}>{value}</p>
+      <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
     </motion.div>
   );
 
   return (
-    <div className="p-6 space-y-8 bg-gray-50 min-h-screen relative">
+    <div className="p-4 md:p-6 lg:p-8 space-y-6 relative">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-800">Dashboard</h1>
-          <p className="text-gray-500 text-sm">Inventory & Operations Overview</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-500 text-sm mt-1">Inventory & Operations Overview</p>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-2 md:gap-3">
           <button
-            className="px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700"
+            className="px-4 py-2 text-sm font-medium rounded-lg shadow-sm bg-blue-600 text-white hover:bg-blue-700"
             onClick={() => window.print()}
           >
             Export Report
           </button>
 
           <button
-            className="px-4 py-2 bg-gray-800 text-white rounded-xl hover:bg-black"
+            className="px-4 py-2 text-sm font-medium rounded-lg shadow-sm bg-green-600 hover:bg-green-700 text-white"
             onClick={() => setShowPoModal(true)}
           >
             + Add PO
           </button>
 
           <button
-            className="px-4 py-2 bg-gray-800 text-white rounded-xl hover:bg-black"
+            className="px-4 py-2 text-sm font-medium rounded-lg shadow-sm bg-green-600 hover:bg-green-700 text-white"
             onClick={() => setShowPartModal(true)}
           >
             + Add Part
           </button>
 
           <button
-            className="px-4 py-2 bg-gray-800 text-white rounded-xl hover:bg-black"
+            className="px-4 py-2 text-sm font-medium rounded-lg shadow-sm bg-green-600 hover:bg-green-700 text-white"
             onClick={() => setShowVendorModal(true)}
           >
             + Add Vendor
@@ -245,10 +273,10 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* PO Chart */}
-        <div className="bg-white rounded-xl shadow p-5 border">
-          <h3 className="text-lg font-semibold mb-4">POs Placed (Last 6 Months)</h3>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-5">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">POs Placed (Last 6 Months)</h3>
 
           <ResponsiveContainer width="100%" height={280}>
             <BarChart
@@ -275,7 +303,7 @@ export default function DashboardPage() {
                   );
                 }}
               />
-             <Bar dataKey="count">
+             <Bar dataKey="count" barSize={32}>
   {poMonthly.map((entry, index) => {
     const colors = [
       "#2563EB",
@@ -299,8 +327,8 @@ export default function DashboardPage() {
         </div>
 
         {/* Parts Chart (✅ Tooltip FIXED like PO tooltip) */}
-        <div className="bg-white rounded-xl shadow p-5 border">
-          <h3 className="text-lg font-semibold mb-4">Parts Bought (Last 6 Months)</h3>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-5">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Parts Bought (Last 6 Months)</h3>
 
           <ResponsiveContainer width="100%" height={280}>
             <BarChart
@@ -327,7 +355,7 @@ export default function DashboardPage() {
                   );
                 }}
               />
-             <Bar dataKey="qty">
+             <Bar dataKey="qty" barSize={32}>
   {partsMonthly.map((entry, index) => {
     const colors = [
   "#EC4899",  // pink-500
@@ -352,8 +380,8 @@ export default function DashboardPage() {
       </div>
 
       {/* Vendors Chart (clean + same tooltip style) */}
-      <div className="bg-white rounded-xl shadow p-5 border">
-        <h3 className="text-lg font-semibold mb-4">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-5">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">
           Top 5 Vendors by Spend (Last 12 Months)
         </h3>
 

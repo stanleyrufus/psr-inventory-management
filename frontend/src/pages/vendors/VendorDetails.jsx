@@ -56,24 +56,51 @@ useEffect(() => {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl p-6 overflow-y-auto max-h-[90vh]">
+      <div className="bg-white rounded-xl shadow-xl border border-gray-300 w-full max-w-3xl p-6 overflow-y-auto max-h-[90vh]">
         {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold text-gray-800">
+        <div className="flex items-start justify-between gap-4 border-b border-gray-200 pb-3 mb-4">
+          <h2 className="min-w-0 flex-1 text-2xl font-bold text-gray-900 leading-tight break-words">
             {vendor.vendor_name || "Vendor Details"}
           </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-lg"
-            disabled={deleting}
-            title="Close"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              className={`min-w-[80px] h-9 px-4 rounded-lg text-sm font-medium shadow-sm transition-colors ${
+                canEditVendors
+                  ? "bg-blue-600 hover:bg-blue-700 text-white"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
+              }`}
+              disabled={deleting || !canEditVendors}
+              onClick={() => {
+                if (!canEditVendors) return;
+                onEdit?.(vendor);
+              }}
+            >
+              Edit
+            </button>
+            <button
+              className={`min-w-[80px] h-9 px-4 rounded-lg text-sm font-medium shadow-sm transition-colors ${
+                canDeleteVendors
+                  ? "bg-red-600 hover:bg-red-700 text-white"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
+              }`}
+              disabled={deleting || !canDeleteVendors}
+              onClick={handleDelete}
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </button>
+            <button
+              onClick={onClose}
+              className="h-9 w-9 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 text-xl shrink-0"
+              disabled={deleting}
+              title="Close"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Basic Info */}
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="bg-gray-50 border border-gray-300 rounded-xl p-4 grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
           <div>
             <p>
               <span className="font-medium text-gray-700">Contact Name:</span>{" "}
@@ -120,8 +147,8 @@ useEffect(() => {
         </div>
 
         {/* Address */}
-        <div className="mt-5 border-t pt-3">
-          <h3 className="font-medium text-gray-800 mb-1">Address</h3>
+        <div className="mt-4 bg-gray-50/40 border border-gray-300 rounded-xl p-4">
+          <h3 className="text-base font-semibold text-gray-900 mb-2">Address</h3>
           <p className="text-sm text-gray-700 whitespace-pre-line">
             {[vendor.address1, vendor.address2].filter(Boolean).join("\n") || "—"}
           </p>
@@ -132,7 +159,7 @@ useEffect(() => {
         </div>
 
         {/* Payment / Terms */}
-        <div className="mt-5 border-t pt-3 grid grid-cols-2 gap-3 text-sm">
+        <div className="mt-4 bg-gray-50/40 border border-gray-300 rounded-xl p-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
           <p>
             <span className="font-medium text-gray-700">Payment Terms:</span>{" "}
             {vendor.payment_terms || "—"}
@@ -154,16 +181,16 @@ useEffect(() => {
         </div>
 
         {/* Remarks */}
-        <div className="mt-5 border-t pt-3">
-          <h3 className="font-medium text-gray-800 mb-1">Remarks</h3>
+        <div className="mt-4 bg-gray-50/40 border border-gray-300 rounded-xl p-4">
+          <h3 className="text-base font-semibold text-gray-900 mb-2">Remarks</h3>
           <p className="text-gray-600 text-sm whitespace-pre-line">
             {vendor.remarks || "—"}
           </p>
         </div>
 
 {/* Linked Purchase Orders */}
-<div className="mt-6 border-t pt-4">
-  <h3 className="font-medium text-gray-800 mb-2">
+<div className="mt-4 bg-gray-50/40 border border-gray-300 rounded-xl p-4">
+  <h3 className="text-base font-semibold text-gray-900 mb-3">
     Linked Purchase Orders
   </h3>
 
@@ -173,19 +200,19 @@ useEffect(() => {
     <p className="text-sm text-gray-500">No purchase orders found.</p>
   ) : (
     <div className="max-h-40 overflow-y-auto border rounded">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-100">
+      <table className="w-full text-[13px] border-collapse">
+        <thead className="bg-gray-50 font-bold text-gray-900">
           <tr>
-            <th className="p-2 text-left">PO #</th>
-<th className="p-2 text-left">Status</th>
-<th className="p-2 text-left">Order Date</th>
-<th className="p-2 text-left">Total</th>
-<th className="p-2 text-left">Action</th>
+            <th className="h-9 px-3 py-0 border-b border-gray-300 border-r border-gray-200 last:border-r-0 text-left align-middle">PO #</th>
+<th className="h-9 px-3 py-0 border-b border-gray-300 border-r border-gray-200 last:border-r-0 text-left align-middle">Status</th>
+<th className="h-9 px-3 py-0 border-b border-gray-300 border-r border-gray-200 last:border-r-0 text-left align-middle">Order Date</th>
+<th className="h-9 px-3 py-0 border-b border-gray-300 border-r border-gray-200 last:border-r-0 text-left align-middle">Total</th>
+<th className="h-9 px-3 py-0 border-b border-gray-300 border-r border-gray-200 last:border-r-0 text-left align-middle">Action</th>
           </tr>
         </thead>
         <tbody>
   {linkedPOs.map((po) => (
-    <tr key={po.id} className="border-t">
+    <tr key={po.id} className="hover:bg-gray-50 transition-colors">
       <td className="p-2">{po.psr_po_number}</td>
 
       <td className="p-2">{po.status}</td>
@@ -214,38 +241,8 @@ useEffect(() => {
   )}
 </div>
 
-        {/* Actions */}
-        <div className="flex justify-end gap-3 mt-6 border-t pt-4">
-                  <button
-            className={`px-4 py-2 rounded ${
-              canEditVendors
-                ? "bg-blue-600 text-white"
-                : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }`}
-            disabled={deleting || !canEditVendors}
-            onClick={() => {
-              if (!canEditVendors) return;
-              onEdit?.(vendor);
-            }}
-          >
-            Edit Vendor
-          </button>
-
-                    <button
-            className={`px-4 py-2 rounded ${
-              canDeleteVendors
-                ? "bg-red-600 text-white"
-                : "bg-gray-300 text-gray-500 cursor-not-allowed"
-            }`}
-            disabled={deleting || !canDeleteVendors}
-            onClick={handleDelete}
-          >
-            {deleting ? "Deleting..." : "Delete Vendor"}
-          </button>
-        </div>
-
         {/* Footer */}
-        <div className="mt-6 text-xs text-gray-500 border-t pt-3">
+        <div className="mt-4 bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-xs text-gray-500">
           <p>
             <span className="font-medium">Created On:</span>{" "}
             {vendor.created_on ? new Date(vendor.created_on).toLocaleString() : "—"}

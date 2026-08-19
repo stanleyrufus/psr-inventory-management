@@ -187,17 +187,17 @@ await api.put(`/purchase_orders/${po.id}`, {
         }`}
       >
         {/* TOP ACTION BAR (non-print) */}
-        <div className="flex justify-end gap-2 mb-3 -mt-6 print-hide">
+        <div className="flex flex-wrap justify-end items-center gap-2 mb-3 print-hide">
           <button
             onClick={() => window.print()}
-            className="px-3 h-10 bg-gray-700 hover:bg-black text-white text-sm rounded shadow flex items-center"
+            className="h-9 px-4 bg-gray-700 hover:bg-black text-white text-sm font-medium rounded-lg shadow-sm transition-colors whitespace-nowrap flex items-center"
           >
             🖨 Print
           </button>
 
                              {po.status !== "Paid" && hasPermission("mark_po_paid") && (
             <button
-              className="px-3 h-10 bg-green-700 hover:bg-green-800 text-white text-sm rounded shadow flex items-center"
+              className="h-9 px-4 bg-green-700 hover:bg-green-800 text-white text-sm font-medium rounded-lg shadow-sm transition-colors whitespace-nowrap flex items-center"
               onClick={() => setShowPaymentModal(true)}
             >
               💲 Mark as Paid
@@ -206,12 +206,12 @@ await api.put(`/purchase_orders/${po.id}`, {
 
                     {po.status === "Paid" && hasPermission("mark_po_unpaid") && (
             <button
-              className="px-3 h-10 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded shadow flex items-center"
+              className="h-9 px-4 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg shadow-sm transition-colors whitespace-nowrap flex items-center"
               onClick={async () => {
                 if (!window.confirm("Revert this PO to UNPAID status?")) return;
 
                 try {
-await api.put(`/purchase_orders/${po.id}`, {
+    await api.put(`/purchase_orders/${po.id}`, {
                     ...po,
                     status: "Received", // revert to previous state
                   });
@@ -231,7 +231,7 @@ await api.put(`/purchase_orders/${po.id}`, {
            <button
             type="button"
             disabled={!canEditPOs}
-            className={`px-3 h-10 text-sm rounded shadow flex items-center ${
+            className={`h-9 px-4 rounded-lg text-sm font-medium shadow-sm transition-colors whitespace-nowrap flex items-center ${
               canEditPOs
                 ? "bg-blue-600 hover:bg-blue-700 text-white"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
@@ -247,7 +247,7 @@ await api.put(`/purchase_orders/${po.id}`, {
                              <button
             type="button"
             disabled={!canDeletePOs}
-            className={`px-3 h-10 text-sm rounded shadow flex items-center ${
+            className={`h-9 px-4 rounded-lg text-sm font-medium shadow-sm transition-colors whitespace-nowrap flex items-center ${
               canDeletePOs
                 ? "bg-red-600 hover:bg-red-700 text-white"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
@@ -260,7 +260,7 @@ await api.put(`/purchase_orders/${po.id}`, {
               }
 
               try {
-await api.delete(`/purchase_orders/${po.id}`);
+    await api.delete(`/purchase_orders/${po.id}`);
                 alert("✅ Purchase Order deleted");
                 handleClose();
               } catch (err) {
@@ -271,11 +271,10 @@ await api.delete(`/purchase_orders/${po.id}`);
           >
             🗑 Delete
           </button>
-          
 
           <button
             onClick={handleClose}
-            className="h-10 px-3 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xl font-bold rounded flex items-center justify-center"
+            className="h-9 w-9 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 text-xl shadow-sm shrink-0"
           >
             ✕
           </button>
@@ -284,7 +283,7 @@ await api.delete(`/purchase_orders/${po.id}`);
         {/* =======================================================
     ULTRA-COMPACT HEADER WITH PSR BLUE STRIP (UPDATED)
    ======================================================= */}
-<div className="bg-blue-900 text-white rounded-md mb-4 px-4 py-3 border border-blue-900 flex justify-between items-start">
+<div className="bg-blue-900 text-white rounded-xl mb-4 px-4 py-3 border border-blue-900 flex justify-between items-start">
 
   {/* LEFT: PSR ADDRESS */}
   <div className="text-xs leading-tight">
@@ -329,16 +328,16 @@ await api.delete(`/purchase_orders/${po.id}`);
 {/* =======================================================
     PURCHASED FROM + SUMMARY (compact + THICK BLUE BORDERS)
    ======================================================= */}
-<div className="grid grid-cols-2 gap-3 mb-3 text-sm">
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm">
   {/* ---------------------------------------------
       PURCHASED FROM (Vendor) — Ultra Compact
-     --------------------------------------------- */}
-<div className="border-2 border-blue-900 rounded-md bg-gray-50 px-3 py-2 leading-snug text-sm">
-  <div className="font-semibold text-gray-800 mb-1">
+    --------------------------------------------- */}
+<div className="bg-gray-50/40 border border-gray-300 rounded-xl p-4">
+  <div className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">
     VENDOR:
   </div>
 
-  <div className="text-gray-900">
+  <div className="text-gray-900 font-medium">
     {vendorInfo?.vendor_name || po.vendor_name || "Vendor"}
   </div>
 
@@ -377,7 +376,11 @@ await api.delete(`/purchase_orders/${po.id}`);
   {/* ---------------------------------------------
       ORDER SUMMARY (Ordered By + Dates + Terms + Remarks)
      --------------------------------------------- */}
-<div className="border-2 border-blue-900 rounded-md bg-gray-50 px-3 py-2 leading-snug space-y-0.5 text-sm">
+<div className="bg-gray-50/40 border border-gray-300 rounded-xl p-4">
+
+  <div className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">
+    ORDER SUMMARY
+  </div>
 
     <div className="flex">
       <span className="w-32 font-medium text-gray-700">Ordered By:</span>
@@ -425,39 +428,39 @@ await api.delete(`/purchase_orders/${po.id}`);
         {/* =======================================================
             ORDER PARTS
            ======================================================= */}
-        <h3 className="mt-2 font-semibold text-gray-800 text-sm">
+        <h3 className="mt-4 text-base font-semibold text-gray-900 mb-3">
           ORDER PARTS
         </h3>
 
         {items.length > 0 ? (
-          <div className="overflow-x-auto mt-2 border border-gray-300 rounded-md">
+          <div className="overflow-x-auto border border-gray-300 rounded-xl">
             <table className="min-w-full text-[13px] border-collapse">
               <thead>
-                <tr className="bg-blue-900 text-white">
-                  <th className="border border-gray-300 px-2 py-1 text-center w-12">
+                <tr className="bg-blue-900 text-white font-bold">
+                  <th className="h-9 px-3 py-0 border-b border-blue-800 border-r border-blue-800 last:border-r-0 text-center align-middle w-12">
                     LINE
                   </th>
-                  <th className="border border-gray-300 px-2 py-1 text-left w-40">
+                  <th className="h-9 px-3 py-0 border-b border-blue-800 border-r border-blue-800 last:border-r-0 text-left align-middle w-40">
                     PART NUMBER
                   </th>
-                  <th className="border border-gray-300 px-2 py-1 text-left">
+                  <th className="h-9 px-3 py-0 border-b border-blue-800 border-r border-blue-800 last:border-r-0 text-left align-middle">
                     DESCRIPTION
                   </th>
-                  <th className="border border-gray-300 px-2 py-1 text-center w-24">
+                  <th className="h-9 px-3 py-0 border-b border-blue-800 border-r border-blue-800 last:border-r-0 text-center align-middle w-24">
                     IMAGE
                   </th>
-                  <th className="border border-gray-300 px-2 py-1 text-right w-20">
+                  <th className="h-9 px-3 py-0 border-b border-blue-800 border-r border-blue-800 last:border-r-0 text-right align-middle w-20">
                     QTY
                   </th>
-                  <th className="border border-gray-300 px-2 py-1 text-right w-24">
+                  <th className="h-9 px-3 py-0 border-b border-blue-800 border-r border-blue-800 last:border-r-0 text-right align-middle w-24">
                     UNIT PRICE
                   </th>
-                  <th className="border border-gray-300 px-2 py-1 text-right w-28">
+                  <th className="h-9 px-3 py-0 border-b border-blue-800 border-r border-blue-800 last:border-r-0 text-right align-middle w-28">
                     LINE TOTAL
                   </th>
-<th className="border border-gray-300 px-2 py-1 text-center w-24">
-  BO
-</th>
+                  <th className="h-9 px-3 py-0 border-b border-blue-800 border-r border-blue-800 last:border-r-0 text-center align-middle w-24">
+                    BO
+                  </th>
                 </tr>
               </thead>
 
@@ -505,93 +508,115 @@ const isBackOrdered =
   it.bo === true ||
   it.bo === 1;
 
-return (
-<tr
-  key={idx}
-  style={isBackOrdered ? { backgroundColor: "#fecaca" } : {}}
-  className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
->
-<td
-  className="border border-gray-300 px-2 py-1 text-center"
-  style={isBackOrdered ? { backgroundColor: "#fecaca" } : {}}
->
-      {it.line_no ?? idx + 1}
-    </td>
+  return (
+    <tr
+      key={idx}
+      style={isBackOrdered ? { backgroundColor: "#fecaca" } : {}}
+      className={`transition-colors ${
+        isBackOrdered ? "" : "hover:bg-gray-50"
+      }`}
+    >
+      <td
+        className="h-9 px-3 py-0 text-center align-middle border-b border-gray-200 border-r border-gray-100 last:border-r-0"
+        style={isBackOrdered ? { backgroundColor: "#fecaca" } : {}}
+      >
+        {it.line_no ?? idx + 1}
+      </td>
 
-    <td className={`border border-gray-300 px-2 py-1 ${isBackOrdered ? "bg-red-100" : ""}`}>
-      {part?.part_number || `Part #${it.part_id || it.partId || "-"}`}
-    </td>
+      <td
+        className={`h-9 px-3 py-0 align-middle border-b border-gray-200 border-r border-gray-100 last:border-r-0 ${
+          isBackOrdered ? "bg-red-100" : ""
+        }`}
+      >
+        {part?.part_number || `Part #${it.part_id || it.partId || "-"}`}
+      </td>
 
-<td
-  className="border border-gray-300 px-2 py-1 text-center"
-  style={isBackOrdered ? { backgroundColor: "#fecaca" } : {}}
->
-      {part?.description || it.description || "—"}
-    </td>
+      <td
+        className="h-9 px-3 py-0 align-middle border-b border-gray-200 border-r border-gray-100 last:border-r-0"
+        style={isBackOrdered ? { backgroundColor: "#fecaca" } : {}}
+      >
+        {part?.description || it.description || "—"}
+      </td>
 
-    <td className={`border border-gray-300 px-2 py-1 text-center ${isBackOrdered ? "bg-red-100" : ""}`}>
-      {imgUrl ? (
-        <img
-          src={imgUrl}
-          alt={part?.part_number || "Part image"}
-          className="w-12 h-12 object-cover border border-gray-300 rounded"
-        />
-      ) : (
-        <span className="text-gray-400 text-[11px]">No Image</span>
-      )}
-    </td>
+      <td
+        className={`h-9 px-3 py-0 text-center align-middle border-b border-gray-200 border-r border-gray-100 last:border-r-0 ${
+          isBackOrdered ? "bg-red-100" : ""
+        }`}
+      >
+        {imgUrl ? (
+          <img
+            src={imgUrl}
+            alt={part?.part_number || "Part image"}
+            className="w-12 h-12 object-cover border border-gray-300 rounded"
+          />
+        ) : (
+          <span className="text-gray-400 text-[11px]">No Image</span>
+        )}
+      </td>
 
-    <td className={`border border-gray-300 px-2 py-1 text-right ${isBackOrdered ? "bg-red-100" : ""}`}>
-      {it.quantity}
-    </td>
+      <td
+        className={`h-9 px-3 py-0 text-right align-middle border-b border-gray-200 border-r border-gray-100 last:border-r-0 ${
+          isBackOrdered ? "bg-red-100" : ""
+        }`}
+      >
+        {it.quantity}
+      </td>
 
-    <td className={`border border-gray-300 px-2 py-1 text-right ${isBackOrdered ? "bg-red-100" : ""}`}>
-      {money(it.unit_price)}
-    </td>
+      <td
+        className={`h-9 px-3 py-0 text-right align-middle border-b border-gray-200 border-r border-gray-100 last:border-r-0 ${
+          isBackOrdered ? "bg-red-100" : ""
+        }`}
+      >
+        {money(it.unit_price)}
+      </td>
 
-    <td className={`border border-gray-300 px-2 py-1 text-right ${isBackOrdered ? "bg-red-100" : ""}`}>
-      {money(it.total_price)}
-    </td>
+      <td
+        className={`h-9 px-3 py-0 text-right align-middle border-b border-gray-200 border-r border-gray-100 last:border-r-0 ${
+          isBackOrdered ? "bg-red-100" : ""
+        }`}
+      >
+        {money(it.total_price)}
+      </td>
 
-<td
-  className="border border-gray-300 px-2 py-1 text-center"
-  style={isBackOrdered ? { backgroundColor: "#fecaca" } : {}}
->
-  {isBackOrdered ? (
-    <div className="flex flex-col items-center gap-1">
-      <span className="px-2 py-1 rounded bg-red-600 text-white text-[11px] font-semibold">
-        BO
-      </span>
+      <td
+        className="h-9 px-3 py-0 text-center align-middle border-b border-gray-200 border-r border-gray-100 last:border-r-0"
+        style={isBackOrdered ? { backgroundColor: "#fecaca" } : {}}
+      >
+        {isBackOrdered ? (
+          <div className="flex flex-col items-center gap-1">
+            <span className="px-2 py-1 rounded bg-red-600 text-white text-[11px] font-semibold">
+              BO
+            </span>
 
-      {Number(it.backorder_quantity || 0) > 0 && (
-        <span className="text-[11px] font-medium text-red-800">
-          Qty: {Number(it.backorder_quantity)}
-        </span>
-      )}
-    </div>
-  ) : it.received_complete ? (
-    <span className="px-2 py-1 bg-green-600 text-white rounded text-xs font-semibold">
-      RCV
-    </span>
-  ) : (
-    "—"
-  )}
-</td>
-  </tr>
-);
+            {Number(it.backorder_quantity || 0) > 0 && (
+              <span className="text-[11px] font-medium text-red-800">
+                Qty: {Number(it.backorder_quantity)}
+              </span>
+            )}
+          </div>
+        ) : it.received_complete ? (
+          <span className="px-2 py-1 bg-green-600 text-white rounded text-xs font-semibold">
+            RCV
+          </span>
+        ) : (
+          "—"
+        )}
+      </td>
+    </tr>
+  );
                 })}
               </tbody>
             </table>
           </div>
         ) : (
-          <p className="text-sm text-gray-500 mt-2">No items found.</p>
+          <p className="text-sm text-gray-500 mt-4">No items found.</p>
         )}
 
         {/* =======================================================
             TOTALS (Tax forced to 0)
            ======================================================= */}
                 <div className="mt-4 flex justify-end">
-          <div className="border border-gray-300 rounded-md bg-gray-50 px-4 py-3 text-sm w-72">
+          <div className="bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-sm w-full sm:w-72">
             {po.status === "Paid" && (
               <>
                 <div className="font-semibold text-gray-800 mb-2 border-b border-gray-300 pb-1">
@@ -646,10 +671,10 @@ return (
         {/* =======================================================
             ATTACHMENTS
            ======================================================= */}
-        <h3 className="mt-6 font-semibold text-gray-800">Attachments</h3>
+        <h3 className="mt-4 text-base font-semibold text-gray-900 mb-3">Attachments</h3>
 
                {files.length > 0 ? (
-          <div className="grid grid-cols-4 gap-4 mt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-3">
             {files.map((f) => {
               const fileUrl = `${FILE_BASE}${
                 f.filepath.startsWith("/") ? "" : "/"
@@ -661,7 +686,7 @@ return (
               return (
                 <div
                   key={f.id}
-                  className="border rounded p-2 text-center bg-white shadow-sm"
+                  className="border border-gray-300 rounded-xl bg-white p-3 text-center shadow-sm"
                 >
                   {isImage ? (
                     <a href={fileUrl} target="_blank" rel="noreferrer">

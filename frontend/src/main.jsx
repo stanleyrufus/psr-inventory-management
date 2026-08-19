@@ -3,7 +3,6 @@ console.warn("🔥 VITE_API_URL =", import.meta.env.VITE_API_URL);
 // ✅ React entry point for PSR Inventory & Purchase Order Management Portal
 import React from "react";
 import ReactDOM from "react-dom/client";
-import "./styles/theme.css";
 
 import { BrowserRouter } from "react-router-dom"; // Handles client-side routing (URL navigation)
 import App from "./App"; // Main app component that contains routes, layout, etc.

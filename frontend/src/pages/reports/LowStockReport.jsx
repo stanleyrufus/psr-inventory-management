@@ -2,15 +2,15 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRaw as api } from "../../utils/api";
 
-// ✅ View Part Modal
+// View Part Modal
 import PartDetail from "../../components/PartDetail";
 
-// ✅ AG Grid
+// AG Grid
 import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
-// import "ag-grid-community/styles/ag-theme-quartz.css";
+import "ag-grid-community/styles/ag-theme-quartz.css";
 
-// ✅ PDF Export libs
+// PDF Export libs
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -54,14 +54,14 @@ export default function LowStockReport() {
     }
   };
 
-  // ✅ Search Filter
+  // Search Filter
   const filteredData = data.filter((r) =>
     (r.part_number || "").toLowerCase().includes(search.toLowerCase()) ||
     (r.part_name || "").toLowerCase().includes(search.toLowerCase()) ||
     (r.description || "").toLowerCase().includes(search.toLowerCase())
   );
 
-  // ✅ Manual pagination (same as POList)
+  // Manual pagination
   const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
 
   const paginatedRows = filteredData.slice(
@@ -72,7 +72,7 @@ export default function LowStockReport() {
   const goToPage = (p) =>
     p >= 1 && p <= totalPages && setCurrentPage(p);
 
-  // ✅ Export CSV
+  // Export CSV
   const exportCSV = () => {
     const headers = [
       "Part Number",
@@ -101,7 +101,7 @@ export default function LowStockReport() {
     link.click();
   };
 
-  // ✅ Export PDF
+  // Export PDF
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: "landscape" });
     doc.text("Low Stock Report", 14, 10);
@@ -125,7 +125,7 @@ export default function LowStockReport() {
     doc.save("low_stock_report.pdf");
   };
 
-  // ✅ AG Grid Columns
+  // AG Grid Columns
   const columns = [
     {
       headerName: "Part #",
@@ -242,33 +242,34 @@ export default function LowStockReport() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 md:p-6 lg:p-8">
 
-      {/* ✅ Bold headers (same as Parts & Vendors) */}
-      <style>{`
-        .ag-theme-quartz .ag-header-cell-text {
-          font-weight: 600 !important;
-        }
-      `}</style>
+        <style>{`
+          .ag-theme-quartz { --ag-font-size: 13px; --ag-row-height: 36px; }
+          .ag-theme-quartz .ag-header-cell-text { font-weight: 700 !important; }
+          .ag-theme-quartz .ag-cell { display: flex; align-items: center; padding: 0 8px; }
+        `}</style>
 
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-2xl font-bold">Low Stock Report</h2>
-          <p className="text-gray-600 text-sm">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+            Low Stock Report
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
             Parts below minimum stock level
           </p>
         </div>
         <button
           onClick={() => navigate("/reports")}
-          className="tremor-Button"
+          className="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors"
         >
           ← Back to Reports
         </button>
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded shadow flex items-center gap-3 flex-wrap">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 md:p-4 mb-5 flex flex-wrap gap-3 md:gap-4 items-center">
         <input
           type="text"
           placeholder="Search part # / name / description…"
@@ -277,13 +278,13 @@ export default function LowStockReport() {
             setSearch(e.target.value);
             setCurrentPage(1);
           }}
-          className="border px-2 py-2 rounded w-72"
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors w-full md:w-64 lg:w-72"
         />
 
-        <button onClick={exportCSV} className="tremor-Button">
+        <button onClick={exportCSV} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors">
           Export CSV
         </button>
-        <button onClick={exportPDF} className="tremor-Button">
+        <button onClick={exportPDF} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors">
           Export PDF
         </button>
 
@@ -293,7 +294,7 @@ export default function LowStockReport() {
             setPageSize(Number(e.target.value));
             setCurrentPage(1);
           }}
-          className="border rounded px-2 py-1"
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
         >
           {[10, 25, 50, 100].map((n) => (
             <option key={n} value={n}>
@@ -303,24 +304,24 @@ export default function LowStockReport() {
         </select>
       </div>
 
-      {/* ✅ AG Grid (NO AG pagination) */}
-      <div className="ag-theme-quartz bg-white shadow p-2 rounded" style={{ width: "100%" }}>
+      {/* AG Grid */}
+      <div className="ag-theme-quartz bg-white rounded-xl shadow-sm border border-gray-100 p-3 md:p-5" style={{ width: "100%" }}>
         <AgGridReact
-theme="legacy"
           rowData={paginatedRows}
           columnDefs={columns}
+          defaultColDef={{ resizable: true, minWidth: 90, unSortIcon: true }}
           domLayout="autoHeight"
           animateRows={true}
         />
       </div>
 
-      {/* ✅ Manual Pagination (same as POList) */}
+      {/* Manual Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-3 mt-4 text-sm">
           <button
             onClick={() => goToPage(currentPage - 1)}
             disabled={currentPage === 1}
-            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+            className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
           >
             Prev
           </button>
@@ -332,7 +333,7 @@ theme="legacy"
           <button
             onClick={() => goToPage(currentPage + 1)}
             disabled={currentPage === totalPages}
-            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+            className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
           >
             Next
           </button>

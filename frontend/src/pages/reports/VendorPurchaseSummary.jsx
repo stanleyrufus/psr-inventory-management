@@ -1,23 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Title, Card, Button, TextInput } from "@tremor/react";
 import { apiRaw as api, fetchPurchaseOrdersReport } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 
-// ✅ AG Grid
+// AG Grid
 import { ModuleRegistry } from "ag-grid-community";
 import { AllCommunityModule } from "ag-grid-community";
 ModuleRegistry.registerModules([AllCommunityModule]);
 import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
-import "ag-grid-community/styles/ag-theme-alpine.css";
+import "ag-grid-community/styles/ag-theme-quartz.css";
 
-// ✅ Exports
+// Exports
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
-// ✅ Vendor modal
+// Vendor modal
 import VendorDetail from "../vendors/VendorDetails.jsx";
 
 export default function VendorPurchaseSummary() {
@@ -45,7 +44,7 @@ export default function VendorPurchaseSummary() {
     }
   }
 
-  // ✅ Filter and group
+  // Filter and group
   const filtered = rows.filter((r) => {
     const orderDate = r.order_date ? new Date(r.order_date) : null;
     return (
@@ -76,7 +75,7 @@ export default function VendorPurchaseSummary() {
     }))
     .sort((a, b) => b.total_spend - a.total_spend);
 
-  // ✅ Fetch vendor details when clicked
+  // Fetch vendor details when clicked
   async function openVendorModal(vendor) {
     try {
       const id = vendor.vendor_id;
@@ -90,7 +89,7 @@ export default function VendorPurchaseSummary() {
     }
   }
 
-  // ✅ Grid columns
+  // Grid columns
   const columns = useMemo(
     () => [
       {
@@ -133,13 +132,7 @@ export default function VendorPurchaseSummary() {
     []
   );
 
-  const gridStyle = {
-    width: "100%",
-    "--ag-font-size": "13px",
-    "--ag-row-height": "34px",
-  };
-
-  // ✅ Exports
+  // Exports
   const exportCSV = () => gridRef.current?.api?.exportDataAsCsv({ fileName: "vendor_summary.csv" });
 
   const exportXLSX = () => {
@@ -168,67 +161,78 @@ export default function VendorPurchaseSummary() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 md:p-6 lg:p-8">
+
+        <style>{`
+          .ag-theme-quartz { --ag-font-size: 13px; --ag-row-height: 36px; }
+          .ag-theme-quartz .ag-header-cell-text { font-weight: 700 !important; }
+          .ag-theme-quartz .ag-cell { display: flex; align-items: center; padding: 0 8px; }
+        `}</style>
+
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <Title className="text-2xl font-bold">Vendor Purchase Summary</Title>
-          <p className="text-gray-600 text-sm">Summarized purchase totals by vendor</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+            Vendor Purchase Summary
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
+            Summarized purchase totals by vendor
+          </p>
         </div>
-        <Button variant="secondary" onClick={() => navigate("/reports")}>← Back to Reports</Button>
+        <button
+          onClick={() => navigate("/reports")}
+          className="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors"
+        >
+          ← Back to Reports
+        </button>
       </div>
 
-      {/* Filters + Export toolbar (compact, single line) */}
-<Card className="p-4">
-  <div className="flex items-center justify-between gap-3 w-full">
-    {/* Left side: filters */}
-    <div className="flex items-center gap-2">
-      <TextInput
-        placeholder="Search vendor..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-56 text-sm"
-      />
-      <input
-        type="date"
-        value={fromDate}
-        onChange={(e) => setFromDate(e.target.value)}
-        className="border rounded px-2 py-1 text-sm w-36"
-      />
-      <span className="text-gray-600 text-sm">to</span>
-      <input
-        type="date"
-        value={toDate}
-        onChange={(e) => setToDate(e.target.value)}
-        className="border rounded px-2 py-1 text-sm w-36"
-      />
-    </div>
+      {/* Filters + Export toolbar */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 md:p-4 mb-5 flex flex-wrap xl:flex-nowrap items-center gap-3">
+        <input
+          type="text"
+          placeholder="Search vendor..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors w-full md:w-56 xl:w-60"
+        />
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm w-full md:w-40"
+        />
+        <input
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm w-full md:w-40"
+        />
 
-    {/* Right side: export buttons */}
-    <div className="flex items-center gap-2">
-      <Button variant="secondary" onClick={exportCSV}>Export CSV</Button>
-      <Button variant="secondary" onClick={exportXLSX}>Export XLSX</Button>
-      <Button variant="secondary" onClick={exportPDF}>Export PDF</Button>
-    </div>
-  </div>
-</Card>
-
+        <div className="flex gap-2 shrink-0">
+          <button onClick={exportCSV} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors">
+            Export CSV
+          </button>
+          <button onClick={exportXLSX} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors">
+            Export XLSX
+          </button>
+          <button onClick={exportPDF} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors">
+            Export PDF
+          </button>
+        </div>
+      </div>
 
       {/* Grid */}
-      <Card className="p-0">
-        <div className="ag-theme-alpine" style={gridStyle}>
-          <AgGridReact
-theme="legacy"
-
-            ref={gridRef}
-            rowData={data}
-            columnDefs={columns}
-            defaultColDef={{ resizable: true }}
-            domLayout="autoHeight"
-            animateRows
-          />
-        </div>
-      </Card>
+      <div className="ag-theme-quartz bg-white rounded-xl shadow-sm border border-gray-100 p-3 md:p-5" style={{ width: "100%" }}>
+        <AgGridReact
+          ref={gridRef}
+          rowData={data}
+          columnDefs={columns}
+          defaultColDef={{ resizable: true, minWidth: 90, unSortIcon: true }}
+          domLayout="autoHeight"
+          animateRows
+        />
+      </div>
 
       {/* Vendor Modal */}
       {selectedVendor && (
