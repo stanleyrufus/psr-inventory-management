@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Title, Card, Button, TextInput } from "@tremor/react";
 import { apiRaw as api, fetchPurchaseOrdersReport } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -9,13 +8,13 @@ import { AllCommunityModule } from "ag-grid-community";
 ModuleRegistry.registerModules([AllCommunityModule]);
 import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
-// import "ag-grid-community/styles/ag-theme-alpine.css";
+import "ag-grid-community/styles/ag-theme-quartz.css";
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 
-// ✅ Import Part Detail Modal
+// Part Detail Modal
 import PartDetail from "../../components/PartDetail";
 
 export default function PartPurchaseSummary() {
@@ -25,15 +24,15 @@ export default function PartPurchaseSummary() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [rows, setRows] = useState([]);
-  const [parts, setParts] = useState([]); // ✅ Cache all full parts
+  const [parts, setParts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedPart, setSelectedPart] = useState(null);
   const gridRef = useRef(null);
 
-  /* ---------------------- 🧩 Load data once on mount ---------------------- */
+  /* ---------------------- Load data once on mount ---------------------- */
   useEffect(() => {
     loadPurchaseOrders();
-    preloadParts(); // load all parts once for modal
+    preloadParts();
   }, []);
 
   async function loadPurchaseOrders() {
@@ -48,14 +47,14 @@ export default function PartPurchaseSummary() {
 
   async function preloadParts() {
     try {
-      const res = await api.get("/parts"); // ✅ same endpoint as LowStockReport
+      const res = await api.get("/parts");
       setParts(res.data?.data || []);
     } catch (err) {
       console.error("Error preloading parts:", err);
     }
   }
 
-  /* ---------------------- 🧩 Filter & summarize ---------------------- */
+  /* ---------------------- Filter & summarize ---------------------- */
   const filtered = rows.filter((r) => {
     const orderDate = r.order_date ? new Date(r.order_date) : null;
     return (
@@ -99,7 +98,7 @@ export default function PartPurchaseSummary() {
     )
     .sort((a, b) => b.total_spend - a.total_spend);
 
-  /* ---------------------- 🧩 Modal: open instantly with cache ---------------------- */
+  /* ---------------------- Modal: open instantly with cache ---------------------- */
   function openPartModal(part) {
   const normalize = (v) => (v ? v.toString().trim().toLowerCase() : "");
   const match = parts.find(
@@ -109,7 +108,7 @@ export default function PartPurchaseSummary() {
 }
 
 
-  /* ---------------------- 🧩 AG Grid ---------------------- */
+  /* ---------------------- AG Grid ---------------------- */
   const columns = useMemo(
     () => [
       {
@@ -150,13 +149,7 @@ export default function PartPurchaseSummary() {
     []
   );
 
-  const gridStyle = {
-    width: "100%",
-    "--ag-font-size": "13px",
-    "--ag-row-height": "34px",
-  };
-
-  /* ---------------------- 🧩 Exports ---------------------- */
+  /* ---------------------- Exports ---------------------- */
   const exportCSV = () =>
     gridRef.current?.api?.exportDataAsCsv({ fileName: "part_summary.csv" });
 
@@ -195,78 +188,84 @@ export default function PartPurchaseSummary() {
     doc.save("part_summary.pdf");
   };
 
-  /* ---------------------- 🧩 Render ---------------------- */
+  /* ---------------------- Render ---------------------- */
   return (
-    <div className="space-y-6">
+    <div className="p-4 md:p-6 lg:p-8">
+
+        <style>{`
+          .ag-theme-quartz { --ag-font-size: 13px; --ag-row-height: 36px; }
+          .ag-theme-quartz .ag-header-cell-text { font-weight: 700 !important; }
+          .ag-theme-quartz .ag-cell { display: flex; align-items: center; padding: 0 8px; }
+        `}</style>
+
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <Title className="text-2xl font-bold">Part Purchase Summary</Title>
-          <p className="text-gray-600 text-sm">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+            Part Purchase Summary
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
             Summarized purchase totals by part
           </p>
         </div>
-        <Button variant="secondary" onClick={() => navigate("/reports")}>
+        <button
+          onClick={() => navigate("/reports")}
+          className="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors"
+        >
           ← Back to Reports
-        </Button>
+        </button>
       </div>
 
-      {/* Filters (compact layout with exports inline) */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between gap-3 w-full flex-wrap">
-          <div className="flex items-center gap-2">
-            <TextInput
-              placeholder="Search part # / name..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-56 text-sm"
-            />
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="border rounded px-2 py-1 text-sm w-36"
-            />
-            <span className="text-gray-600 text-sm">to</span>
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="border rounded px-2 py-1 text-sm w-36"
-            />
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="secondary" onClick={exportCSV}>
-              Export CSV
-            </Button>
-            <Button variant="secondary" onClick={exportXLSX}>
-              Export XLSX
-            </Button>
-            <Button variant="secondary" onClick={exportPDF}>
-              Export PDF
-            </Button>
-          </div>
+      {/* Filters + Export toolbar */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 md:p-4 mb-5 flex flex-wrap gap-3 md:gap-4 items-center">
+        <input
+          type="text"
+          placeholder="Search part # / name..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors w-full md:w-56"
+        />
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm"
+        />
+        <span className="text-gray-500 text-sm">to</span>
+        <input
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm"
+        />
+
+        <div className="flex items-center gap-2 ml-auto">
+          <button onClick={exportCSV} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors">
+            Export CSV
+          </button>
+          <button onClick={exportXLSX} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors">
+            Export XLSX
+          </button>
+          <button onClick={exportPDF} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors">
+            Export PDF
+          </button>
         </div>
-      </Card>
+      </div>
 
       {/* Grid */}
-      <Card className="p-0">
-        <div className="ag-theme-alpine" style={gridStyle}>
-          <AgGridReact
-theme="legacy"
-
-            ref={gridRef}
-            rowData={data}
-            columnDefs={columns}
-            defaultColDef={{ resizable: true }}
-            domLayout="autoHeight"
-            animateRows
-            pagination={true}
-            paginationPageSize={100}
-            rowBuffer={50}
-          />
-        </div>
-      </Card>
+      <div className="ag-theme-quartz bg-white rounded-xl shadow-sm border border-gray-100 p-3 md:p-5" style={{ width: "100%" }}>
+        <AgGridReact
+          ref={gridRef}
+          rowData={data}
+          columnDefs={columns}
+          defaultColDef={{ resizable: true, minWidth: 90, unSortIcon: true }}
+          domLayout="autoHeight"
+          animateRows
+          pagination={true}
+          paginationPageSize={100}
+          rowBuffer={50}
+        />
+      </div>
 
       {/* Part Detail Modal */}
       {selectedPart && (

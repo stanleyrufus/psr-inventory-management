@@ -20,6 +20,8 @@ import SettingsIndex from "../pages/settings/SettingsIndex";
 import UserManagement from "../pages/settings/UserManagement";
 import RolesManagement from "../pages/settings/RolesManagement";
 import SystemPreferences from "../pages/settings/SystemPreferences";
+import AuditLogsPage from "../pages/settings/AuditLogsPage";
+import AppInfoPage from "../pages/settings/AppInfoPage";
 
 /* Reports */
 import ReportsIndex from "../pages/reports/ReportsIndex";
@@ -86,7 +88,7 @@ export default function AppRoutes() {
     </div>
 
     {/* Title */}
-    <h1 className="text-lg md:text-xl font-semibold text-white tracking-wide m-0">
+    <h1 className="text-base md:text-lg font-semibold text-white tracking-wide m-0">
       Inventory &amp; Purchase Order Management Portal
     </h1>
   </div>
@@ -99,14 +101,14 @@ export default function AppRoutes() {
 
     <button
       onClick={logout}
-      className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-sm rounded transition"
+      className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-sm rounded-lg transition"
     >
       Logout
     </button>
   </div>
 </header>
 
-<div className="flex-1 pt-2 px-6 pb-6 overflow-y-auto bg-psr-sky">
+<div className="flex-1 pt-5 px-6 pb-6 overflow-y-auto bg-psr-sky">
   {children}
 </div>
         </main>
@@ -310,10 +312,16 @@ export default function AppRoutes() {
   )}
 />
 
-<Route
-  path="/reports/vendor-parts-latest"
-  element={<VendorPartsLatestReport />}
-/>
+            <Route
+              path="/reports/vendor-parts-latest"
+              element={Protected(
+                <AdminRoute permission="view_reports" message="Reports access required.">
+                  <PrivateLayout>
+                    <VendorPartsLatestReport />
+                  </PrivateLayout>
+                </AdminRoute>
+              )}
+            />
      <Route
   path="/reports/vendor-summary"
   element={Protected(
@@ -392,6 +400,28 @@ export default function AppRoutes() {
     <AdminRoute permission="manage_settings" message="Settings access required.">
       <PrivateLayout>
         <MonitoringPage />
+      </PrivateLayout>
+    </AdminRoute>
+  )}
+/>
+
+      <Route
+  path="/settings/logs"
+  element={Protected(
+    <AdminRoute permission="manage_settings" message="Settings access required.">
+      <PrivateLayout>
+        <AuditLogsPage />
+      </PrivateLayout>
+    </AdminRoute>
+  )}
+/>
+
+      <Route
+  path="/settings/info"
+  element={Protected(
+    <AdminRoute permission="manage_settings" message="Settings access required.">
+      <PrivateLayout>
+        <AppInfoPage />
       </PrivateLayout>
     </AdminRoute>
   )}

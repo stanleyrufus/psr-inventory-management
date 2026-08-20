@@ -92,6 +92,12 @@ export default function VendorsPage() {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
 
+  const clearFilters = () => {
+    setSearch("");
+    setStatusFilter("");
+    setCurrentPage(1);
+  };
+
   /* ---------------- Handlers ---------------- */
   const onView = useCallback((vendor) => {
     setViewingVendor(vendor);
@@ -187,19 +193,41 @@ export default function VendorsPage() {
   }
 
   return (
-    <div className="p-6">
-      <style>{`.ag-theme-quartz .ag-header-cell-text{font-weight:600;}`}</style>
+    <div className="p-4 md:p-6 lg:p-8">
+      <style>{`
+        .ag-theme-quartz {
+          --ag-header-font-weight: 700;
+          --ag-font-size: 13px !important;
+          --ag-row-height: 36px !important;
+        }
+        .ag-theme-quartz .ag-cell,
+        .ag-theme-quartz .ag-cell-wrapper {
+          padding-top: 0 !important;
+          padding-bottom: 0 !important;
+          display: flex !important;
+          align-items: center !important;
+        }
+        .ag-theme-quartz .ag-header-cell-sortable .ag-sort-none-icon {
+          opacity: 0.35;
+        }
+        .ag-theme-quartz .ag-header-cell-sortable:hover .ag-sort-none-icon {
+          opacity: 0.6;
+        }
+        .ag-theme-quartz .ag-header-cell-sortable:hover {
+          background-color: rgba(0, 0, 0, 0.04);
+        }
+      `}</style>
 
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-800">Vendors</h2>
-          <p className="text-gray-500 text-sm">
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Vendors</h2>
+          <p className="text-gray-500 text-sm mt-1">
             Approved suppliers / vendors used for purchasing
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 md:gap-3">
                <button
             type="button"
             disabled={!canEditVendors}
@@ -207,7 +235,7 @@ export default function VendorsPage() {
               if (!canEditVendors) return;
               setShowBulk(true);
             }}
-            className={`px-3 py-1.5 text-sm rounded shadow ${
+            className={`px-4 py-2 text-sm font-medium rounded-lg shadow-sm ${
               canEditVendors
                 ? "bg-blue-600 hover:bg-blue-700 text-white"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
@@ -225,7 +253,7 @@ export default function VendorsPage() {
               setEditingVendor(null);
               setShowForm(true);
             }}
-            className={`px-3 py-1.5 text-sm rounded shadow ${
+            className={`px-4 py-2 text-sm font-medium rounded-lg shadow-sm ${
               canEditVendors
                 ? "bg-green-600 hover:bg-green-700 text-white"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
@@ -237,10 +265,11 @@ export default function VendorsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-4 mb-4">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 md:p-4 mb-5">
+      <div className="flex flex-wrap items-center gap-3 md:gap-4">
         <input
           placeholder="🔍 Search name, contact, phone, email…"
-          className="border rounded px-3 py-2 w-64"
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 w-full md:w-72 lg:w-80 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -249,7 +278,7 @@ export default function VendorsPage() {
         />
 
         <select
-          className="border rounded px-3 py-2"
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
           value={statusFilter}
           onChange={(e) => {
             setStatusFilter(e.target.value);
@@ -267,7 +296,7 @@ export default function VendorsPage() {
             setItemsPerPage(Number(e.target.value));
             setCurrentPage(1);
           }}
-          className="border rounded px-3 py-2"
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
         >
           {[10, 25, 50].map((n) => (
             <option key={n} value={n}>
@@ -275,13 +304,23 @@ export default function VendorsPage() {
             </option>
           ))}
         </select>
+
+        <button
+          type="button"
+          onClick={clearFilters}
+          className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors"
+        >
+          Clear Filters
+        </button>
+      </div>
       </div>
 
-   <div className="bg-white shadow-md rounded-lg p-2">
+   <div className="bg-white shadow-md rounded-xl p-3 md:p-5">
   <div className="ag-theme-quartz" style={{ width: "100%" }}>
     <AgGridReact
       rowData={pageData}
       columnDefs={columnDefs}
+      defaultColDef={{ resizable: true, minWidth: 90, unSortIcon: true }}
       pagination={false}
       domLayout="autoHeight"
     />
