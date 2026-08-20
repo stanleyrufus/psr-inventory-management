@@ -1,9 +1,11 @@
 // frontend/src/pages/settings/SystemPreferences.jsx
 import { useEffect, useState } from "react";
-import { Card, Title, Button } from "@tremor/react";
+import { useNavigate } from "react-router-dom";
 import api from "../../utils/api";
 
 export default function SystemPreferences() {
+  const navigate = useNavigate();
+
   const [settings, setSettings] = useState({
     default_currency: "",
     default_vendor_terms: "",
@@ -46,10 +48,38 @@ export default function SystemPreferences() {
     "w-full border rounded-lg px-3 py-2 text-sm bg-white shadow-sm focus:ring-2 focus:ring-blue-400 focus:outline-none";
 
   return (
-    <div className="space-y-6">
-      <Title className="text-xl font-bold">System Preferences</Title>
+    <div className="p-4 md:p-6 lg:p-8">
 
-      <Card className="p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+            System Preferences
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
+            System-wide defaults, alerts, and PDF branding
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
+          <button
+            onClick={saveSettings}
+            disabled={saving}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors disabled:opacity-50 whitespace-nowrap"
+          >
+            {saving ? "Saving..." : "Save Preferences"}
+          </button>
+
+          <button
+            onClick={() => navigate("/settings")}
+            className="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors whitespace-nowrap"
+          >
+            ← Back to Settings
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-5">
         {/* 2 COLUMN LAYOUT */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
@@ -139,14 +169,7 @@ export default function SystemPreferences() {
             />
           </div>
         </div>
-
-        {/* Save button */}
-        <div className="flex justify-end mt-6">
-          <Button onClick={saveSettings} disabled={saving}>
-            {saving ? "Saving..." : "Save Preferences"}
-          </Button>
-        </div>
-      </Card>
+      </div>
     </div>
   );
 }

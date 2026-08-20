@@ -1,15 +1,5 @@
-// src/pages/settings/SettingsIndex.jsx
-
 import { useNavigate } from "react-router-dom";
-import { PageContainer, PageHeader, Card } from "../../components/ui";
 
-/**
- * SettingsIndex
- * Purpose:
- * - Main landing page for Settings
- * - Shows all settings sections as clickable cards
- * - Uses shared PSR design shell for consistent look and feel
- */
 export default function SettingsIndex() {
   const navigate = useNavigate();
 
@@ -42,11 +32,16 @@ export default function SettingsIndex() {
   ];
 
   return (
-    <PageContainer>
-      <PageHeader
-        title="Settings"
-        subtitle="Manage configuration, monitoring, access control, and administrative tools."
-      />
+    <div className="p-4 md:p-6 lg:p-8">
+      <div className="mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+          Settings
+        </h1>
+        <p className="text-gray-500 text-sm mt-1">
+          Manage configuration, monitoring, access control, and administrative
+          tools.
+        </p>
+      </div>
 
       <div
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
@@ -58,53 +53,25 @@ export default function SettingsIndex() {
             key={section.path}
             type="button"
             onClick={() => navigate(section.path)}
-            className="text-left bg-transparent border-0 p-0"
-            style={{ cursor: "pointer" }}
+            className="text-left cursor-pointer bg-transparent border-0 p-0"
             aria-label={`Open ${section.title}`}
           >
-            <Card
-              className="h-full transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-              padding="lg"
-            >
-              <div className="psr-section-stack">
-                <div>
-                  <h2
-                    style={{
-                      margin: 0,
-                      fontSize: "18px",
-                      fontWeight: 700,
-                      color: "var(--psr-text)",
-                    }}
-                  >
-                    {section.title}
-                  </h2>
-
-                  <p
-                    style={{
-                      margin: "10px 0 0 0",
-                      fontSize: "14px",
-                      lineHeight: 1.6,
-                      color: "var(--psr-text-muted)",
-                    }}
-                  >
-                    {section.desc}
-                  </p>
-                </div>
-
-                <div
-                  style={{
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    color: "var(--psr-primary)",
-                  }}
-                >
-                  Open section →
-                </div>
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 h-full flex flex-col justify-between hover:shadow-md hover:-translate-y-0.5 transition-all">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {section.title}
+                </h2>
+                <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+                  {section.desc}
+                </p>
               </div>
-            </Card>
+              <p className="text-sm font-medium text-blue-600 mt-4">
+                Open section →
+              </p>
+            </div>
           </button>
         ))}
       </div>
-    </PageContainer>
+    </div>
   );
 }
