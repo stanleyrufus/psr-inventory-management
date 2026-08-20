@@ -515,7 +515,7 @@ export default function PurchaseOrderList() {
             : "bg-gray-100 text-gray-800";
 
         return (
-          <span className={`px-2 py-1 rounded text-xs font-semibold ${color}`}>
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${color}`}>
             {s || "-"}
           </span>
         );
@@ -535,15 +535,13 @@ if (!canViewPOs) {
 }
 
 return (
-  <div className="p-6">
+  <div className="p-4 md:p-6 lg:p-8">
       {/* AG Grid style tuning */}
       <style>{`
-        .ag-theme-quartz .ag-header-cell-text {
-          font-weight: 600 !important;
-        }
         .ag-theme-quartz {
+          --ag-header-font-weight: 700;
           --ag-font-size: 13px !important;
-          --ag-row-height: 28px !important;
+          --ag-row-height: 36px !important;
         }
         .ag-theme-quartz .ag-cell, 
         .ag-theme-quartz .ag-cell-wrapper {
@@ -552,16 +550,25 @@ return (
           display: flex !important;
           align-items: center !important;
         }
+        .ag-theme-quartz .ag-header-cell-sortable .ag-sort-none-icon {
+          opacity: 0.35;
+        }
+        .ag-theme-quartz .ag-header-cell-sortable:hover .ag-sort-none-icon {
+          opacity: 0.6;
+        }
+        .ag-theme-quartz .ag-header-cell-sortable:hover {
+          background-color: rgba(0, 0, 0, 0.04);
+        }
       `}</style>
 
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-800">Purchase Orders</h2>
-          <p className="text-gray-500 text-sm">Create, track and manage purchase orders</p>
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Purchase Orders</h2>
+          <p className="text-gray-500 text-sm mt-1">Create, track and manage purchase orders</p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 md:gap-3">
                   <button
             type="button"
             disabled={!canEditPOs}
@@ -569,7 +576,7 @@ return (
               if (!canEditPOs) return;
               setShowReserve(true);
             }}
-            className={`px-3 py-1.5 text-sm rounded shadow ${
+            className={`px-4 py-2 text-sm font-medium rounded-lg shadow-sm ${
               canEditPOs
                 ? "bg-indigo-600 hover:bg-indigo-700 text-white"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
@@ -586,7 +593,7 @@ return (
               if (!canEditPOs) return;
               navigate("/purchase-orders/bulk-upload");
             }}
-            className={`px-3 py-1.5 text-sm rounded shadow ${
+            className={`px-4 py-2 text-sm font-medium rounded-lg shadow-sm ${
               canEditPOs
                 ? "bg-blue-600 hover:bg-blue-700 text-white"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
@@ -602,7 +609,7 @@ return (
               if (!canEditPOs) return;
               navigate("/purchase-orders/import-from-pdf");
             }}
-            className={`px-3 py-1.5 text-sm rounded shadow ${
+            className={`px-4 py-2 text-sm font-medium rounded-lg shadow-sm ${
               canEditPOs
                 ? "bg-green-600 hover:bg-green-700 text-white"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
@@ -618,7 +625,7 @@ return (
               if (!canEditPOs) return;
               navigate("/purchase-orders/import-from-excel");
             }}
-            className={`px-3 py-1.5 text-sm rounded shadow ${
+            className={`px-4 py-2 text-sm font-medium rounded-lg shadow-sm ${
               canEditPOs
                 ? "bg-green-600 hover:bg-green-700 text-white"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
@@ -634,7 +641,7 @@ return (
               if (!canEditPOs) return;
               navigate("/purchase-orders/new");
             }}
-            className={`px-3 py-1.5 text-sm rounded shadow ${
+            className={`px-4 py-2 text-sm font-medium rounded-lg shadow-sm ${
               canEditPOs
                 ? "bg-green-600 hover:bg-green-700 text-white"
                 : "bg-gray-300 text-gray-500 cursor-not-allowed"
@@ -646,7 +653,8 @@ return (
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 mb-4 items-center">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 md:p-4 mb-5">
+      <div className="flex flex-wrap gap-3 md:gap-4 items-center">
         <input
           placeholder="🔍 Search PO#, Vendor..."
           value={search}
@@ -654,7 +662,7 @@ return (
             setSearch(e.target.value);
             setCurrentPage(1);
           }}
-          className="border rounded px-3 py-2 w-64"
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 w-full md:w-64 lg:w-72 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
         />
 
         <select
@@ -663,7 +671,7 @@ return (
             setSupplierFilter(e.target.value);
             setCurrentPage(1);
           }}
-          className="border rounded px-2 py-2 w-40"
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 w-full sm:w-auto md:w-44 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
         >
           <option value="">All Vendors</option>
           {Array.from(new Set(orders.map((o) => o.vendor_name).filter(Boolean))).map((s) => (
@@ -677,7 +685,7 @@ return (
             setStatusFilter(e.target.value);
             setCurrentPage(1);
           }}
-          className="border rounded px-2 py-2 w-32"
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 w-full sm:w-auto md:w-36 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
         >
           <option value="">All Status</option>
           {Array.from(new Set(orders.map((o) => o.status).filter(Boolean))).map((s) => (
@@ -688,11 +696,11 @@ return (
         <select
           value={itemsPerPage}
           onChange={(e) => setItemsPerPage(Number(e.target.value))}
-          className="border rounded px-2 py-2"
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 w-full sm:w-auto focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
         >
           {[10, 20, 50, 100].map((n) => (
             <option key={n} value={n}>
-              Show {n}
+              Show {n} per page
             </option>
           ))}
         </select>
@@ -700,19 +708,20 @@ return (
         <button
           type="button"
           onClick={clearFilters}
-          className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-2 rounded text-sm shadow"
+          className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors"
         >
           Clear Filters
         </button>
       </div>
+      </div>
 
       {/* AG Grid Table */}
-      <div className="ag-theme-quartz bg-white shadow-md rounded-lg p-2">
+      <div className="ag-theme-quartz bg-white shadow-md rounded-xl p-3 md:p-5">
         <AgGridReact
   ref={gridRef}
   rowData={paginated}
   columnDefs={columns}
-  defaultColDef={{ resizable: true }}
+  defaultColDef={{ resizable: true, minWidth: 90, unSortIcon: true }}
   domLayout="autoHeight"
   animateRows={true}
   onGridReady={(params) => params.api.sizeColumnsToFit()}

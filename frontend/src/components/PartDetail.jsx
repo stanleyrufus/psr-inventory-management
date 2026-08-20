@@ -72,6 +72,11 @@ const canDeleteParts = hasPermission("delete_parts");
   const [zoom, setZoom] = useState(false);
 
   const [relatedPOs, setRelatedPOs] = useState([]);
+const [reviewStatus, setReviewStatus] = useState(
+  part.image_review_status || "not_reviewed"
+);
+
+const [reviewBusy, setReviewBusy] = useState(false);
 
   React.useEffect(() => {
     if (!part?.part_id) return;
@@ -83,19 +88,81 @@ api
 
   const latestPO = getLatestPO(relatedPOs);
   const mainImageUrl = hasImages ? imageUrls[mainIndex] : null;
+/* IMAGE REVIEW ACTIONS */
+
+const handleImageVerified = async () => {
+  if (!canEditParts || reviewBusy) return;
+
+  try {
+    setReviewBusy(true);
+
+    await api.post(`/parts/${part.part_id}/image-review`);
+
+    setReviewStatus("approved");
+    window.dispatchEvent(new Event("reload-parts"));
+  } catch (err) {
+    alert(
+      err?.response?.data?.message ||
+      err?.message ||
+      "Failed to verify image."
+    );
+  } finally {
+    setReviewBusy(false);
+  }
+};
+
+const handleImageRejected = async () => {
+  if (!canEditParts || reviewBusy || !imagePaths[mainIndex]) return;
+
+  const confirmed = window.confirm(
+    "This image does not match the part. Do you want to delete this image?"
+  );
+
+  if (!confirmed) return;
+
+  try {
+    setReviewBusy(true);
+
+    await api.delete(`/parts/${part.part_id}/image`, {
+      data: {
+        image_url: imagePaths[mainIndex],
+      },
+    });
+
+    window.dispatchEvent(new Event("reload-parts"));
+
+    alert("Image removed successfully.");
+    onClose();
+  } catch (err) {
+    alert(
+      err?.response?.data?.message ||
+      err?.message ||
+      "Failed to remove image."
+    );
+  } finally {
+    setReviewBusy(false);
+  }
+};
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl p-5 relative overflow-y-auto max-h-[90vh]">
+      <div className="bg-white rounded-xl shadow-xl border border-gray-100 w-full max-w-4xl p-5 relative overflow-y-auto max-h-[90vh]">
 
-        {/* ACTION BAR */}
-        <div className="absolute top-3 right-3 flex items-center gap-2">
+        {/* HEADER */}
+        <div className="flex items-start justify-between gap-4 mb-4 border-b border-gray-100 pb-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-2xl font-bold text-gray-900 leading-tight break-words">
+              {part.part_name || "Part Details"}
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
 <button
   type="button"
   disabled={!canEditParts}
-  className={`px-3 h-8 rounded text-xs ${
+  className={`min-w-[80px] h-9 px-4 rounded-lg text-sm font-medium shadow-sm transition-colors ${
     canEditParts
-      ? "bg-blue-600 text-white"
+      ? "bg-blue-600 hover:bg-blue-700 text-white"
       : "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
   }`}
   onClick={() => {
@@ -110,9 +177,9 @@ api
 <button
   type="button"
   disabled={!canDeleteParts}
-  className={`px-3 h-8 rounded text-xs ${
+  className={`min-w-[80px] h-9 px-4 rounded-lg text-sm font-medium shadow-sm transition-colors ${
     canDeleteParts
-      ? "bg-red-600 text-white"
+      ? "bg-red-600 hover:bg-red-700 text-white"
       : "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
   }`}
 onClick={async () => {
@@ -153,40 +220,72 @@ onClick={async () => {
 >
   Delete
 </button>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-800 text-xl font-bold px-2"
-          >
-            ✕
-          </button>
+            <button
+              onClick={onClose}
+              className="h-9 w-9 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100 text-xl font-bold transition-colors"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
-        {/* TITLE */}
-        <h2 className="text-2xl font-semibold text-gray-800 mb-3 pr-8">
-          {part.part_name || "Part Details"}
-        </h2>
+        <div className="space-y-4">
 
         {/* IMAGE + DETAILS ROW */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-          {/* IMAGES */}
-          <div className="flex flex-col items-center gap-2">
+          {/* IMAGES CARD */}
+          <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex flex-col items-center gap-2">
             {hasImages ? (
               <>
 <img
   src={mainImageUrl}
   referrerPolicy="no-referrer"
-className="w-36 h-36 object-contain rounded-lg border cursor-pointer bg-white"
+className="w-36 h-36 object-contain rounded-lg border border-gray-200 cursor-pointer bg-white"
   onClick={() => setZoom(true)}
   alt={part.part_name || part.part_number || "Part image"}
 />
 
                 <button
-                  className="bg-blue-600 text-white px-3 py-1 rounded text-xs"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
                   onClick={() => window.open(mainImageUrl, "_blank")}
                 >
                   Download Image
                 </button>
+
+{reviewStatus === "approved" ? (
+  <div className="text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-center">
+    ✓ Image verified by PSR team
+  </div>
+) : (
+  canEditParts && (
+    <div className="border border-gray-200 rounded-lg px-3 py-2.5 text-center bg-gray-50">
+      <p className="text-xs font-medium text-gray-700 mb-2">
+        Is this the right image?
+      </p>
+
+      <div className="flex justify-center gap-2">
+        <button
+          type="button"
+          disabled={reviewBusy}
+          onClick={handleImageVerified}
+          className="px-3 py-1 rounded-lg text-xs font-medium transition-colors bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+        >
+          Yes
+        </button>
+
+        <button
+          type="button"
+          disabled={reviewBusy}
+          onClick={handleImageRejected}
+          className="px-3 py-1 rounded-lg text-xs font-medium transition-colors bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+        >
+          No
+        </button>
+      </div>
+    </div>
+  )
+)}
 
                 {imageUrls.length > 1 && (
                   <div className="flex gap-1 mt-2 flex-wrap justify-center">
@@ -196,7 +295,7 @@ className="w-36 h-36 object-contain rounded-lg border cursor-pointer bg-white"
   src={url}
   referrerPolicy="no-referrer"
   alt={`Part image ${idx + 1}`}
-className={`w-10 h-10 object-contain rounded border cursor-pointer bg-white ${
+className={`w-10 h-10 object-contain rounded border border-gray-200 cursor-pointer bg-white ${
     idx === mainIndex
       ? "ring-2 ring-blue-500"
       : "opacity-80 hover:opacity-100"
@@ -208,14 +307,14 @@ className={`w-10 h-10 object-contain rounded border cursor-pointer bg-white ${
                 )}
               </>
             ) : (
-              <div className="w-36 h-36 rounded-lg border bg-gray-100 flex items-center justify-center text-gray-400 text-sm">
+              <div className="w-36 h-36 rounded-lg border border-gray-200 bg-gray-100 flex items-center justify-center text-gray-400 text-sm">
                 No Image
               </div>
             )}
           </div>
 
-          {/* DETAILS — SQUEEZED */}
-          <div className="md:col-span-2 grid grid-cols-2 gap-2 text-sm">
+          {/* DETAILS CARD */}
+          <div className="md:col-span-2 bg-gray-50/70 border border-gray-200 rounded-xl p-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
             <Detail label="Part Number" value={part.part_number} />
             <Detail label="Category" value={part.category} />
             <Detail
@@ -237,12 +336,12 @@ className={`w-10 h-10 object-contain rounded border cursor-pointer bg-white ${
           </div>
         </div>
 
-        {/* ⭐ LAST VENDOR + PO — SQUEEZED */}
-        <div className="mt-3 border-t pt-3">
-          <h3 className="font-semibold text-gray-800 mb-1">Latest Vendor &amp; PO</h3>
+        {/* ⭐ LAST VENDOR + PO */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+          <h3 className="text-base font-semibold text-gray-900 mb-3">Latest Vendor &amp; PO</h3>
 
           {latestPO ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3 text-sm">
               <Detail label="Vendor" value={latestPO.vendor_name} />
               <Detail label="PO #" value={latestPO.psr_po_number} />
               <Detail
@@ -277,54 +376,54 @@ className={`w-10 h-10 object-contain rounded border cursor-pointer bg-white ${
         </div>
 
         {/* DESCRIPTION */}
-        <div className="mt-4">
-          <h3 className="font-semibold text-gray-800 mb-1">Description</h3>
-          <p className="text-gray-600 text-sm whitespace-pre-line">{part.description || "—"}</p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <h3 className="text-base font-semibold text-gray-900 mb-2">Description</h3>
+          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{part.description || "—"}</p>
         </div>
 
         {/* REMARKS */}
-        <div className="mt-3">
-          <h3 className="font-semibold text-gray-800 mb-1">Remarks</h3>
-          <p className="text-gray-600 text-sm whitespace-pre-line">{part.remarks || "—"}</p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <h3 className="text-base font-semibold text-gray-900 mb-2">Remarks</h3>
+          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{part.remarks || "—"}</p>
         </div>
 
-        {/* ⭐ RELATED POs — UNCHANGED */}
-        <div className="mt-6">
-          <h3 className="font-semibold text-gray-800 mb-2">Purchase Orders Containing This Part</h3>
+        {/* ⭐ RELATED POs */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+          <h3 className="text-base font-semibold text-gray-900 mb-3">Purchase Orders Containing This Part</h3>
 
           {relatedPOs.length === 0 ? (
             <p className="text-sm text-gray-500">No purchase orders contain this part.</p>
           ) : (
-            <div className="overflow-x-auto border border-gray-300 rounded-md">
-              <table className="min-w-full text-sm border-collapse">
-                <thead className="bg-gray-100">
+            <div className="overflow-x-auto rounded-lg border border-gray-300">
+              <table className="min-w-full text-[13px] border-collapse">
+                <thead>
                   <tr>
-                    <th className="border px-2 py-1">PO #</th>
-                    <th className="border px-2 py-1">Status</th>
-                    <th className="border px-2 py-1">Order Date</th>
-                    <th className="border px-2 py-1">Qty</th>
-                    <th className="border px-2 py-1">Unit Price</th>
-                    <th className="border px-2 py-1">Total</th>
-                    <th className="border px-2 py-1">Action</th>
+                    <th className="h-9 px-3 py-0 text-left text-[13px] font-bold text-gray-900 bg-gray-50 align-middle leading-none whitespace-nowrap border-b border-gray-300 border-r border-gray-200 last:border-r-0">PO #</th>
+                    <th className="h-9 px-3 py-0 text-left text-[13px] font-bold text-gray-900 bg-gray-50 align-middle leading-none whitespace-nowrap border-b border-gray-300 border-r border-gray-200 last:border-r-0">Status</th>
+                    <th className="h-9 px-3 py-0 text-left text-[13px] font-bold text-gray-900 bg-gray-50 align-middle leading-none whitespace-nowrap border-b border-gray-300 border-r border-gray-200 last:border-r-0">Order Date</th>
+                    <th className="h-9 px-3 py-0 text-left text-[13px] font-bold text-gray-900 bg-gray-50 align-middle leading-none whitespace-nowrap border-b border-gray-300 border-r border-gray-200 last:border-r-0">Qty</th>
+                    <th className="h-9 px-3 py-0 text-left text-[13px] font-bold text-gray-900 bg-gray-50 align-middle leading-none whitespace-nowrap border-b border-gray-300 border-r border-gray-200 last:border-r-0">Unit Price</th>
+                    <th className="h-9 px-3 py-0 text-left text-[13px] font-bold text-gray-900 bg-gray-50 align-middle leading-none whitespace-nowrap border-b border-gray-300 border-r border-gray-200 last:border-r-0">Total</th>
+                    <th className="h-9 px-3 py-0 text-left text-[13px] font-bold text-gray-900 bg-gray-50 align-middle leading-none whitespace-nowrap border-b border-gray-300 border-r border-gray-200 last:border-r-0">Action</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {relatedPOs.map((po, idx) => (
-                    <tr key={`${po.id}-${idx}`}>
-                      <td className="border px-2 py-1">{po.psr_po_number}</td>
-                      <td className="border px-2 py-1">{po.status}</td>
-                      <td className="border px-2 py-1">
+                    <tr key={`${po.id}-${idx}`} className="hover:bg-gray-50 transition-colors">
+                      <td className="h-9 px-3 py-0 text-[13px] text-gray-800 align-middle leading-none whitespace-nowrap border-b border-gray-200 border-r border-gray-100 last:border-r-0">{po.psr_po_number}</td>
+                      <td className="h-9 px-3 py-0 text-[13px] text-gray-800 align-middle leading-none whitespace-nowrap border-b border-gray-200 border-r border-gray-100 last:border-r-0">{po.status}</td>
+                      <td className="h-9 px-3 py-0 text-[13px] text-gray-800 align-middle leading-none whitespace-nowrap border-b border-gray-200 border-r border-gray-100 last:border-r-0">
                         {po.order_date ? new Date(po.order_date).toLocaleDateString() : "—"}
                       </td>
-                      <td className="border px-2 py-1">{po.quantity}</td>
-                      <td className="border px-2 py-1">
+                      <td className="h-9 px-3 py-0 text-[13px] text-gray-800 align-middle leading-none whitespace-nowrap border-b border-gray-200 border-r border-gray-100 last:border-r-0">{po.quantity}</td>
+                      <td className="h-9 px-3 py-0 text-[13px] text-gray-800 align-middle leading-none whitespace-nowrap border-b border-gray-200 border-r border-gray-100 last:border-r-0">
                         {po.unit_price ? "$" + Number(po.unit_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}
                       </td>
-                      <td className="border px-2 py-1">
+                      <td className="h-9 px-3 py-0 text-[13px] text-gray-800 align-middle leading-none whitespace-nowrap border-b border-gray-200 border-r border-gray-100 last:border-r-0">
                         {po.total_price ? "$" + Number(po.total_price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—"}
                       </td>
-                      <td className="border px-2 py-1">
+                      <td className="h-9 px-3 py-0 text-[13px] text-gray-800 align-middle leading-none whitespace-nowrap border-b border-gray-200 border-r border-gray-100 last:border-r-0">
                         <a
                           href={`/purchase-orders/${po.id}`}
                           className="text-blue-600 hover:underline"
@@ -341,7 +440,7 @@ className={`w-10 h-10 object-contain rounded border cursor-pointer bg-white ${
         </div>
 
         {/* FOOTER */}
-        <div className="mt-5 text-xs text-gray-500 border-t pt-2">
+        <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500">
           <p>
             <span className="font-medium">Created On:</span>{" "}
             {part.created_on ? new Date(part.created_on).toLocaleString() : "—"}
@@ -350,6 +449,8 @@ className={`w-10 h-10 object-contain rounded border cursor-pointer bg-white ${
             <span className="font-medium">Updated On:</span>{" "}
             {part.updated_on ? new Date(part.updated_on).toLocaleString() : "—"}
           </p>
+        </div>
+
         </div>
       </div>
 
@@ -372,8 +473,8 @@ className={`w-10 h-10 object-contain rounded border cursor-pointer bg-white ${
 function Detail({ label, value }) {
   return (
     <div>
-      <p className="text-gray-500 text-[11px] uppercase">{label}</p>
-      <p className="text-gray-800 text-sm font-medium whitespace-nowrap">
+      <p className="text-gray-500 text-[11px] uppercase tracking-wide">{label}</p>
+      <p className="text-gray-900 text-sm font-medium whitespace-nowrap">
         {value || value === 0 ? value : "—"}
       </p>
     </div>

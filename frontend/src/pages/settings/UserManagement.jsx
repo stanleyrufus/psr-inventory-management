@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, Title, Button, TextInput, Badge } from "@tremor/react";
+import { Button, TextInput, Badge } from "@tremor/react";
 import api from "../../utils/api";
 import { PlusIcon } from "@heroicons/react/24/outline";
 
@@ -281,52 +281,58 @@ export default function UserManagement() {
     role === "manager" ? "orange" : "blue";
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 md:p-6 lg:p-8">
 
-      {/* Back Link */}
-      <button
-        onClick={() => navigate("/settings")}
-        className="text-blue-600 hover:underline mb-2 text-sm"
-      >
-        ← Back to Settings
-      </button>
-
-      <Title className="text-xl font-bold">User Management</Title>
-
-      <Card className="p-4"	>
-
-        <div className="flex justify-between items-center mb-4">
-          <div className="text-gray-700">Manage application users</div>
-
-          {/* ✅ FIXED BUTTON */}
-          <button
-  onClick={openAddUser}
-  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded shadow flex items-center gap-2"
->
-  <PlusIcon className="h-5 w-5 text-white" />
-  <span>Add User</span>
-</button>
-
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+            User Management
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
+            Manage application users
+          </p>
         </div>
 
-        <table className="w-full text-sm border rounded overflow-hidden">
-          <thead className="bg-gray-50 text-gray-700">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
+          <button
+            onClick={openAddUser}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center gap-2"
+          >
+            <PlusIcon className="h-5 w-5 text-white" />
+            <span>Add User</span>
+          </button>
+
+          <button
+            onClick={() => navigate("/settings")}
+            className="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors whitespace-nowrap"
+          >
+            ← Back to Settings
+          </button>
+        </div>
+      </div>
+
+      {/* Content Card */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-5">
+
+        <table className="w-full text-[13px] border-collapse">
+          <thead>
             <tr>
-              <th className="p-2 text-left">Username</th>
-              <th className="p-2 text-left">Email</th>
-              <th className="p-2 text-left">Role</th>
-              <th className="p-2 text-center">Actions</th>
+              <th className="h-9 px-3 py-0 text-left text-[13px] font-bold text-gray-900 bg-gray-50 align-middle leading-none whitespace-nowrap border-b border-gray-300 border-r border-gray-200 last:border-r-0">Username</th>
+              <th className="h-9 px-3 py-0 text-left text-[13px] font-bold text-gray-900 bg-gray-50 align-middle leading-none whitespace-nowrap border-b border-gray-300 border-r border-gray-200 last:border-r-0">Email</th>
+              <th className="h-9 px-3 py-0 text-left text-[13px] font-bold text-gray-900 bg-gray-50 align-middle leading-none whitespace-nowrap border-b border-gray-300 border-r border-gray-200 last:border-r-0">Role</th>
+              <th className="h-9 px-3 py-0 text-center text-[13px] font-bold text-gray-900 bg-gray-50 align-middle leading-none whitespace-nowrap border-b border-gray-300 border-r border-gray-200 last:border-r-0">Actions</th>
             </tr>
           </thead>
 
           <tbody>
             {users.map(u => (
-              <tr key={u.id} className="border-t hover:bg-gray-50">
-                <td className="p-2">{u.username}</td>
-                <td className="p-2">{u.email}</td>
-                <td className="p-2"><Badge color={badgeColor(u.role)}>{u.role}</Badge></td>
+              <tr key={u.id} className="hover:bg-gray-50 transition-colors">
+                <td className="h-9 px-3 py-0 text-[13px] text-gray-800 align-middle leading-none border-b border-gray-200 border-r border-gray-100 last:border-r-0">{u.username}</td>
+                <td className="h-9 px-3 py-0 text-[13px] text-gray-800 align-middle leading-none border-b border-gray-200 border-r border-gray-100 last:border-r-0">{u.email}</td>
+                <td className="h-9 px-3 py-0 text-[13px] text-gray-800 align-middle leading-none border-b border-gray-200 border-r border-gray-100 last:border-r-0"><Badge color={badgeColor(u.role)}>{u.role}</Badge></td>
 
-                <td className="p-2 text-center">
+                <td className="h-9 px-3 py-0 text-[13px] text-gray-800 align-middle leading-none border-b border-gray-200 border-r border-gray-100 last:border-r-0 text-center">
                   <div className="flex gap-3 justify-center">
 
                     <button className="text-blue-600" onClick={() => openEditUser(u)}>
@@ -363,7 +369,7 @@ export default function UserManagement() {
           </tbody>
         </table>
 
-      </Card>
+      </div>
 
       {/* Modals */}
       <UserForm

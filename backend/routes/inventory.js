@@ -149,54 +149,48 @@ router.get("/:id/purchase-orders", async (req, res) => {
 ---------------------------------------------------------*/
 router.get("/", async (req, res) => {
   try {
-    const rows = await db("inventory as inv")
-      .leftJoin("vendors as v", "inv.last_vendor_id", "v.vendor_id")
+    const rows = await db("inventory")
       .select(
-        "inv.part_id",
-        "inv.part_number",
-        "inv.part_name",
-        "inv.category",
-        "inv.description",
-        "inv.uom",
-        "inv.quantity_on_hand",
-        "inv.minimum_stock_level",
-        "inv.current_unit_price",
-        "inv.last_unit_price",
-        "inv.location",
-        "inv.status",
-        "inv.lead_time_days",
-        "inv.weight_kg",
-        "inv.material",
-        "inv.remarks",
-        "inv.machine_name",
-        "inv.last_po_number",
-        "inv.last_po_id",
-        "inv.last_po_date",
-        "inv.last_vendor_id",
-        db.raw(`
-          COALESCE(
-            NULLIF(TRIM(inv.last_vendor_name), ''),
-            v.vendor_name
-          ) AS last_vendor_name
-        `),
-        "inv.last_quantity",
-        "inv.last_currency_code",
-        "inv.last_freight",
-        "inv.last_payment_terms",
-        "inv.last_payment_method",
-        "inv.image_url",
-        "inv.created_on",
-        "inv.updated_on"
+        "part_id",
+        "part_number",
+        "part_name",
+        "category",
+        "description",
+        "uom",
+        "quantity_on_hand",
+        "minimum_stock_level",
+        "current_unit_price",
+        "last_unit_price",
+        "location",
+        "status",
+        "lead_time_days",
+        "weight_kg",
+        "material",
+        "remarks",
+        "machine_name",
+        "last_po_number",
+        "last_po_id",
+        "last_po_date",
+        "last_vendor_id",
+        "last_vendor_name",
+        "last_quantity",
+        "last_currency_code",
+        "last_freight",
+        "last_payment_terms",
+        "last_payment_method",
+        "image_url",
+        "image_review_status",
+        "image_reviewed_at",
+        "image_reviewed_by",
+        "created_on",
+        "updated_on"
       )
-      .orderBy("inv.part_id", "desc");
+      .orderBy("part_id", "desc");
 
     res.json({ success: 1, data: rows });
   } catch (err) {
     console.error("❌ GET /api/parts error:", err);
-    res.status(500).json({
-      success: 0,
-      message: "Failed to fetch parts",
-    });
+    res.status(500).json({ success: 0, message: "Failed to fetch parts" });
   }
 });
 
@@ -454,6 +448,11 @@ router.put("/:id", upload.array("images", 10), async (req, res) => {
       } else {
         updateData.image_url = null;
       }
+
+      updateData.image_review_status = "not_reviewed";
+      updateData.image_reviewed_at = null;
+      updateData.image_reviewed_by = null;
+
     } else {
       // No change requested to images → keep DB as-is
       finalImages = oldImages;
@@ -481,6 +480,64 @@ router.put("/:id", upload.array("images", 10), async (req, res) => {
   }
 });
 
+
+/* --------------------------------------------------------
+   VERIFY PART IMAGE
+   POST /api/parts/:id/image-review
+---------------------------------------------------------*/
+router.post(
+  "/:id/image-review",
+  requirePermission("edit_parts"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+
+    try {
+      const part = await db("inventory").where({ part_id: id }).first();
+      if (!part) return res.status(404).json({ success: 0, message: "Part not found" });
+      if (!part.image_url || !String(part.image_url).trim()) return res.status(400).json({ success: 0, message: "Part does not have an image to verify" });
+      await db("inventory").where({ part_id: id }).update({ image_review_status: "approved", image_reviewed_at: db.fn.now(), updated_on: db.fn.now() });
+      return res.json({ success: 1, message: "Image verified by PSR team", data: { image_review_status: "approved" } });
+    } catch (err) {
+      console.error("VERIFY image error:", err);
+      return res.status(500).json({ success: 0, message: "Failed to verify image" });
+    }
+  }
+);
+
+/* --------------------------------------------------------
+   REMOVE ONE PART IMAGE
+   DELETE /api/parts/:id/image
+---------------------------------------------------------*/
+router.delete(
+  "/:id/image",
+  requirePermission("edit_parts"),
+  async (req, res) => {
+    const id = Number(req.params.id);
+    const imagePath = String(req.body?.image_url || "").trim();
+    if (!imagePath) return res.status(400).json({ success: 0, message: "image_url is required" });
+    try {
+      const part = await db("inventory").where({ part_id: id }).first();
+      if (!part) return res.status(404).json({ success: 0, message: "Part not found" });
+      const currentImages = parseImageArray(part.image_url);
+      const remainingImages = currentImages.filter((img) => String(img).trim() !== imagePath);
+      let newImageUrl = null;
+      if (remainingImages.length === 1) newImageUrl = remainingImages[0];
+      else if (remainingImages.length > 1) newImageUrl = JSON.stringify(remainingImages);
+      const hasProductUrl = part.product_url && String(part.product_url).trim() !== "";
+      await db("inventory").where({ part_id: id }).update({
+        image_url: newImageUrl,
+        image_review_status: "rejected",
+        image_reviewed_at: db.fn.now(),
+        enrichment_status: remainingImages.length === 0 ? (hasProductUrl ? "product_found_no_image" : "not_started") : part.enrichment_status,
+        updated_on: db.fn.now(),
+      });
+      return res.json({ success: 1, message: "Image removed successfully", data: { image_url: newImageUrl, image_review_status: "rejected" } });
+    } catch (err) {
+      console.error("REMOVE image error:", err);
+      return res.status(500).json({ success: 0, message: "Failed to remove image" });
+    }
+  }
+);
 
 /* --------------------------------------------------------
    DELETE PART  ->  DELETE /api/parts/:id
