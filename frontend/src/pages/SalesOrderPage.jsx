@@ -1,46 +1,46 @@
-import React, { useState, useEffect } from "react";
-import api from "../utils/api";
-import SalesOrderForm from "../components/forms/SalesOrderForm";
-import SalesOrderList from "../components/lists/SalesOrderList";
+import React from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function SalesOrderPage() {
-  const [orders, setOrders] = useState([]);
-  const [editing, setEditing] = useState(null);
-
-  useEffect(() => {
-    api.fetchSalesOrders().then(setOrders).catch(console.error);
-  }, []);
-
-  const openNew = () => setEditing({});
-  const edit = (order) => setEditing(order);
-  const onSaved = () => {
-    api.fetchSalesOrders().then(setOrders);
-    setEditing(null);
-  };
+  const navigate = useNavigate();
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <h2 className="text-xl font-semibold">Sales Orders</h2>
-          <p className="text-sm text-gray-500">Manage customer orders</p>
+    <div className="p-4 md:p-6 lg:p-8">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-8 max-w-2xl">
+        <div className="flex items-center gap-3 mb-4">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+            Sales Orders
+          </h1>
+          <span className="px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+            Coming Soon
+          </span>
         </div>
-        <div>
-          <button onClick={openNew} className="bg-psr-accent text-white px-4 py-2 rounded">Add Sales Order</button>
+
+        <p className="text-gray-500 mt-2">
+          This module is currently under construction.
+        </p>
+
+        <p className="text-gray-500 mt-2">
+          Sales Order functionality has not been enabled yet. Please use the
+          available Inventory, Vendors, or Purchase Order modules for now.
+        </p>
+
+        <div className="flex flex-wrap gap-3 mt-6">
+          <button
+            onClick={() => navigate("/")}
+            className="px-4 py-2 rounded-lg text-sm font-medium shadow-sm bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          >
+            Back to Dashboard
+          </button>
+
+          <button
+            onClick={() => navigate("/parts")}
+            className="px-4 py-2 rounded-lg text-sm font-medium shadow-sm bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 transition-colors"
+          >
+            Go to Inventory
+          </button>
         </div>
       </div>
-
-      <div className="card p-4">
-        <SalesOrderList orders={orders} onEdit={edit} />
-      </div>
-
-      {editing !== null && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white p-6 rounded w-full max-w-4xl">
-            <SalesOrderForm initial={editing} onSaved={onSaved} onCancel={() => setEditing(null)} />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

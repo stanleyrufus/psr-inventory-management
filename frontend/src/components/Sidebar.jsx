@@ -8,7 +8,7 @@ const NavItem = ({ to, children, onClick, active }) => (
   <Link
     to={to || "#"}
     onClick={onClick}
-    className={`block py-3 px-4 rounded-lg transition-colors ${
+    className={`block py-2.5 px-4 rounded-lg transition-colors ${
       active
         ? "bg-white text-psr-primary font-semibold"
         : "hover:bg-white/10 text-white"
@@ -57,8 +57,8 @@ export default function Sidebar() {
         onClose={() => setShowToast(false)}
         message={toastMessage}
       />
-      {/* ⭐ REDUCED HEADER HEIGHT */}
-<div className="px-5 py-4 border-b border-white/10 shrink-0">
+      {/* Brand — fixed 64px to align sidebar border with top-header border */}
+<div className="px-5 h-16 flex items-center border-b border-white/10 shrink-0">
   <div className="text-lg font-bold">PSR Automation Inc.</div>
 </div>
 
@@ -122,7 +122,7 @@ export default function Sidebar() {
       </nav>
 
       {/* ⭐ REDUCED FOOTER HEIGHT + CONTACT INFO */}
-      <div className="mt-auto p-3 border-t border-white/10 text-[15px] leading-tight">
+      <div className="mt-auto p-3 border-t border-white/10 text-[15px] leading-normal">
         <div className="font-semibold text-white">Contact</div>
         <div className="text-white/80">📞 952-233-1441</div>
         <div className="text-white/80">✉️ info@psrautomation.com</div>

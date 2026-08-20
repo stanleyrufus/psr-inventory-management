@@ -382,7 +382,7 @@ if (!canEditParts) {
           accept="image/*"
           multiple
           onChange={handleFileChange}
-          className="border p-2 rounded mt-3"
+          className="border p-2 rounded mt-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
         />
 
         {/* Previews of NEW images */}
@@ -425,7 +425,7 @@ if (!canEditParts) {
             name="part_number"
             value={formData.part_number}
             onChange={handleChange}
-            className={`border p-2 rounded ${
+            className={`border p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors ${
               errors.part_number ? "border-red-500" : ""
             }`}
             required
@@ -441,7 +441,7 @@ if (!canEditParts) {
             name="category"
             value={formData.category}
             onChange={handleChange}
-            className="border p-2 rounded"
+            className="border p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
           >
             <option value="">Select Category</option>
             <option value="Electrical">Electrical</option>
@@ -458,7 +458,7 @@ if (!canEditParts) {
             name="supplier_name"
             value={formData.supplier_name}
             onChange={handleChange}
-            className="border p-2 rounded"
+            className="border p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
           >
             <option value="">Select Vendor</option>
             {vendors.map((v) => (
@@ -479,7 +479,7 @@ if (!canEditParts) {
             type="number"
             value={formData.quantity_on_hand}
             onChange={handleChange}
-            className="border p-2 rounded"
+            className="border p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
           />
         </label>
 
@@ -493,7 +493,7 @@ if (!canEditParts) {
             type="number"
             value={formData.minimum_stock_level}
             onChange={handleChange}
-            className="border p-2 rounded"
+            className="border p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
           />
         </label>
 
@@ -508,7 +508,7 @@ if (!canEditParts) {
             step="0.01"
             value={formData.current_unit_price}
             onChange={handleChange}
-            className="border p-2 rounded"
+            className="border p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
           />
         </label>
 
@@ -521,7 +521,7 @@ if (!canEditParts) {
             name="location"
             value={formData.location}
             onChange={handleChange}
-            className="border p-2 rounded"
+            className="border p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
           />
         </label>
 
@@ -535,7 +535,7 @@ if (!canEditParts) {
             type="number"
             value={formData.lead_time_days}
             onChange={handleChange}
-            className="border p-2 rounded"
+            className="border p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
           />
         </label>
 
@@ -548,7 +548,7 @@ if (!canEditParts) {
             name="material"
             value={formData.material}
             onChange={handleChange}
-            className="border p-2 rounded"
+            className="border p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
           />
         </label>
 
@@ -562,7 +562,7 @@ if (!canEditParts) {
             type="date"
             value={formData.last_po_date}
             onChange={handleChange}
-            className="border p-2 rounded"
+            className="border p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
           />
         </label>
 
@@ -575,7 +575,7 @@ if (!canEditParts) {
             name="status"
             value={formData.status}
             onChange={handleChange}
-            className="border p-2 rounded"
+            className="border p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
           >
             <option>Active</option>
             <option>Inactive</option>

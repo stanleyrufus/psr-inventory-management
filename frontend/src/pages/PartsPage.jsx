@@ -135,6 +135,13 @@ const matchSearch =
     currentPage * itemsPerPage
   );
 
+  const clearFilters = () => {
+    setSearch("");
+    setCategoryFilter("");
+    setStatusFilter("");
+    setCurrentPage(1);
+  };
+
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
@@ -393,21 +400,21 @@ if (!canViewParts) {
 }
 
 return (
-  <div className="p-6">
+  <div className="p-4 md:p-6 lg:p-8">
 
 
         {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
-<h2 className="text-2xl font-semibold text-gray-800">
+<h2 className="text-2xl md:text-3xl font-bold text-gray-900">
             Inventory Dashboard
           </h2>
-          <p className="text-gray-500 text-sm">
+          <p className="text-gray-500 text-sm mt-1">
             Manage all parts, components, and materials
           </p>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-2 md:gap-3">
           <button
   onClick={() => {
     if (!canEditParts) {
@@ -417,7 +424,7 @@ return (
     setEditingPart(null);
     setShowForm(true);
   }}
-  className={`px-3 py-1.5 text-sm rounded shadow ${
+  className={`px-4 py-2 text-sm font-medium rounded-lg shadow-sm ${
     canEditParts
       ? "bg-green-600 hover:bg-green-700 text-white"
       : "bg-gray-300 text-gray-500 cursor-not-allowed"
@@ -428,7 +435,7 @@ return (
 
           <button
             onClick={() => setShowBulk(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-sm rounded shadow"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm font-medium rounded-lg shadow-sm"
           >
             ⬆️ Bulk Upload
           </button>
@@ -436,19 +443,20 @@ return (
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 mb-4 items-center">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 md:p-4 mb-5">
+      <div className="flex flex-wrap gap-3 md:gap-4 items-center">
         <input
           type="text"
-          placeholder="Search..."
+          placeholder="Search part #, name, description, vendor..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="border rounded px-3 py-2 w-64"
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 w-full md:w-72 lg:w-80 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
         />
 
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="border rounded px-3 py-2"
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
         >
           <option value="">All Categories</option>
           {[...new Set(parts.map((p) => p.category))].map(
@@ -459,7 +467,7 @@ return (
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="border rounded px-3 py-2"
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
         >
           <option value="">All Status</option>
           <option value="Active">Active</option>
@@ -472,7 +480,7 @@ return (
             setItemsPerPage(Number(e.target.value));
             setCurrentPage(1);
           }}
-          className="border rounded px-3 py-2"
+          className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
         >
           {[10, 25, 50].map((n) => (
             <option key={n} value={n}>
@@ -480,10 +488,19 @@ return (
             </option>
           ))}
         </select>
+
+        <button
+          type="button"
+          onClick={clearFilters}
+          className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors"
+        >
+          Clear Filters
+        </button>
+      </div>
       </div>
 
      {/* AG Grid + Pagination */}
-<div className="bg-white shadow-md rounded-lg p-2">
+<div className="bg-white shadow-md rounded-xl p-3 md:p-5">
 <div className="ag-theme-quartz" style={{ width: "100%" }}>
 <AgGridReact
   rowData={paginated}
@@ -491,10 +508,12 @@ return (
   defaultColDef={{
     resizable: true,
     minWidth: 90,
+    unSortIcon: true,
   }}
   animateRows={true}
   suppressMovableColumns={true}
   domLayout="autoHeight"
+  rowHeight={60}
   onGridReady={(params) => params.api.sizeColumnsToFit()}
   onFirstDataRendered={(params) => params.api.sizeColumnsToFit()}
 />
@@ -585,10 +604,19 @@ return (
         </div>
       )}
 
-      {/* Bold Headers */}
+      {/* Bold Headers + Sort Affordance */}
       <style>{`
         .ag-theme-quartz {
           --ag-header-font-weight: 700;
+        }
+        .ag-theme-quartz .ag-header-cell-sortable .ag-sort-none-icon {
+          opacity: 0.35;
+        }
+        .ag-theme-quartz .ag-header-cell-sortable:hover .ag-sort-none-icon {
+          opacity: 0.6;
+        }
+        .ag-theme-quartz .ag-header-cell-sortable:hover {
+          background-color: rgba(0, 0, 0, 0.04);
         }
       `}</style>
 

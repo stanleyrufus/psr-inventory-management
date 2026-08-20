@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Title, Card, Button, TextInput, Badge } from "@tremor/react";
+import { Badge } from "@tremor/react";
 import { apiRaw as api, fetchPurchaseOrdersReport } from "../../utils/api";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 
-// ✅ AG Grid (Alpine theme like Low Stock)
+// AG Grid
 import { ModuleRegistry } from "ag-grid-community";
 import { AllCommunityModule } from "ag-grid-community";
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 import { AgGridReact } from "ag-grid-react";
 import "ag-grid-community/styles/ag-grid.css";
-import "ag-grid-community/styles/ag-theme-alpine.css";
+import "ag-grid-community/styles/ag-theme-quartz.css";
 
+// Exports
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -58,7 +59,7 @@ export default function PurchaseOrderReport() {
   const [drawer, setDrawer] = useState({ open: false, po: null });
   const isRowMaster = (d) => Array.isArray(d.items) && d.items.length > 0;
 
-  // ✅ Columns
+  // Columns
   const columnDefs = useMemo(
     () => [
       {
@@ -154,7 +155,7 @@ export default function PurchaseOrderReport() {
     []
   );
 
-  // ✅ Master/Detail config
+  // Master/Detail config
   const detailCellRendererParams = useMemo(
     () => ({
       detailGridOptions: {
@@ -209,7 +210,7 @@ export default function PurchaseOrderReport() {
     []
   );
 
-  // ✅ Combined client-side filters
+  // Combined client-side filters
   const filteredRows = rows.filter((r) => {
     const orderDate = r.order_date ? new Date(r.order_date) : null;
     const matchesSearch =
@@ -227,15 +228,7 @@ export default function PurchaseOrderReport() {
     return matchesSearch && matchesVendor && matchesStatus && matchesDate;
   });
 
-  // ✅ Compact grid styling
-  const gridStyle = {
-    width: "100%",
-    "--ag-font-size": "13px",
-    "--ag-row-height": "30px",
-    "--ag-line-height": "28px",
-  };
-
-  // ✅ Export CSV / XLSX / PDF
+  // Export CSV / XLSX / PDF
   const exportCSV = () => {
     gridRef.current?.api?.exportDataAsCsv({ fileName: "po_report.csv" });
   };
@@ -296,33 +289,67 @@ export default function PurchaseOrderReport() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 md:p-6 lg:p-8">
+
+      <style>{`
+        .ag-theme-quartz { --ag-font-size: 13px; --ag-row-height: 36px; }
+        .ag-theme-quartz .ag-header-cell-text { font-weight: 700 !important; }
+        .ag-theme-quartz .ag-cell { display: flex; align-items: center; padding: 0 8px; }
+      `}</style>
+
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <Title className="text-2xl font-bold">Purchase Order Report</Title>
-          <p className="text-gray-600 text-sm">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+            Purchase Order Report
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
             Analyze purchase history, filter, and export
           </p>
         </div>
-        <Button variant="secondary" onClick={() => navigate("/reports")}>
-          ← Back to Reports
-        </Button>
+        <div className="flex flex-wrap items-center justify-end gap-2 md:gap-3">
+          <button
+            onClick={exportCSV}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors whitespace-nowrap"
+          >
+            Export CSV
+          </button>
+          <button
+            onClick={exportXLSX}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors whitespace-nowrap"
+          >
+            Export XLSX
+          </button>
+          <button
+            onClick={exportPDF}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors whitespace-nowrap"
+          >
+            Export PDF
+          </button>
+          <button
+            onClick={() => navigate("/reports")}
+            className="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors whitespace-nowrap"
+          >
+            ← Back to Reports
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
-      <Card className="p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <TextInput
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 md:p-4 mb-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+          <input
+            type="text"
             placeholder="Search PO # / vendor / notes…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-72"
+            className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm w-full"
           />
+
           <select
             value={vendorId}
             onChange={(e) => setVendorId(e.target.value)}
-            className="border rounded-md text-sm px-2 py-2 bg-white"
+            className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm w-full"
           >
             <option value="">All Vendors</option>
             {vendors.map((v) => (
@@ -335,7 +362,7 @@ export default function PurchaseOrderReport() {
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="border rounded-md text-sm px-2 py-2 bg-white"
+            className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm w-full"
           >
             <option value="">All Statuses</option>
             {STATUS_OPTIONS.map((s) => (
@@ -349,52 +376,36 @@ export default function PurchaseOrderReport() {
             type="date"
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
-            className="border rounded px-2 py-2 text-sm"
+            className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm w-full"
           />
-          <span className="text-gray-600 text-sm">to</span>
           <input
             type="date"
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
-            className="border rounded px-2 py-2 text-sm"
+            className="border border-gray-300 rounded-lg bg-white shadow-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors text-sm w-full"
           />
-
-          <div className="grow" />
-          <Button variant="secondary" onClick={exportCSV}>
-            Export CSV
-          </Button>
-          <Button variant="secondary" onClick={exportXLSX}>
-            Export XLSX
-          </Button>
-          <Button variant="secondary" onClick={exportPDF}>
-            Export PDF
-          </Button>
         </div>
-      </Card>
+      </div>
 
       {/* AG Grid */}
-      <Card className="p-0">
-        <div className="ag-theme-alpine" style={gridStyle}>
-          <AgGridReact
-theme="legacy"
-
-            ref={gridRef}
-            rowData={filteredRows}
-            columnDefs={columnDefs}
-            defaultColDef={{
-              resizable: true,
-              wrapText: false,
-              autoHeight: false,
-            }}
-            animateRows
-            masterDetail
-            suppressMasterDetailAutoColumn={true}
-            isRowMaster={isRowMaster}
-            detailCellRendererParams={detailCellRendererParams}
-            domLayout="autoHeight"
-          />
-        </div>
-      </Card>
+      <div className="ag-theme-quartz bg-white rounded-xl shadow-sm border border-gray-100 p-3 md:p-5" style={{ width: "100%" }}>
+        <AgGridReact
+          ref={gridRef}
+          rowData={filteredRows}
+          columnDefs={columnDefs}
+          defaultColDef={{
+            resizable: true,
+            wrapText: false,
+            autoHeight: false,
+          }}
+          animateRows
+          masterDetail
+          suppressMasterDetailAutoColumn={true}
+          isRowMaster={isRowMaster}
+          detailCellRendererParams={detailCellRendererParams}
+          domLayout="autoHeight"
+        />
+      </div>
 
       {/* Drawer */}
       {drawer.open && (
@@ -413,12 +424,12 @@ theme="legacy"
                   {drawer.po.vendor_name}
                 </p>
               </div>
-              <Button
-                variant="secondary"
+              <button
                 onClick={() => setDrawer({ open: false, po: null })}
+                className="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors"
               >
                 Close
-              </Button>
+              </button>
             </div>
 
             <div className="space-y-2 text-sm">

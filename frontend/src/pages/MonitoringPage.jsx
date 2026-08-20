@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiRaw as api } from "../utils/api";
 
 function text(value, fallback = "—") {
@@ -23,7 +24,7 @@ function statusBadge(level) {
 
   if (v === "critical" || v === "down") {
     return (
-      <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200 shadow-sm">
+      <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
         Critical
       </span>
     );
@@ -31,20 +32,21 @@ function statusBadge(level) {
 
   if (v === "warning") {
     return (
-      <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200 shadow-sm">
+      <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200">
         Warning
       </span>
     );
   }
 
   return (
-    <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200 shadow-sm">
+    <span className="inline-flex px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
       Healthy
     </span>
   );
 }
 
 export default function MonitoringPage() {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -109,35 +111,56 @@ export default function MonitoringPage() {
       : "System operating normally";
 
   if (loading && !data) {
-    return <div className="p-6 text-gray-600">Loading system health...</div>;
+    return (
+      <div className="p-4 md:p-6 lg:p-8">
+        <p className="text-gray-600">Loading system health...</p>
+      </div>
+    );
   }
 
   if (error && !data) {
-    return <div className="p-6 text-red-600">{error}</div>;
+    return (
+      <div className="p-4 md:p-6 lg:p-8">
+        <p className="text-red-600">{error}</p>
+      </div>
+    );
   }
 
   return (
-    <div className="p-8 space-y-8 bg-gradient-to-b from-slate-50 to-slate-100 min-h-screen">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="p-4 md:p-6 lg:p-8 space-y-6">
+
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-            🩺 System Health
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+            System Health
           </h1>
-          <p className="text-sm text-slate-600 mt-2 max-w-2xl">
-            Monitor API, database, server performance, web traffic, and business-level alerts.
+          <p className="text-gray-500 text-sm mt-1">
+            Monitor API, database, server performance, web traffic, and
+            business-level alerts.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={load}
-          className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md"
-        >
-          🔄 Refresh
-        </button>
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
+          <button
+            type="button"
+            onClick={load}
+            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium shadow-sm"
+          >
+            Refresh
+          </button>
+
+          <button
+            onClick={() => navigate("/settings")}
+            className="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors whitespace-nowrap"
+          >
+            ← Back to Settings
+          </button>
+        </div>
       </div>
 
-      <div className={`rounded-2xl border px-5 py-4 shadow-md ${bannerClass}`}>
+      {/* Status Banner */}
+      <div className={`rounded-xl border px-5 py-4 shadow-sm ${bannerClass}`}>
         <div className="font-semibold text-lg">{bannerText}</div>
         <div className="text-sm opacity-80 mt-1">
           Updated:{" "}
@@ -145,128 +168,131 @@ export default function MonitoringPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border bg-white shadow-md p-6">
-        <h2 className="text-lg font-semibold text-slate-900 mb-5">
-          ⚙️ Technical System Health
+      {/* Technical System Health */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <h2 className="text-lg font-semibold text-gray-900 mb-5">
+          Technical System Health
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 text-sm">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">
-              API Status •
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+              API Status
             </div>
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-slate-900">
+              <span className="font-semibold text-gray-900">
                 {text(system.apiStatus)}
               </span>
               {statusBadge(system.level)}
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">
-              Database Status •
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+              Database Status
             </div>
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-slate-900">
+              <span className="font-semibold text-gray-900">
                 {text(system.dbStatus)}
               </span>
               {statusBadge(system.dbStatus)}
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">
-              DB Latency ⏱
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+              DB Latency
             </div>
-            <div className="font-semibold text-slate-900">
+            <div className="font-semibold text-gray-900">
               {text(system.dbLatencyMs)} ms
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">
-              API Latency ⏱
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+              API Latency
             </div>
-            <div className="font-semibold text-slate-900">
+            <div className="font-semibold text-gray-900">
               {text(system.apiLatencyMs)} ms
             </div>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-5 shadow-sm">
-          <div className="text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">
-            CPU Load ⚡
+      {/* Metric Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+            CPU Load
           </div>
-          <div className="text-4xl font-bold tracking-tight text-slate-900">
+          <div className="text-3xl font-bold tracking-tight text-gray-900">
             {numberValue(system.nodeCpu, 0).toFixed(2)}
           </div>
-          <div className="mt-1 text-xs text-slate-500">1-minute average</div>
+          <div className="mt-1 text-xs text-gray-500">1-minute average</div>
         </div>
 
-        <div className="rounded-2xl border border-purple-200 bg-purple-50/40 p-5 shadow-sm">
-          <div className="text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">
-            Memory Usage 🧠
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+            Memory Usage
           </div>
-          <div className="text-4xl font-bold tracking-tight text-slate-900">
+          <div className="text-3xl font-bold tracking-tight text-gray-900">
             {text(system.nodeMemory)} MB
           </div>
-          <div className="mt-1 text-xs text-slate-500">Node process RSS</div>
+          <div className="mt-1 text-xs text-gray-500">Node process RSS</div>
         </div>
 
-        <div className="rounded-2xl border border-green-200 bg-green-50/40 p-5 shadow-sm">
-          <div className="text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">
-            Uptime ⏳
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+            Uptime
           </div>
-          <div className="text-4xl font-bold tracking-tight text-slate-900">
+          <div className="text-3xl font-bold tracking-tight text-gray-900">
             {uptime}
           </div>
-          <div className="mt-1 text-xs text-slate-500">Since backend start</div>
+          <div className="mt-1 text-xs text-gray-500">Since backend start</div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-5 shadow-sm">
-          <div className="text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">
-            Requests / Minute 📈
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <div className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+            Requests / Minute
           </div>
-          <div className="text-4xl font-bold tracking-tight text-slate-900">
+          <div className="text-3xl font-bold tracking-tight text-gray-900">
             {text(system?.nginx?.recentRequests ?? 0)}
           </div>
-          <div className="mt-1 text-xs text-slate-500">Recent web traffic</div>
+          <div className="mt-1 text-xs text-gray-500">Recent web traffic</div>
         </div>
       </div>
 
+      {/* Web Traffic + Business Health */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <div className="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-6 shadow-md">
-          <h2 className="text-lg font-semibold text-slate-900 mb-5">
-            🌐 Web Traffic (Last 1 Minute)
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h2 className="text-lg font-semibold text-gray-900 mb-5">
+            Web Traffic (Last 1 Minute)
           </h2>
 
           <div className="grid grid-cols-3 gap-5 text-sm">
-            <div className="rounded-xl bg-white border border-slate-200 p-4">
-              <div className="text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">
+            <div className="rounded-xl bg-gray-50 border border-gray-200 p-4">
+              <div className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
                 Requests
               </div>
-              <div className="text-3xl font-bold tracking-tight text-slate-900 mt-1">
+              <div className="text-2xl font-bold tracking-tight text-gray-900 mt-1">
                 {text(system?.nginx?.recentRequests ?? 0)}
               </div>
             </div>
 
-            <div className="rounded-xl bg-white border border-yellow-200 p-4">
-              <div className="text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">
+            <div className="rounded-xl bg-gray-50 border border-yellow-200 p-4">
+              <div className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
                 4xx Errors
               </div>
-              <div className="text-3xl font-bold tracking-tight text-yellow-700 mt-1">
+              <div className="text-2xl font-bold tracking-tight text-yellow-700 mt-1">
                 {text(system?.nginx?.status4xx ?? 0)}
               </div>
             </div>
 
-            <div className="rounded-xl bg-white border border-red-200 p-4">
-              <div className="text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">
+            <div className="rounded-xl bg-gray-50 border border-red-200 p-4">
+              <div className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
                 5xx Errors
               </div>
-              <div className="text-3xl font-bold tracking-tight text-red-700 mt-1">
+              <div className="text-2xl font-bold tracking-tight text-red-700 mt-1">
                 {text(system?.nginx?.status5xx ?? 0)}
               </div>
             </div>
@@ -274,51 +300,51 @@ export default function MonitoringPage() {
         </div>
 
         <div
-          className={`rounded-2xl border p-5 shadow-sm ${
+          className={`rounded-xl border p-5 shadow-sm ${
             businessLevel === "critical"
-              ? "border-red-200 bg-red-50/30"
+              ? "border-red-200 bg-red-50"
               : businessLevel === "warning"
-              ? "border-yellow-200 bg-yellow-50/30"
-              : "border-green-200 bg-green-50/30"
+              ? "border-yellow-200 bg-yellow-50"
+              : "border-green-200 bg-green-50"
           }`}
         >
-          <h2 className="text-lg font-semibold text-slate-900 mb-5">
-            📦 Business Health
+          <h2 className="text-lg font-semibold text-gray-900 mb-5">
+            Business Health
           </h2>
 
           <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-            <div className="rounded-xl bg-white border border-slate-200 p-4">
-              <div className="text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">
-                Low Stock Parts 📉
+            <div className="rounded-xl bg-white border border-gray-200 p-4">
+              <div className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+                Low Stock Parts
               </div>
-              <div className="text-3xl font-bold tracking-tight text-slate-900 mt-1">
+              <div className="text-2xl font-bold tracking-tight text-gray-900 mt-1">
                 {text(business.lowStockCount ?? 0)}
               </div>
             </div>
 
-            <div className="rounded-xl bg-white border border-slate-200 p-4">
-              <div className="text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">
-                Pending POs 📝
+            <div className="rounded-xl bg-white border border-gray-200 p-4">
+              <div className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+                Pending POs
               </div>
-              <div className="text-3xl font-bold tracking-tight text-slate-900 mt-1">
+              <div className="text-2xl font-bold tracking-tight text-gray-900 mt-1">
                 {text(business.pendingPoCount ?? 0)}
               </div>
             </div>
 
-            <div className="rounded-xl bg-white border border-slate-200 p-4">
-              <div className="text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">
-                Stale POs ⏰
+            <div className="rounded-xl bg-white border border-gray-200 p-4">
+              <div className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+                Stale POs
               </div>
-              <div className="text-3xl font-bold tracking-tight text-slate-900 mt-1">
+              <div className="text-2xl font-bold tracking-tight text-gray-900 mt-1">
                 {text(business.stalePoCount ?? 0)}
               </div>
             </div>
 
-            <div className="rounded-xl bg-white border border-slate-200 p-4">
-              <div className="text-sm font-semibold text-slate-600 mb-2 uppercase tracking-wide">
-                Vendor Alerts 🚚
+            <div className="rounded-xl bg-white border border-gray-200 p-4">
+              <div className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+                Vendor Alerts
               </div>
-              <div className="text-3xl font-bold tracking-tight text-slate-900 mt-1">
+              <div className="text-2xl font-bold tracking-tight text-gray-900 mt-1">
                 {text(business.staleVendorRecordsCount ?? 0)}
               </div>
             </div>
@@ -329,14 +355,14 @@ export default function MonitoringPage() {
               messages.map((msg, idx) => (
                 <div
                   key={idx}
-                  className="rounded-xl bg-white border border-slate-200 px-4 py-3 text-sm text-slate-800 shadow-sm"
+                  className="rounded-xl bg-white border border-gray-200 px-4 py-3 text-sm text-gray-800 shadow-sm"
                 >
                   {msg}
                 </div>
               ))
             ) : (
-              <div className="rounded-xl bg-white border border-slate-200 px-4 py-3 text-sm text-slate-500 shadow-sm">
-                ✅ No business alerts.
+              <div className="rounded-xl bg-white border border-gray-200 px-4 py-3 text-sm text-gray-500">
+                No business alerts.
               </div>
             )}
           </div>
