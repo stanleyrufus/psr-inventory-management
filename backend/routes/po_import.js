@@ -258,15 +258,15 @@ function normalizePartNumber(value) {
 }
 
 async function ensurePart(trx, line, meta = {}) {
-  const pn = derivePartNumber(line);
+  const pn = derivePartNumber(line).slice(0, 255);
 if (!pn) {
   const err = new Error("Line item missing partNumber");
   err.debugLine = line;
   throw err;
 }
   const normalizedPn = normalizePartNumber(pn);
-  const incomingPartName = String(line.partName || line.description || "").trim();
-  const incomingDescription = String(line.description || "").trim();
+  const incomingPartName = String(line.partName || line.description || "").trim().slice(0, 255);
+  const incomingDescription = String(line.description || "").trim().slice(0, 255);
 
   const parsedUnitPrice =
     line.unitPrice === null ||
